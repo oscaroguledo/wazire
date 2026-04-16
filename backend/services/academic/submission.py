@@ -10,7 +10,7 @@ from uuid import UUID
 from sqlalchemy import select, func, exists
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.database import get_session_factory
+
 from services.analytics.dashboard import refresh_dashboard_bg, refresh_multiple_dashboards_bg
 
 from models.academic.submission import Submission as SubmissionModel, SubmissionAttempt as SubmissionAttemptModel
@@ -372,11 +372,13 @@ class SubmissionService:
         return total_score.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP), graded_answers
 
     # ------------------------------------------------------------------
-    # Background task methods (run via FastAPI BackgroundTasks)
+    # Background helpers (run by Celery tasks)
     # ------------------------------------------------------------------
 
     async def grade_attempt_background(self, attempt_id: str, exam_id: str) -> None:
-        """Grade an attempt in the background using FastAPI BackgroundTasks."""
+        """Grade an attempt in the background (used by Celery tasks)."""
+        from core.database import get_session_factory
+
         AsyncSessionLocal = get_session_factory()
         async with AsyncSessionLocal() as db:
             attempt = (await db.execute(

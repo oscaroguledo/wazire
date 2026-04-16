@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import List, Optional
 import uuid
 
-from fastapi import APIRouter, Depends, Request, status, BackgroundTasks
+from fastapi import APIRouter, Depends, Request, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +12,7 @@ from core.utils.response import Response
 from core.utils.token import TokenService
 from core.dependencies.common import get_token_service, lecturer_or_admin_dep, authenticated_dep
 from services.academic.question import QuestionService
+from tasks.question_tasks import detect_answer_task, parse_and_create_task
 from services.engine.exam_extractor import ExamParser
 from schemas.academic.question import (
     QuestionCreate,
@@ -36,7 +37,6 @@ class ExamUpload(BaseModel):
 async def create_question(
     question_in: QuestionCreate,
     request: Request,
-    background_tasks: BackgroundTasks,
     current_user: UserRead = lecturer_or_admin_dep,
     db: AsyncSession = Depends(get_db),
 ):
@@ -56,10 +56,8 @@ async def create_question(
         q = await service.create(question_in, tenant_id=tenant_id)
         # If MCQ with no answer provided, detect it in the background
         if q.qtype == "multiple_choice" and not q.answer_id:
-            background_tasks.add_task(
-                service.detect_answer_background,
-                str(q.id)
-            )
+            # Enqueue MCQ answer detection to Celery worker
+            detect_answer_task.delay(str(q.id))
         return Response(success=True, message="Question created", data=q.to_dict(), request=request, status_code=status.HTTP_201_CREATED)
     except ValueError as e:
         return Response(success=False, error=str(e), request=request, status_code=status.HTTP_400_BAD_REQUEST)
@@ -167,7 +165,6 @@ async def delete_question(
 async def upload_exam_paper(
     body: ExamUpload,
     request: Request,
-    background_tasks: BackgroundTasks,
     current_user: UserRead = lecturer_or_admin_dep,
     db: AsyncSession = Depends(get_db),
 ):
@@ -183,15 +180,8 @@ async def upload_exam_paper(
 
     tenant_id = None if current_user.role == "admin" else str(current_user.tenant_id)
 
-    # Parse exam paper and create questions in background
-    background_tasks.add_task(
-        service.parse_and_create_background,
-        body.pages,
-        body.industry.value,
-        str(body.exam_id),
-        body.mark_per_question,
-        tenant_id,
-    )
+    # Enqueue exam parsing and question-creation to Celery worker
+    parse_and_create_task.delay(body.pages, body.industry.value, str(body.exam_id), body.mark_per_question, tenant_id)
 
     return Response(
         success=True,

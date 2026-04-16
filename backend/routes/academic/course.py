@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from fastapi import APIRouter, Depends, status, Request, BackgroundTasks
+from fastapi import APIRouter, Depends, status, Request
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,7 +10,7 @@ from core.utils.response import Response
 from core.utils.token import TokenService
 from core.dependencies.common import get_token_service, lecturer_or_admin_dep, authenticated_dep
 from services.academic.course import CourseService
-from services.analytics.dashboard import refresh_dashboard_bg_sync
+from tasks.submission_tasks import refresh_dashboard_task
 from schemas.academic.course import CourseCreate, CourseUpdate
 from schemas.account.users import UserRead
 
@@ -21,7 +21,6 @@ router = APIRouter(prefix="/courses", tags=["courses"])
 async def create_course(
     course_in: CourseCreate,
     request: Request,
-    background_tasks: BackgroundTasks,
     current_user: UserRead = lecturer_or_admin_dep,
     db: AsyncSession = Depends(get_db),
 ):
@@ -49,9 +48,9 @@ async def create_course(
 
     course = await service.create(course_data, tenant_id=tenant_id)
     
-    # Refresh lecturer dashboard in background
+    # Refresh lecturer dashboard in background (enqueue Celery task)
     if course.lecturer_id:
-        background_tasks.add_task(refresh_dashboard_bg_sync, course.lecturer_id)
+        refresh_dashboard_task.delay(str(course.lecturer_id))
     
     return Response(success=True, message="Course created", data=course.to_dict(), request=request, status_code=status.HTTP_201_CREATED)
 
@@ -120,7 +119,6 @@ async def update_course(
     course_id: uuid.UUID,
     course_in: CourseUpdate,
     request: Request,
-    background_tasks: BackgroundTasks,
     current_user: UserRead = lecturer_or_admin_dep,
     db: AsyncSession = Depends(get_db),
 ):
@@ -135,11 +133,11 @@ async def update_course(
     
     updated = await service.update(course_model, course_in)
     
-    # Refresh dashboards in background
+    # Refresh dashboards in background (enqueue Celery tasks)
     if old_lecturer_id and old_lecturer_id != updated.lecturer_id:
-        background_tasks.add_task(refresh_dashboard_bg_sync, old_lecturer_id)
+        refresh_dashboard_task.delay(str(old_lecturer_id))
     if updated.lecturer_id:
-        background_tasks.add_task(refresh_dashboard_bg_sync, updated.lecturer_id)
+        refresh_dashboard_task.delay(str(updated.lecturer_id))
     
     return Response(success=True, message="Course updated", data=updated.to_dict(), request=request)
 
@@ -148,7 +146,6 @@ async def update_course(
 async def delete_course(
     course_id: uuid.UUID,
     request: Request,
-    background_tasks: BackgroundTasks,
     current_user: UserRead = lecturer_or_admin_dep,
     db: AsyncSession = Depends(get_db),
 ):
@@ -163,8 +160,8 @@ async def delete_course(
     
     await service.delete(course_model)
     
-    # Refresh lecturer dashboard in background
+    # Refresh lecturer dashboard in background (enqueue Celery task)
     if lecturer_id:
-        background_tasks.add_task(refresh_dashboard_bg_sync, lecturer_id)
+        refresh_dashboard_task.delay(str(lecturer_id))
     
     return Response(success=True, message="Course deleted", request=request, status_code=status.HTTP_204_NO_CONTENT)

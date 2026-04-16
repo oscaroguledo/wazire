@@ -536,23 +536,20 @@ class DashboardService:
 
 
 # ---------------------------------------------------------------------------
-# Background task helpers for FastAPI BackgroundTasks
+# Background task helpers (run by Celery)
 # ---------------------------------------------------------------------------
 
 async def refresh_dashboard_bg(user_id: uuid.UUID) -> None:
     """Background task to refresh a user's dashboard.
     
-    Usage in routes:
-        from fastapi import BackgroundTasks
-        from services.analytics.dashboard import refresh_dashboard_bg
-        
+    Usage in routes (prefer Celery):
+        from tasks.submission_tasks import refresh_dashboard_task
+
         @router.post("/some-endpoint")
-        async def some_endpoint(
-            background_tasks: BackgroundTasks,
-            ...
-        ):
+        async def some_endpoint(...):
             # ... do work ...
-            background_tasks.add_task(refresh_dashboard_bg, user_id)
+            # enqueue refresh to Celery worker
+            refresh_dashboard_task.delay(str(user_id))
     """
     from core.database import get_session_factory
     
@@ -576,7 +573,7 @@ async def refresh_dashboard_bg(user_id: uuid.UUID) -> None:
 
 
 def refresh_dashboard_bg_sync(user_id: uuid.UUID) -> None:
-    """Sync wrapper for refresh_dashboard_bg to use with FastAPI BackgroundTasks."""
+    """Sync wrapper for refresh_dashboard_bg (kept for compatibility). Prefer Celery tasks."""
     import asyncio
     
     # Create a new event loop and run the async function

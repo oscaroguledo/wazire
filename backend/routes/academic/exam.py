@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from decimal import Decimal
 from typing import Optional
-from fastapi import APIRouter, Depends, status, Request, Response as FastAPIResponse, BackgroundTasks
+from fastapi import APIRouter, Depends, status, Request, Response as FastAPIResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -12,7 +12,7 @@ from core.utils.response import Response
 from core.utils.token import TokenService
 from core.dependencies.common import get_token_service, lecturer_or_admin_dep, authenticated_dep
 from services.academic.exam import ExamService
-from services.analytics.dashboard import refresh_dashboard_bg_sync
+from tasks.submission_tasks import refresh_dashboard_task
 from schemas.academic.exam import ExamCreate, ExamUpdate
 from schemas.account.users import UserRead
 from models.academic.course import Course
@@ -29,7 +29,6 @@ def _tenant(user: UserRead):
 async def create_exam(
     exam_in: ExamCreate,
     request: Request,
-    background_tasks: BackgroundTasks,
     current_user: UserRead = lecturer_or_admin_dep,
     db: AsyncSession = Depends(get_db),
 ):
@@ -55,7 +54,7 @@ async def create_exam(
         course_result = await service.db.execute(course_stmt)
         course = course_result.scalar_one_or_none()
         if course and course.lecturer_id:
-            background_tasks.add_task(refresh_dashboard_bg_sync, course.lecturer_id)
+            refresh_dashboard_task.delay(str(course.lecturer_id))
 
     return Response(success=True, message="Exam created", data=exam.to_dict(), request=request, status_code=status.HTTP_201_CREATED)
 
@@ -179,7 +178,6 @@ async def update_exam(
     exam_id: uuid.UUID,
     exam_in: ExamUpdate,
     request: Request,
-    background_tasks: BackgroundTasks,
     current_user: UserRead = lecturer_or_admin_dep,
     db: AsyncSession = Depends(get_db),
 ):
@@ -252,13 +250,13 @@ async def update_exam(
         old_course_result = await service.db.execute(old_course_stmt)
         old_course = old_course_result.scalar_one_or_none()
         if old_course and old_course.lecturer_id:
-            background_tasks.add_task(refresh_dashboard_bg_sync, old_course.lecturer_id)
+            refresh_dashboard_task.delay(str(old_course.lecturer_id))
     if updated.course_id:
         new_course_stmt = select(Course).where(Course.id == updated.course_id)
         new_course_result = await service.db.execute(new_course_stmt)
         new_course = new_course_result.scalar_one_or_none()
         if new_course and new_course.lecturer_id:
-            background_tasks.add_task(refresh_dashboard_bg_sync, new_course.lecturer_id)
+            refresh_dashboard_task.delay(str(new_course.lecturer_id))
 
     return Response(success=True, message="Exam updated", data=updated.to_dict(), request=request)
 
@@ -267,7 +265,6 @@ async def update_exam(
 async def delete_exam(
     exam_id: uuid.UUID,
     request: Request,
-    background_tasks: BackgroundTasks,
     current_user: UserRead = lecturer_or_admin_dep,
     db: AsyncSession = Depends(get_db),
 ):
@@ -287,6 +284,6 @@ async def delete_exam(
         course_result = await service.db.execute(course_stmt)
         course = course_result.scalar_one_or_none()
         if course and course.lecturer_id:
-            background_tasks.add_task(refresh_dashboard_bg_sync, course.lecturer_id)
+            refresh_dashboard_task.delay(str(course.lecturer_id))
     
     return Response(success=True, message="Exam deleted", request=request, status_code=status.HTTP_204_NO_CONTENT)

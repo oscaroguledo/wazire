@@ -5,24 +5,14 @@ from .exam_extractor import ExamParser
 from .answer_sheet_extractor import AnswerSheetParser
 from .answer_grader import QuestionAnswerer
 from .similarity_grader import SimilarityGrader
-from .scheduler import (
-    TaskScheduler,
-    ScheduledTask,
-    get_scheduler,
-    start_scheduler,
-    update_exam_statuses,
-    run_exam_update_now,
-)
 
+# Note: the in-process scheduler was removed in favor of Celery + Celery Beat.
+# Keep engine exports for the core helpers; heavy scheduler logic was migrated
+# into Celery tasks (see `backend/tasks/scheduler_tasks.py`).
 __all__ = [
     "GroqEngineBase",
     "ExamParser",
     "AnswerSheetParser",
     "QuestionAnswerer",
     "SimilarityGrader",
-    "TaskScheduler",
-    "ScheduledTask",
-    "get_scheduler",
-    "start_scheduler",
-    "run_exam_update_now",
 ]

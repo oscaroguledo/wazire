@@ -13,7 +13,6 @@ from models.academic.question import Question as QuestionModel, Answer as Answer
 from models.academic.exam import Exam as ExamModel
 from schemas.academic.question import QuestionCreate, QuestionUpdate
 from services.engine.exam_extractor import ExamParser
-from core.database import get_session_factory
 from core.websockets import notify_exam_update
 
 class QuestionService:
@@ -425,7 +424,7 @@ class QuestionService:
         return int(res.scalar_one())
 
     # ---------------------------------------------------------------------------
-    # Background task methods (run via FastAPI BackgroundTasks)
+    # Background helpers (run by Celery tasks)
     # ---------------------------------------------------------------------------
 
     async def detect_answer_background(self, question_id: str) -> None:

@@ -11,13 +11,22 @@ This module provides intelligent question answering capabilities with:
 """
 
 import base64
-import pandas as pd
 import json
+import os
+import sys
+import csv
 from decimal import Decimal, ROUND_HALF_UP
 from typing import List, Dict, Any, Union, Optional
 
 from core.config import get_settings
 from models.academic.question import AnswerEnum
+
+# Make pandas optional so the module can be imported in environments
+# where pandas is not installed (e.g. minimal API containers).
+try:
+    import pandas as pd
+except Exception:
+    pd = None
 
 # Try importing the Groq client from known locations and provide
 # helpful fallback/error messages when it's not available.
@@ -98,12 +107,19 @@ class QuestionAnswerer:
 
         # Normalize options to avoid pandas NaN (float) or other unexpected types.
         # Acceptable shapes: list, dict, JSON string, legacy labeled string. Fallback to empty list.
-        try:
-            if pd.isna(options):
+        # Normalize pandas NaN if pandas is available, otherwise
+        # handle common NaN float case (NaN != NaN) as a fallback.
+        if pd is not None:
+            try:
+                if pd.isna(options):
+                    options = []
+            except Exception:
+                # pd.isna may fail for some types; ignore and continue
+                pass
+        else:
+            # float('nan') is the common NaN representation; detect via x != x
+            if isinstance(options, float) and options != options:
                 options = []
-        except Exception:
-            # pd.isna may fail for some types; ignore and continue
-            pass
 
         if isinstance(options, str):
             s = options.strip()
@@ -394,18 +410,30 @@ def process_csv_to_dict_list(csv_file: str) -> List[Dict[str, Any]]:
     Returns:
         List of dictionaries representing rows
     """
-    try:
-        df = pd.read_csv(csv_file)
-        return df.to_dict("records")
-    except FileNotFoundError:
-        print(f"❌ Error: File '{csv_file}' not found.")
-        return []
-    except pd.errors.EmptyDataError:
-        print(f"❌ Error: File '{csv_file}' is empty or invalid.")
-        return []
-    except Exception as e:
-        print(f"❌ Error reading '{csv_file}': {e}")
-        return []
+    # Prefer pandas when available for robust CSV parsing. If pandas is
+    # not installed, fall back to the standard library `csv` module.
+    if pd is not None:
+        try:
+            df = pd.read_csv(csv_file)
+            return df.to_dict("records")
+        except FileNotFoundError:
+            print(f"❌ Error: File '{csv_file}' not found.")
+            return []
+        except Exception as e:
+            # pandas can raise a variety of errors (including EmptyDataError)
+            print(f"❌ Error reading '{csv_file}' with pandas: {e}")
+            return []
+    else:
+        try:
+            with open(csv_file, newline='', encoding='utf-8') as fh:
+                reader = csv.DictReader(fh)
+                return [dict(row) for row in reader]
+        except FileNotFoundError:
+            print(f"❌ Error: File '{csv_file}' not found.")
+            return []
+        except Exception as e:
+            print(f"❌ Error reading '{csv_file}': {e}")
+            return []
 
 def main() -> None:
     """
@@ -413,24 +441,44 @@ def main() -> None:
     """
     # Parse command line arguments
     input_file = "questions.csv"
-    # red the questions
+
+    # Read the questions
     questions = process_csv_to_dict_list(input_file)
     if not questions:
         sys.exit(1)
 
-    # Create answerer and process   
+    # Create answerer and process
     answerer = QuestionAnswerer()
     results = answerer.process(questions)
     if not results:
         sys.exit(1)
 
-    # Convert results back to DataFrame and save
-    df_results = pd.DataFrame(results)
-    
     # Select columns for output
     output_cols = ["id", "question", "topic", "answer", "confidence", "key_points", "word_count"]
-    df_results[output_cols].to_csv("answer.csv", index=False)
-    
+
+    # Write results using pandas when available, otherwise use csv
+    if pd is not None:
+        try:
+            df_results = pd.DataFrame(results)
+            df_results[output_cols].to_csv("answer.csv", index=False)
+        except Exception as e:
+            print(f"❌ Error writing results with pandas: {e}")
+            sys.exit(1)
+    else:
+        try:
+            with open("answer.csv", "w", newline='', encoding='utf-8') as fh:
+                writer = csv.DictWriter(fh, fieldnames=output_cols)
+                writer.writeheader()
+                for row in results:
+                    out = {k: row.get(k, '') for k in output_cols}
+                    # Serialize key_points list if present
+                    if isinstance(out.get('key_points'), (list, tuple)):
+                        out['key_points'] = json.dumps(out['key_points'])
+                    writer.writerow(out)
+        except Exception as e:
+            print(f"❌ Error writing results to CSV: {e}")
+            sys.exit(1)
+
     print(f"✅ Done! Processed {len(results)} questions. Saved to answer.csv")
     
 

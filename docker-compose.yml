@@ -2,6 +2,7 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    container_name: postgres
     environment:
       POSTGRES_DB: wazire
       POSTGRES_USER: wazire
@@ -19,6 +20,7 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    container_name: redis
     ports:
       - "6379:6379"
     volumes:
@@ -33,10 +35,11 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    container_name: backend
     restart: unless-stopped
     env_file:
-      - ./backend/.env.example
-    command: sh -c "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000"
+      - ./backend/.env
+    # command: sh -c "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000"
     ports:
       - "8000:8000"
     volumes:
@@ -52,8 +55,9 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     restart: unless-stopped
+    container_name: celery-worker
     env_file:
-      - ./backend/.env.example
+      - ./backend/.env
     environment:
       - CELERY_WORKER_CONCURRENCY=1
     command: sh -c "celery -A celery_app.celery_app worker --loglevel=info --concurrency=${CELERY_WORKER_CONCURRENCY:-1}"
@@ -70,8 +74,9 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     restart: unless-stopped
+    container_name: celery-beat
     env_file:
-      - ./backend/.env.example
+      - ./backend/.env
     command: celery -A celery_app.celery_app beat --loglevel=info
     volumes:
       - ./backend:/app
@@ -86,6 +91,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     restart: unless-stopped
+    container_name: frontend
     environment:
       VITE_PROXY_TARGET: http://backend:8000
     ports:
@@ -93,8 +99,7 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
-    depends_on:
-      - backend
+    
 
 volumes:
   postgres_data:

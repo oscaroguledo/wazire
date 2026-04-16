@@ -3,13 +3,14 @@
 Create test users, tenant, course, exam and questions for Wazire system
 """
 
+import os
 import requests
 import json
 import time
 from datetime import datetime, timedelta
 from decimal import Decimal
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
 
 def clear_database():
     """Clear all data from the database using direct SQL."""
@@ -25,7 +26,7 @@ def clear_database():
         from pathlib import Path
         env_path = Path(__file__).parent / ".env"
         load_dotenv(env_path)
-        db_url = os.getenv("DATABASE_URL")
+        db_url = "postgresql+asyncpg://wazire:wazire@postgres:5432/wazire"
         
         if not db_url:
             print("⚠️  DATABASE_URL not found in environment variables")

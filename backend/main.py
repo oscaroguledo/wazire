@@ -13,35 +13,28 @@ from core.utils.logger import logger
 from core.middleware.rate_limit import limiter, rate_limit_exceeded_handler
 from core.middleware.error_handler import setup_error_handlers
 from slowapi.errors import RateLimitExceeded
-from services.engine import start_scheduler
 
 settings = get_settings()
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-	scheduler = None
-	try:
-		if settings.USE_INTERNAL_SCHEDULER:
-			logger.info("Starting in-process scheduler...")
-			scheduler = await start_scheduler(default_interval=60)
-			logger.info("In-process scheduler started.")
-		else:
-			logger.info("In-process scheduler disabled (use Celery beat for scheduled jobs).")
-	except Exception as e:
-		logger.error(f"Startup failed: {e}")
-		raise
+# @asynccontextmanager
+# async def lifespan(app: FastAPI):
+# 	"""Application lifespan: perform startup and graceful shutdown tasks.
 
-	yield
+# 	This is an async context manager. It MUST `yield` to allow FastAPI to
+# 	enter the application runtime; failing to yield causes the
+# 	`'coroutine' object is not an async iterator` error.
+# 	"""
 
-	# Shutdown
-	if scheduler:
-		logger.info("Stopping scheduler...")
-		await scheduler.stop()
+# 	# Startup actions
+# 	logger.info("Wazire backend starting up...")
 
-	# Close database connections
-	logger.info("Closing database connections...")
-	await close_db()
-	logger.info("Wazire backend has been shut down.")
+# 	# Yield control to the application runtime
+# 	yield
+
+# 	# Shutdown actions
+# 	logger.info("Closing database connections...")
+# 	await close_db()
+# 	logger.info("Wazire backend has been shut down.")
 
 
 app = FastAPI(

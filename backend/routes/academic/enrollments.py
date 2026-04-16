@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List, Optional
@@ -14,7 +14,7 @@ from schemas.academic.enrollment import (
     BulkEnrollmentRequest, Semester
 )
 from services.academic.enrollment import EnrollmentService
-from services.analytics.dashboard import refresh_dashboard_bg_sync
+from tasks.submission_tasks import refresh_dashboard_task
 from core.database import get_db
 from core.dependencies.common import get_token_service, lecturer_or_admin_dep, authenticated_dep
 
@@ -143,7 +143,6 @@ async def get_enrollment(
 async def enroll_student(
     request: Request,
     enrollment_data: EnrollmentCreate,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = lecturer_or_admin_dep
 ):
@@ -172,11 +171,11 @@ async def enroll_student(
         course_result = await db.execute(course_stmt)
         course = course_result.scalar_one_or_none()
         
-        # Refresh student dashboard in background
-        background_tasks.add_task(refresh_dashboard_bg_sync, student_uuid)
-        # Refresh lecturer dashboard if course has a lecturer
+        # Refresh student dashboard in background (enqueue Celery task)
+        refresh_dashboard_task.delay(str(student_uuid))
+        # Refresh lecturer dashboard if course has a lecturer (enqueue Celery task)
         if course and course.lecturer_id:
-            background_tasks.add_task(refresh_dashboard_bg_sync, course.lecturer_id)
+            refresh_dashboard_task.delay(str(course.lecturer_id))
         
         return Response(success=True, data=enrollment.to_dict(), request=request, status_code=status.HTTP_201_CREATED)
     except ValueError as e:
@@ -244,7 +243,6 @@ async def update_enrollment(
 @router.delete("/{enrollment_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_enrollment(
     enrollment_id: uuid.UUID,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = lecturer_or_admin_dep
 ):
@@ -269,11 +267,11 @@ async def remove_enrollment(
         
         # Refresh dashboards in background
         if enrollment:
-            # Refresh student dashboard in background
-            background_tasks.add_task(refresh_dashboard_bg_sync, enrollment.student_id)
-            # Refresh lecturer dashboard in background
-            if enrollment.course and enrollment.course.lecturer_id:
-                background_tasks.add_task(refresh_dashboard_bg_sync, enrollment.course.lecturer_id)
+            # Refresh student dashboard in background (enqueue Celery task)
+                refresh_dashboard_task.delay(str(enrollment.student_id))
+                # Refresh lecturer dashboard in background (enqueue Celery task)
+                if enrollment.course and enrollment.course.lecturer_id:
+                    refresh_dashboard_task.delay(str(enrollment.course.lecturer_id))
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
