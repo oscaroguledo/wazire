@@ -6,6 +6,7 @@ from typing import Optional
 from celery.utils.log import get_task_logger
 
 from celery_app import celery_app
+from core.database import get_worker_db
 from services.academic.question import QuestionService
 
 logger = get_task_logger(__name__)
@@ -15,7 +16,12 @@ logger = get_task_logger(__name__)
 def detect_answer_task(question_id: str) -> dict:
     """Detect MCQ answer for a question (runs the existing async helper)."""
     try:
-        asyncio.run(QuestionService(None).detect_answer_background(question_id))
+        async def _run():
+            async with get_worker_db() as db:
+                svc = QuestionService(db)
+                await svc.detect_answer_background(question_id)
+
+        asyncio.run(_run())
         logger.info("Question answer detection enqueued/ran for %s", question_id)
         return {"detected": True, "question_id": question_id}
     except Exception as e:
@@ -27,7 +33,12 @@ def detect_answer_task(question_id: str) -> dict:
 def parse_and_create_task(pages: list, industry: str, exam_id: str, mark_per_question: Optional[float], tenant_id: Optional[str] = None) -> dict:
     """Parse exam pages and create questions in the DB (runs existing async helper)."""
     try:
-        asyncio.run(QuestionService(None).parse_and_create_background(pages, industry, exam_id, mark_per_question, tenant_id))
+        async def _run():
+            async with get_worker_db() as db:
+                svc = QuestionService(db)
+                await svc.parse_and_create_background(pages, industry, exam_id, mark_per_question, tenant_id)
+
+        asyncio.run(_run())
         logger.info("Exam parsing task completed for exam=%s", exam_id)
         return {"created": True, "exam_id": exam_id}
     except Exception as e:

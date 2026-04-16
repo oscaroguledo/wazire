@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta
 from celery.utils.log import get_task_logger
 
 from celery_app import celery_app
-from core.database import get_session_factory
+from core.database import get_worker_db
 from sqlalchemy import select
 from models.academic.exam import Exam
 
@@ -21,8 +21,7 @@ async def update_exam_statuses() -> Dict[str, int]:
     `update_exam_statuses_task`) and mirrors the logic previously in the
     in-process scheduler.
     """
-    AsyncSessionLocal = get_session_factory()
-    async with AsyncSessionLocal() as db:
+    async with get_worker_db() as db:
         now = datetime.now(timezone.utc)
         activated = 0
         completed = 0
