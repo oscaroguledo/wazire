@@ -24,6 +24,14 @@ Based on my analysis of the frontend codebase, here are the key areas that could
 - **No code splitting**: All routes loaded upfront instead of lazy loading
 - **QueryClient config**: 5-second staleTime could be optimized per endpoint
 
+
+### **4. Accessibility Issues** 🟡
+- **Missing ARIA labels**: Buttons, inputs, and interactive elements lack proper labels
+- **Search input must have buttons that trigger the search, i dont want any search when am typing or filtering
+- **Keyboard navigation**: Some components may not be fully keyboard accessible
+- **Focus management**: Modals and dropdowns need proper focus trapping
+- **Color contrast**: Need to verify WCAG compliance for all themes
+
 ### **5. Code Quality** 🟢
 - **Inconsistent naming**: Mix of camelCase and snake_case in some places
 - **Duplicate code**: Similar patterns in multiple API files could be abstracted
@@ -39,6 +47,10 @@ Based on my analysis of the frontend codebase, here are the key areas that could
 - **Empty states**: Not all list views have proper empty states
 - **Error states**: Need better error messages and recovery options
 
+### **8. Testing** 🔴
+- **No unit tests**: Zero test coverage for components or utilities
+- **No E2E tests**: No integration tests for critical user flows
+- **No type tests**: Missing runtime type validation
 
 ### **Recommended Priority** 🎯
 
