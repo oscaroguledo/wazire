@@ -3,7 +3,8 @@ from __future__ import annotations
 from typing import Optional, List
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Request, Depends, status
+from core.middleware.error_handler import ForbiddenError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
@@ -259,10 +260,7 @@ async def get_tenant_stats(
     """Get tenant statistics (admin only)."""
     # Check if user has access to this tenant
     if current_user.role == "admin" and current_user.tenant_id != tenant_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied: You can only access statistics for your own tenant"
-        )
+        raise ForbiddenError("Access denied: You can only access statistics for your own tenant")
     
     stats = await service.get_tenant_stats(tenant_id)
     

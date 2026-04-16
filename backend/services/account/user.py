@@ -11,6 +11,7 @@ from models.account.users import User as UserModel
 from schemas.account.users import UserCreate, UserUpdate
 from core.utils.encryption import EncryptionService
 from core.utils.token import TokenService
+from core.repositories.account import UserRepository
 
 
 class UserService:
@@ -18,20 +19,18 @@ class UserService:
         self.db = db
         self.encryption = encryption
         self.token_service = token_service
+        self.user_repo = UserRepository(db)
 
     async def get_by_email(self, email: str, tenant_id: Optional[UUID] = None) -> Optional[UserModel]:
-        stmt = select(UserModel).where(UserModel.email == email)
         if tenant_id:
-            stmt = stmt.where(UserModel.tenant_id == tenant_id)
-        res = await self.db.execute(stmt)
-        return res.scalar_one_or_none()
+            return await self.user_repo.get_by_email_and_tenant(email, tenant_id)
+        return await self.user_repo.get_by_email(email)
 
     async def get(self, user_id, tenant_id: Optional[UUID] = None) -> Optional[UserModel]:
-        stmt = select(UserModel).where(UserModel.id == user_id)
-        if tenant_id:
-            stmt = stmt.where(UserModel.tenant_id == tenant_id)
-        res = await self.db.execute(stmt)
-        return res.scalar_one_or_none()
+        user = await self.user_repo.get_by_id(user_id)
+        if tenant_id and user and user.tenant_id != tenant_id:
+            return None
+        return user
 
     async def create(self, user_in: UserCreate, tenant_id: Optional[UUID] = None) -> UserModel:
         if not self.encryption:
@@ -48,10 +47,7 @@ class UserService:
             institution_id=user_in.institution_id,
             is_active=True,
         )
-        self.db.add(user)
-        await self.db.commit()
-        await self.db.refresh(user)
-        return user
+        return await self.user_repo.create(user)
 
     async def authenticate(self, email: str, password: str, tenant_id: Optional[UUID] = None) -> Optional[UserModel]:
         """Authenticate user with email and password."""
@@ -170,10 +166,7 @@ class UserService:
                     raise RuntimeError("EncryptionService required to update passwords")
                 value = self.encryption.hash_password(value)
             setattr(user, field, value)
-        self.db.add(user)
-        await self.db.commit()
-        await self.db.refresh(user)
-        return user
+        return await self.user_repo.update(user)
 
     async def delete(self, user: UserModel) -> None:
         await self.db.delete(user)
@@ -181,24 +174,31 @@ class UserService:
 
     async def list(self, limit: int = 50, offset: int = 0, tenant_id: Optional[UUID] = None, is_active: Optional[bool] = None) -> List[UserModel]:
         """List users with offset/limit pagination."""
-        stmt = select(UserModel).order_by(
-            UserModel.created_at.desc(), UserModel.id.desc()
-        ).offset(offset).limit(limit)
-
         if tenant_id:
-            stmt = stmt.where(UserModel.tenant_id == tenant_id)
+            users = await self.user_repo.get_by_tenant(tenant_id, skip=offset, limit=limit)
+        elif is_active:
+            users = await self.user_repo.get_active_users(skip=offset, limit=limit)
+        else:
+            users = await self.user_repo.get_all(skip=offset, limit=limit)
         
-        if is_active is not None:
-            stmt = stmt.where(UserModel.is_active == is_active)
-
-        items = (await self.db.execute(stmt)).scalars().all()
-        return list(items)
+        # Filter by is_active if needed (repository doesn't support combined filters)
+        if is_active is not None and tenant_id:
+            users = [u for u in users if u.is_active == is_active]
+        
+        # Sort by created_at desc, id desc
+        users.sort(key=lambda u: (u.created_at or 0, u.id), reverse=True)
+        return users
 
     async def count(self, tenant_id: Optional[UUID] = None, is_active: Optional[bool] = None) -> int:
-        stmt = select(func.count()).select_from(UserModel)
         if tenant_id:
-            stmt = stmt.where(UserModel.tenant_id == tenant_id)
-        if is_active is not None:
-            stmt = stmt.where(UserModel.is_active == is_active)
-        res = await self.db.execute(stmt)
-        return int(res.scalar_one())
+            users = await self.user_repo.get_by_tenant(tenant_id)
+        elif is_active:
+            users = await self.user_repo.get_active_users()
+        else:
+            return await self.user_repo.count()
+        
+        # Filter by is_active if needed
+        if is_active is not None and tenant_id:
+            users = [u for u in users if u.is_active == is_active]
+        
+        return len(users)

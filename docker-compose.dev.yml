@@ -1,0 +1,107 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    container_name: wazire-postgres-dev
+    environment:
+      POSTGRES_DB: wazire
+      POSTGRES_USER: wazire
+      POSTGRES_PASSWORD: wazire
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wazire -d wazire"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    container_name: wazire-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: wazire-backend-dev
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app  # Hot reload for development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    container_name: wazire-celery-worker-dev
+    env_file:
+      - ./backend/.env
+    environment:
+      - CELERY_WORKER_CONCURRENCY=1
+    command: celery -A celery_app.celery_app worker --loglevel=info --concurrency=1
+    volumes:
+      - ./backend:/app  # Hot reload for development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    container_name: wazire-celery-beat-dev
+    env_file:
+      - ./backend/.env
+    command: celery -A celery_app.celery_app beat --loglevel=info
+    volumes:
+      - ./backend:/app  # Hot reload for development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: wazire-frontend-dev
+    restart: unless-stopped
+    environment:
+      - VITE_API_URL=http://backend:8000
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app  # Hot reload for development
+      - /app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  redis_data:

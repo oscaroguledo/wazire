@@ -44,13 +44,9 @@ class EncryptionService:
 	def verify_password(self, stored: str, password: str) -> bool:
 		# Supported stored password formats:
 		# - PBKDF2: pbkdf2_sha256$<iterations>$<salt_b64>$<dk_b64>
-		# - Plaintext (development only): plain$<password>
 		try:
 			if stored is None:
 				return False
-			# Development shortcut: plain$PASSWORD
-			if stored.startswith("plain$"):
-				return stored.split("plain$", 1)[1] == password
 
 			parts = stored.split("$")
 			if len(parts) != 4 or not parts[0].startswith("pbkdf2_sha256"):

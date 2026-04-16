@@ -134,10 +134,10 @@ async def update_question(
         updated = await service.update(q, question_in)
         return Response(success=True, message="Question updated", data=updated.to_dict(), request=request)
     except ValueError as e:
-        print(f"[update_question] ValueError: {e}")
+        logger.error(f"[update_question] ValueError: {e}")
         return Response(success=False, error=str(e), request=request, status_code=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print(f"[update_question] Unexpected error: {type(e).__name__}: {e}")
+        logger.error(f"[update_question] Unexpected error: {type(e).__name__}: {e}")
         return Response(success=False, error=f"Update failed: {str(e)}", request=request, status_code=status.HTTP_400_BAD_REQUEST)
 
 

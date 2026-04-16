@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from fastapi import APIRouter, Depends, status, Request
+from fastapi import APIRouter, Request, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
@@ -10,6 +10,7 @@ from core.utils.encryption import EncryptionService
 from core.utils.token import TokenService
 from core.config import get_settings
 from core.dependencies.common import get_token_service, authenticated_dep, admin_only_dep, lecturer_or_admin_dep
+from core.dependencies.pagination import get_pagination, PaginationResponse
 from services.account.user import UserService
 from schemas.account.auth import AuthLogin, AuthTokens, AuthRefresh, AuthResponse
 from schemas.account.users import UserCreate, UserUpdate, UserRead
@@ -107,46 +108,39 @@ async def update_me(
 @router.get("/")
 async def list_users(
     request: Request,
-    page: int = 1,
-    per_page: int = 50,
+    pagination: PaginationParams = Depends(get_pagination),
     is_active: Optional[bool] = None,
     current_user: UserRead = lecturer_or_admin_dep,
     service: UserService = Depends(get_user_service),
 ):
-    """List users with offset/limit pagination."""
+    """List users with standardized pagination."""
     try:
         tenant_id = None if current_user.role in ("admin", "superadmin") else current_user.tenant_id
         
-        # Calculate offset from page
-        offset = (page - 1) * per_page
-        
-        # Use offset/limit pagination
-        users = await service.list(limit=per_page, offset=offset, tenant_id=tenant_id, is_active=is_active)
+        # Use standardized pagination
+        users = await service.list(limit=pagination.limit, offset=pagination.offset, tenant_id=tenant_id, is_active=is_active)
         
         # Get total count for pagination
         total_count = await service.count(tenant_id=tenant_id, is_active=is_active)
         
-        # Calculate total pages
-        total_pages = (total_count + per_page - 1) // per_page
+        # Create pagination metadata
+        pagination_meta = PaginationResponse.create(
+            page=pagination.page,
+            per_page=pagination.per_page,
+            total=total_count
+        )
         
         return Response(
             success=True, 
             message="Users retrieved", 
             data=[UserRead.model_validate(u) for u in users], 
-            pagination={
-                "page": page,
-                "per_page": per_page,
-                "total": total_count,
-                "pages": total_pages,
-                "has_next": page < total_pages,
-                "has_prev": page > 1
-            }, 
+            pagination=pagination_meta.model_dump(),
             request=request
         )
     except Exception as e:
         import traceback
-        print(f"[ERROR] list_users failed: {e}")
-        traceback.print_exc()
+        logger.error(f"list_users failed: {e}")
+        logger.error(traceback.format_exc())
         return Response(
             success=False, 
             error=f"Failed to list users: {str(e)}", 

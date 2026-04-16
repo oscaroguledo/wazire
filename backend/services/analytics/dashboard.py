@@ -19,6 +19,11 @@ from schemas.analytics.dashboard import (
     AdminDashboardCreate, AdminDashboardUpdate, AdminDashboardResponse,
     StudentDashboardCreate, StudentDashboardUpdate, StudentDashboardResponse,
 )
+from services.account.user import UserService
+from core.utils.token import TokenService
+from core.config import get_settings
+from core.utils.logger import logger
+from core.database import get_session_factory
 
 
 class DashboardService:
@@ -37,17 +42,13 @@ class DashboardService:
         """
         # If role not provided, fetch it
         if user_role is None:
-            from services.account.user import UserService
-            from core.utils.token import TokenService
-            from core.config import get_settings
-            
             settings = get_settings()
             token_service = TokenService(settings.SECRET_KEY.get_secret_value() if settings.SECRET_KEY else None)
             user_service = UserService(self.db, token_service=token_service)
             user = await user_service.get(user_id)
             
             if not user:
-                print(f"[Dashboard] User not found: {user_id}")
+                logger.warning(f"[Dashboard] User not found: {user_id}")
                 return
             
             user_role = user.role
@@ -65,7 +66,7 @@ class DashboardService:
         elif role_str == "student":
             await self.refresh_student_dashboard(user_id)
         else:
-            print(f"[Dashboard] Unknown user role: {user_role}")
+            logger.warning(f"[Dashboard] Unknown user role: {user_role}")
     
     # -------------------------------------------------------------------------
     # Lecturer Dashboard
@@ -81,7 +82,7 @@ class DashboardService:
         dashboard = result.scalar_one_or_none()
         
         query_time = (time.time() - start) * 1000
-        print(f"[DASHBOARD] Query time: {query_time:.2f}ms")
+        logger.debug(f"[DASHBOARD] Query time: {query_time:.2f}ms")
         
         if not dashboard:
             create_start = time.time()
@@ -98,7 +99,7 @@ class DashboardService:
             await self.db.commit()
             await self.db.refresh(dashboard)
             create_time = (time.time() - create_start) * 1000
-            print(f"[DASHBOARD] Create time: {create_time:.2f}ms")
+            logger.debug(f"[DASHBOARD] Create time: {create_time:.2f}ms")
         
         return dashboard
     
@@ -551,8 +552,6 @@ async def refresh_dashboard_bg(user_id: uuid.UUID) -> None:
             # enqueue refresh to Celery worker
             refresh_dashboard_task.delay(str(user_id))
     """
-    from core.database import get_session_factory
-    
     AsyncSessionLocal = get_session_factory()
     async with AsyncSessionLocal() as db:
         try:
@@ -565,11 +564,11 @@ async def refresh_dashboard_bg(user_id: uuid.UUID) -> None:
             
             if user:
                 await service.refresh_user_dashboard(user)
-                print(f"[DASHBOARD BG] Refreshed dashboard for user {user_id}")
+                logger.info(f"[DASHBOARD BG] Refreshed dashboard for user {user_id}")
         except Exception as e:
-            print(f"[DASHBOARD BG] Error refreshing dashboard for user {user_id}: {e}")
+            logger.error(f"[DASHBOARD BG] Error refreshing dashboard for user {user_id}: {e}")
             import traceback
-            traceback.print_exc()
+            logger.error(traceback.format_exc())
 
 
 def refresh_dashboard_bg_sync(user_id: uuid.UUID) -> None:
@@ -580,9 +579,9 @@ def refresh_dashboard_bg_sync(user_id: uuid.UUID) -> None:
     try:
         asyncio.run(refresh_dashboard_bg(user_id))
     except Exception as e:
-        print(f"[DASHBOARD BG SYNC] Error: {e}")
+        logger.error(f"[DASHBOARD BG SYNC] Error: {e}")
         import traceback
-        traceback.print_exc()
+        logger.error(traceback.format_exc())
 
 
 async def refresh_multiple_dashboards_bg(user_ids: list[uuid.UUID]) -> None:

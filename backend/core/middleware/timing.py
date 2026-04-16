@@ -16,6 +16,6 @@ class TimingMiddleware(BaseHTTPMiddleware):
         duration_ms = (end_time - start_time) * 1000
         
         # Log timing information
-        print(f"[TIMING] {request.method} {request.url.path} - {duration_ms:.2f}ms {'Slow' if duration_ms >= 900 else 'Fast'}")
+        logger.info(f"[TIMING] {request.method} {request.url.path} - {duration_ms:.2f}ms {'Slow' if duration_ms >= 900 else 'Fast'}")
         
         return response

@@ -11,6 +11,10 @@ from alembic import op
 import sqlalchemy as sa
 ${imports if imports else ""}
 
+# IMPORTANT: Do not import models directly in migration files.
+# The env.py file handles all model imports and database URL conversion.
+# If you need to reference model classes, use string references instead.
+
 # revision identifiers, used by Alembic.
 revision: str = ${repr(up_revision)}
 down_revision: Union[str, None] = ${repr(down_revision)}

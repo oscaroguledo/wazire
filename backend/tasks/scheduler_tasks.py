@@ -34,7 +34,7 @@ async def update_exam_statuses() -> Dict[str, int]:
         )
         tenant_ids = [row[0] for row in tenant_ids_result.all() if row[0] is not None]
 
-        print(f"[ExamTask] Processing exams for {len(tenant_ids)} tenant(s)")
+        logger.info(f"[ExamTask] Processing exams for {len(tenant_ids)} tenant(s)")
 
         for tenant_id in tenant_ids:
             total_tenants_processed += 1
@@ -53,13 +53,13 @@ async def update_exam_statuses() -> Dict[str, int]:
                 if exam_start.tzinfo is None:
                     exam_start = exam_start.replace(tzinfo=timezone.utc)
                     timezone_conversions += 1
-                    print(f"[ExamTask] Warning: Exam {exam.id} had naive datetime, converted to UTC")
+                    logger.warning(f"[ExamTask] Warning: Exam {exam.id} had naive datetime, converted to UTC")
 
                 current_status = exam.status
 
                 if not exam.duration:
                     skipped_no_duration += 1
-                    print(f"[ExamTask] Warning: Exam {exam.id} has no duration, skipping status update")
+                    logger.warning(f"[ExamTask] Warning: Exam {exam.id} has no duration, skipping status update")
                     continue
 
                 duration_hours = float(exam.duration)
@@ -71,13 +71,13 @@ async def update_exam_statuses() -> Dict[str, int]:
                         exam.updated_at = now
                         activated += 1
                         tenant_activated += 1
-                        print(f"[ExamTask] Activated exam {exam.id}: start={exam_start}, end={end_time}, now={now}")
+                        logger.info(f"[ExamTask] Activated exam {exam.id}: start={exam_start}, end={end_time}, now={now}")
                     elif now >= end_time:
                         exam.status = 'finished'
                         exam.updated_at = now
                         completed += 1
                         tenant_completed += 1
-                        print(f"[ExamTask] Completed exam {exam.id} (missed start): start={exam_start}, end={end_time}, now={now}")
+                        logger.info(f"[ExamTask] Completed exam {exam.id} (missed start): start={exam_start}, end={end_time}, now={now}")
 
                 elif current_status == 'in_progress':
                     if now >= end_time:
@@ -85,17 +85,17 @@ async def update_exam_statuses() -> Dict[str, int]:
                         exam.updated_at = now
                         completed += 1
                         tenant_completed += 1
-                        print(f"[ExamTask] Completed exam {exam.id}: start={exam_start}, end={end_time}, now={now}")
+                        logger.info(f"[ExamTask] Completed exam {exam.id}: start={exam_start}, end={end_time}, now={now}")
 
             await db.commit()
 
             if tenant_activated > 0 or tenant_completed > 0:
-                print(f"[ExamTask] Tenant {tenant_id}: Activated {tenant_activated}, completed {tenant_completed}")
+                logger.info(f"[ExamTask] Tenant {tenant_id}: Activated {tenant_activated}, completed {tenant_completed}")
 
         if activated > 0 or completed > 0 or skipped_no_duration > 0:
-            print(f"[ExamTask] Summary: Tenants processed {total_tenants_processed}, activated {activated}, completed {completed}, skipped (no duration) {skipped_no_duration}, timezone conversions {timezone_conversions}")
+            logger.info(f"[ExamTask] Summary: Tenants processed {total_tenants_processed}, activated {activated}, completed {completed}, skipped (no duration) {skipped_no_duration}, timezone conversions {timezone_conversions}")
         else:
-            print(f"[ExamTask] Ran at {now.isoformat()} - processed {total_tenants_processed} tenant(s), no exams to update")
+            logger.info(f"[ExamTask] Ran at {now.isoformat()} - processed {total_tenants_processed} tenant(s), no exams to update")
 
         return {
             "tenants_processed": total_tenants_processed,

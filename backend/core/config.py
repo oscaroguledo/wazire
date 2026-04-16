@@ -22,6 +22,7 @@ class Settings(BaseModel):
     # DATABASE_URL = "mysql+aiomysql://user:password@localhost/exam_db"
     DATABASE_URL: Optional[str] = "sqlite+aiosqlite:///./wazire_dev.db"
     REDIS_URL: Optional[str] = None
+    REDIS_PASSWORD: Optional[str] = None
 
     SECRET_KEY: Optional[SecretStr] = SecretStr("change-me-in-production")
     ACCESS_TOKEN_EXPIRE_SECONDS: int = 3600
@@ -34,6 +35,10 @@ class Settings(BaseModel):
     CELERY_BROKER_URL: Optional[str] = None
     CELERY_RESULT_BACKEND: Optional[str] = None
     USE_INTERNAL_SCHEDULER: bool = False
+    
+    # Celery beat schedule intervals (in seconds)
+    CELERY_EXAM_STATUS_UPDATE_INTERVAL: int = 60
+    CELERY_EMAIL_SEND_INTERVAL: int = 60
 
     def cors_origins_list(self) -> List[str]:
         if isinstance(self.CORS_ORIGINS, str):
@@ -87,6 +92,40 @@ class Settings(BaseModel):
         # Fallback: return the original URL unchanged
         return u
 
+    def validate(self) -> None:
+        """Validate configuration settings.
+        
+        Raises:
+            ValueError: If any required configuration is missing or invalid
+        """
+        errors = []
+        
+        # Validate SECRET_KEY
+        if not self.SECRET_KEY or self.SECRET_KEY.get_secret_value() == "change-me-in-production":
+            if self.ENV == "production":
+                errors.append("SECRET_KEY must be set in production environment")
+        
+        # Validate DATABASE_URL
+        if not self.DATABASE_URL:
+            errors.append("DATABASE_URL is required")
+        
+        # Validate ACCESS_TOKEN_EXPIRE_SECONDS
+        if self.ACCESS_TOKEN_EXPIRE_SECONDS < 60:
+            errors.append("ACCESS_TOKEN_EXPIRE_SECONDS must be at least 60 seconds")
+        
+        # Validate PORT
+        if not (1 <= self.PORT <= 65535):
+            errors.append("PORT must be between 1 and 65535")
+        
+        # Validate CELERY intervals
+        if self.CELERY_EXAM_STATUS_UPDATE_INTERVAL < 10:
+            errors.append("CELERY_EXAM_STATUS_UPDATE_INTERVAL must be at least 10 seconds")
+        if self.CELERY_EMAIL_SEND_INTERVAL < 10:
+            errors.append("CELERY_EMAIL_SEND_INTERVAL must be at least 10 seconds")
+        
+        if errors:
+            raise ValueError("Configuration validation failed:\n" + "\n".join(f"  - {e}" for e in errors))
+
 
 _settings: Optional[Settings] = None
 
@@ -121,6 +160,7 @@ def get_settings(force_reload: bool = False) -> Settings:
             PORT=int(os.getenv("PORT", str(_defaults.PORT))),
             DATABASE_URL=os.getenv("DATABASE_URL", _defaults.DATABASE_URL),
             REDIS_URL=os.getenv("REDIS_URL", _defaults.REDIS_URL),
+            REDIS_PASSWORD=os.getenv("REDIS_PASSWORD", _defaults.REDIS_PASSWORD),
             SECRET_KEY=SecretStr(os.getenv("SECRET_KEY")) if os.getenv("SECRET_KEY") else _defaults.SECRET_KEY,
             ACCESS_TOKEN_EXPIRE_SECONDS=int(os.getenv("ACCESS_TOKEN_EXPIRE_SECONDS", str(_defaults.ACCESS_TOKEN_EXPIRE_SECONDS))),
             CORS_ORIGINS=_parse_list(os.getenv("CORS_ORIGINS"), _defaults.CORS_ORIGINS),
@@ -129,7 +169,13 @@ def get_settings(force_reload: bool = False) -> Settings:
             CELERY_BROKER_URL=os.getenv("CELERY_BROKER_URL", os.getenv("REDIS_URL", _defaults.CELERY_BROKER_URL)),
             CELERY_RESULT_BACKEND=os.getenv("CELERY_RESULT_BACKEND", os.getenv("REDIS_URL", _defaults.CELERY_RESULT_BACKEND)),
             USE_INTERNAL_SCHEDULER=os.getenv("USE_INTERNAL_SCHEDULER", str(_defaults.USE_INTERNAL_SCHEDULER)).lower() in ("1", "true", "yes"),
+            CELERY_EXAM_STATUS_UPDATE_INTERVAL=int(os.getenv("CELERY_EXAM_STATUS_UPDATE_INTERVAL", str(_defaults.CELERY_EXAM_STATUS_UPDATE_INTERVAL))),
+            CELERY_EMAIL_SEND_INTERVAL=int(os.getenv("CELERY_EMAIL_SEND_INTERVAL", str(_defaults.CELERY_EMAIL_SEND_INTERVAL))),
         )
+        
+        # Validate configuration
+        s.validate()
+        
         _settings = s
     return _settings
 

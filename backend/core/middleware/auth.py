@@ -34,7 +34,7 @@ def invalidate_user_cache(user_id: uuid.UUID) -> None:
     """Invalidate cache for a specific user (call after user updates)."""
     if user_id in _user_cache:
         del _user_cache[user_id]
-        print(f"[AUTH] Cache invalidated for user {user_id}")
+        logger.info(f"[AUTH] Cache invalidated for user {user_id}")
 
 
 class AuthMiddleware:
@@ -76,15 +76,15 @@ class AuthMiddleware:
                 )
 
             after_jwt = time.time()
-            print(f"[AUTH] JWT verification: {(after_jwt - start) * 1000:.2f}ms")
+            logger.debug(f"[AUTH] JWT verification: {(after_jwt - start) * 1000:.2f}ms")
 
             # Check cache first
             current_time = time.time()
             cached_user, expiry = _user_cache.get(user_uuid, (None, 0))
             if cached_user and expiry > current_time:
                 after_cache = time.time()
-                print(f"[AUTH] Cache hit: {(after_cache - after_jwt) * 1000:.2f}ms")
-                print(f"[AUTH] Total (cached): {(after_cache - start) * 1000:.2f}ms")
+                logger.debug(f"[AUTH] Cache hit: {(after_cache - after_jwt) * 1000:.2f}ms")
+                logger.debug(f"[AUTH] Total (cached): {(after_cache - start) * 1000:.2f}ms")
                 return cached_user
 
             # Cache miss - query database
@@ -92,7 +92,7 @@ class AuthMiddleware:
             user = await user_service.get(user_uuid)
 
             after_db = time.time()
-            print(f"[AUTH] DB query: {(after_db - after_jwt) * 1000:.2f}ms")
+            logger.debug(f"[AUTH] DB query: {(after_db - after_jwt) * 1000:.2f}ms")
 
             if not user or not user.is_active:
                 raise HTTPException(

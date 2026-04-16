@@ -16,31 +16,35 @@ from slowapi.errors import RateLimitExceeded
 
 settings = get_settings()
 
-# @asynccontextmanager
-# async def lifespan(app: FastAPI):
-# 	"""Application lifespan: perform startup and graceful shutdown tasks.
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+	"""Application lifespan: perform startup and graceful shutdown tasks.
 
-# 	This is an async context manager. It MUST `yield` to allow FastAPI to
-# 	enter the application runtime; failing to yield causes the
-# 	`'coroutine' object is not an async iterator` error.
-# 	"""
+	This is an async context manager. It MUST `yield` to allow FastAPI to
+	enter the application runtime; failing to yield causes the
+	`'coroutine' object is not an async iterator` error.
+	"""
 
-# 	# Startup actions
-# 	logger.info("Wazire backend starting up...")
+	# Startup actions
+	logger.info("Wazire backend starting up...")
 
-# 	# Yield control to the application runtime
-# 	yield
+	# Yield control to the application runtime
+	yield
 
-# 	# Shutdown actions
-# 	logger.info("Closing database connections...")
-# 	await close_db()
-# 	logger.info("Wazire backend has been shut down.")
+	# Shutdown actions
+	logger.info("Closing database connections...")
+	await close_db()
+	logger.info("Wazire backend has been shut down.")
 
 
 app = FastAPI(
-	title="Wazire Backend (MVP)",
-	version="0.1.0",
+	title="Wazire Backend",
+	description="Academic assessment and examination management system API",
+	version="1.0.0",
 	lifespan=lifespan,
+	docs_url="/api/v1/docs",
+	redoc_url="/api/v1/redoc",
+	openapi_url="/api/v1/openapi.json"
 )
 
 # Setup error handlers
@@ -88,9 +92,9 @@ from routes.academic import submission, course, exam, question, answer, enrollme
 from routes.analytics import dashboard
 from routes import websocket
 
-
-app.include_router(health)
-app.include_router(websocket)
+# API Version 1
+app.include_router(health, prefix="/api/v1")
+app.include_router(websocket, prefix="/api/v1")
 app.include_router(user.router, prefix="/api/v1")
 app.include_router(tenant.router, prefix="/api/v1")
 app.include_router(submission.router, prefix="/api/v1/academic")

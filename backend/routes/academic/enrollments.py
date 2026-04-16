@@ -1,10 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Request, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from typing import List, Optional
-import uuid
+from sqlalchemy import select, func, and_, or_
+from uuid import UUID
+from typing import Optional, List
 
+from core.database import get_db
 from core.utils.response import Response
+from core.utils.logger import logger
+from core.middleware.error_handler import NotFoundError, BadRequestError, ForbiddenError
+from core.dependencies.pagination import get_pagination, PaginationResponse
 from models.account.users import User, UserRole
 from models.academic.course import Course
 from models.academic.enrollment import Enrollment
@@ -13,6 +17,7 @@ from schemas.academic.enrollment import (
     EnrollmentListResponse, EnrollmentListParams, EnrollmentStatus, EnrollmentCheckResponse,
     BulkEnrollmentRequest, Semester
 )
+from core.dependencies.common import authenticated_dep
 from services.academic.enrollment import EnrollmentService
 from tasks.submission_tasks import refresh_dashboard_task
 from core.database import get_db
@@ -24,74 +29,61 @@ router = APIRouter(prefix="/enrollment", tags=["enrollment"])
 @router.get("/")
 async def list_enrollment(
     request: Request,
-    page: int = Query(1, ge=1, description="Page number"),
-    per_page: int = Query(10, ge=1, le=100, description="Items per page"),
+    pagination: PaginationParams = Depends(get_pagination),
     search: Optional[str] = Query(None, description="Search term"),
     student_id: Optional[str] = Query(None, description="Filter by student ID"),
     course_id: Optional[str] = Query(None, description="Filter by course ID"),
     lecturer_id: Optional[uuid.UUID] = Query(None, description="Filter by lecturer ID"),
     enrollment_status: Optional[EnrollmentStatus] = Query(None, description="Filter by status"),
     semester: Optional[Semester] = Query(None, description="Filter by semester"),
-    year: Optional[int] = Query(None, ge=2020, le=2100, description="Filter by academic year"),
+    current_user: User = authenticated_dep,
     db: AsyncSession = Depends(get_db),
-    current_user: User = authenticated_dep
 ):
-    """
-    List enrollments with filtering and pagination.
-    
-    - Students can only see their own enrollments
-    - Lecturers can only see enrollments for their courses
-    - Admins can see all enrollments
-    """
-    enrollment_service = EnrollmentService(db)
-    
-    # Apply role-based filtering
-    if current_user.role == UserRole.STUDENT:
-        # Students can only see their own enrollments
-        student_id = str(current_user.id)
-    elif current_user.role == UserRole.LECTURER:
-        # Lecturers can only see enrollments for their courses
-        lecturer_id = current_user.id
-
-    params = EnrollmentListParams(
-        page=page,
-        per_page=per_page,
-        search=search,
-        student_id=student_id,
-        course_id=course_id,
-        lecturer_id=lecturer_id,
-        status=enrollment_status,
-        semester=semester,
-        year=year
-    )
-
-    # Get tenant_id from current_user (admins can access all tenants)
-    tenant_id = None if current_user.role in ("admin", "superadmin") else current_user.tenant_id
-
+    """List enrollments with standardized pagination and filters."""
     try:
-        items, total = await enrollment_service.list_enrollments(params, tenant_id=tenant_id)
-        # Convert models to dicts
+        enrollment_service = EnrollmentService(db)
+
+        # Get tenant_id from current_user (admins can access all tenants)
+        tenant_id = None if current_user.role in ("admin", "superadmin") else current_user.tenant_id
+
+        # Build filters
+        filters = {}
+        if search:
+            filters["search"] = search
+        if student_id:
+            filters["student_id"] = student_id
+        if course_id:
+            filters["course_id"] = course_id
+        if lecturer_id:
+            filters["lecturer_id"] = lecturer_id
+        if enrollment_status:
+            filters["status"] = enrollment_status
+        if semester:
+            filters["semester"] = semester
+
+        # Get enrollments with pagination
+        items, total = await enrollment_service.list_enrollments(
+            page=pagination.page,
+            per_page=pagination.per_page,
+            tenant_id=tenant_id,
+            filters=filters
+        )
+
+        # Create pagination metadata
+        pagination_meta = PaginationResponse.create(
+            page=pagination.page,
+            per_page=pagination.per_page,
+            total=total
+        )
+
+        # Convert to response format
         items_dicts = [item.to_dict() for item in items]
         
-        # Calculate pagination metadata
-        pages = (total + per_page - 1) // per_page if total > 0 else 1
-        has_next = page < pages
-        has_prev = page > 1
-        
-        pagination = {
-            "page": page,
-            "per_page": per_page,
-            "total": total,
-            "pages": pages,
-            "has_next": has_next,
-            "has_prev": has_prev
-        }
-        
-        return Response(success=True, data=items_dicts, pagination=pagination, request=request)
+        return Response(success=True, data=items_dicts, pagination=pagination_meta.model_dump(), request=request)
     except Exception as e:
-        print(f"[DEBUG] list_enrollments error: {e}")
+        logger.error(f"list_enrollments error: {e}")
         import traceback
-        traceback.print_exc()
+        logger.error(traceback.format_exc())
         return Response(success=False, error=f"Failed to fetch enrollments: {str(e)}", request=request, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @router.get("/{enrollment_id}")
@@ -117,22 +109,13 @@ async def get_enrollment(
         
         # Role-based access check
         if current_user.role == UserRole.STUDENT and str(enrollment.student_id) != str(current_user.id):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Can only access your own enrollments"
-            )
+            raise ForbiddenError("Can only access your own enrollments")
         elif current_user.role == UserRole.LECTURER and str(enrollment.course.lecturer_id) != str(current_user.id):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Can only access enrollments for your courses"
-            )
+            raise ForbiddenError("Can only access enrollments for your courses")
         
         return Response(success=True, data=enrollment.to_dict(), request=request, status_code=status.HTTP_200_OK)
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        raise NotFoundError(str(e))
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -157,9 +140,8 @@ async def enroll_student(
     # Get tenant_id from current_user (admins can access all tenants)
     tenant_id = None if current_user.role in ("admin", "superadmin") else current_user.tenant_id
 
-    # Debug logging
-    print(f"[DEBUG] enroll_student called by {current_user.email} (role: {current_user.role})")
-    print(f"[DEBUG] enrollment_data: student_id={enrollment_data.student_id}, course_id={enrollment_data.course_id}")
+    logger.debug(f"enroll_student called by {current_user.email} (role: {current_user.role})")
+    logger.debug(f"enrollment_data: student_id={enrollment_data.student_id}, course_id={enrollment_data.course_id}")
 
     try:
         enrollment = await enrollment_service.enroll_student(enrollment_data, current_user, tenant_id=tenant_id)
