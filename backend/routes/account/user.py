@@ -1,0 +1,202 @@
+from __future__ import annotations
+
+import uuid
+from fastapi import APIRouter, Depends, status, Request
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from core.database import get_db
+from core.utils.response import Response
+from core.utils.encryption import EncryptionService
+from core.utils.token import TokenService
+from core.config import get_settings
+from core.dependencies.common import get_token_service, authenticated_dep, admin_only_dep, lecturer_or_admin_dep
+from services.account.user import UserService
+from schemas.account.auth import AuthLogin, AuthTokens, AuthRefresh, AuthResponse
+from schemas.account.users import UserCreate, UserUpdate, UserRead
+
+router = APIRouter(prefix="/auth", tags=["authentication"])
+
+
+def get_encryption_service() -> EncryptionService:
+    return EncryptionService()
+
+
+def get_user_service(
+    db: AsyncSession = Depends(get_db),
+    encryption: EncryptionService = Depends(get_encryption_service),
+    token_service: TokenService = Depends(get_token_service),
+) -> UserService:
+    return UserService(db, encryption=encryption, token_service=token_service)
+
+
+# ---------------------------------------------------------------------------
+# Public auth endpoints
+# ---------------------------------------------------------------------------
+
+@router.post("/register", status_code=status.HTTP_201_CREATED)
+async def register(
+    user_in: UserCreate,
+    request: Request,
+    service: UserService = Depends(get_user_service),
+):
+    if getattr(request.state, "tenant_id", None):
+        user_in.tenant_id = request.state.tenant_id
+    if await service.get_by_email(user_in.email):
+        return Response(success=False, error="Email already registered", request=request, status_code=status.HTTP_400_BAD_REQUEST)
+    user = await service.create(user_in)
+    return Response(success=True, message="Registered successfully", data=UserRead.model_validate(user), request=request, status_code=status.HTTP_201_CREATED)
+
+
+@router.post("/login")
+async def login(
+    login_data: AuthLogin,
+    request: Request,
+    service: UserService = Depends(get_user_service),
+):
+    tenant_id = getattr(request.state, "tenant_id", None)
+    user = await service.authenticate(login_data.email, login_data.password, tenant_id=tenant_id)
+    if not user:
+        return Response(success=False, error="Invalid email or password", request=request, status_code=status.HTTP_401_UNAUTHORIZED)
+    tokens = await service.generate_auth_tokens(user)
+    return Response(success=True, message="Login successful", data=AuthResponse(user=UserRead.model_validate(user), tokens=AuthTokens(**tokens)), request=request)
+
+
+@router.post("/refresh")
+async def refresh_token(
+    body: AuthRefresh,
+    request: Request,
+    service: UserService = Depends(get_user_service),
+):
+    tenant_id = getattr(request.state, "tenant_id", None)
+    result = await service.refresh_access_token(body.refresh_token, tenant_id=tenant_id)
+    if not result:
+        return Response(success=False, error="Invalid or expired refresh token", request=request, status_code=status.HTTP_401_UNAUTHORIZED)
+    return Response(success=True, message="Token refreshed", data=AuthTokens(**result), request=request)
+
+
+# ---------------------------------------------------------------------------
+# Current user — MUST be before /{user_id} to avoid route conflict
+# ---------------------------------------------------------------------------
+
+@router.get("/me")
+async def me(
+    request: Request,
+    current_user: UserRead = authenticated_dep,
+):
+    return Response(success=True, message="Profile retrieved", data=current_user, request=request)
+
+
+@router.put("/me")
+async def update_me(
+    user_in: UserUpdate,
+    request: Request,
+    current_user: UserRead = authenticated_dep,
+    service: UserService = Depends(get_user_service),
+):
+    user = await service.get(current_user.id)
+    if not user:
+        return Response(success=False, error="User not found", request=request, status_code=status.HTTP_404_NOT_FOUND)
+    updated = await service.update(user, user_in)
+    return Response(success=True, message="Profile updated", data=UserRead.model_validate(updated), request=request)
+
+
+# ---------------------------------------------------------------------------
+# User management (lecturer/admin)
+# ---------------------------------------------------------------------------
+
+@router.get("/")
+async def list_users(
+    request: Request,
+    page: int = 1,
+    per_page: int = 50,
+    is_active: Optional[bool] = None,
+    current_user: UserRead = lecturer_or_admin_dep,
+    service: UserService = Depends(get_user_service),
+):
+    """List users with offset/limit pagination."""
+    try:
+        tenant_id = None if current_user.role in ("admin", "superadmin") else current_user.tenant_id
+        
+        # Calculate offset from page
+        offset = (page - 1) * per_page
+        
+        # Use offset/limit pagination
+        users = await service.list(limit=per_page, offset=offset, tenant_id=tenant_id, is_active=is_active)
+        
+        # Get total count for pagination
+        total_count = await service.count(tenant_id=tenant_id, is_active=is_active)
+        
+        # Calculate total pages
+        total_pages = (total_count + per_page - 1) // per_page
+        
+        return Response(
+            success=True, 
+            message="Users retrieved", 
+            data=[UserRead.model_validate(u) for u in users], 
+            pagination={
+                "page": page,
+                "per_page": per_page,
+                "total": total_count,
+                "pages": total_pages,
+                "has_next": page < total_pages,
+                "has_prev": page > 1
+            }, 
+            request=request
+        )
+    except Exception as e:
+        import traceback
+        print(f"[ERROR] list_users failed: {e}")
+        traceback.print_exc()
+        return Response(
+            success=False, 
+            error=f"Failed to list users: {str(e)}", 
+            request=request,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@router.get("/{user_id}")
+async def get_user(
+    user_id: uuid.UUID,
+    request: Request,
+    current_user: UserRead = lecturer_or_admin_dep,
+    service: UserService = Depends(get_user_service),
+):
+    tenant_id = None if current_user.role in ("admin", "superadmin") else current_user.tenant_id
+    user = await service.get(user_id, tenant_id=tenant_id)
+    if not user:
+        return Response(success=False, error="User not found", request=request, status_code=status.HTTP_404_NOT_FOUND)
+    return Response(success=True, message="User retrieved", data=UserRead.model_validate(user), request=request)
+
+
+@router.put("/{user_id}")
+async def update_user(
+    user_id: uuid.UUID,
+    user_in: UserUpdate,
+    request: Request,
+    current_user: UserRead = admin_only_dep,
+    service: UserService = Depends(get_user_service),
+):
+    user = await service.get(user_id)
+    if not user:
+        return Response(success=False, error="User not found", request=request, status_code=status.HTTP_404_NOT_FOUND)
+    updated = await service.update(user, user_in)
+    return Response(success=True, message="User updated", data=UserRead.model_validate(updated), request=request)
+
+
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(
+    user_id: uuid.UUID,
+    request: Request,
+    current_user: UserRead = admin_only_dep,
+    service: UserService = Depends(get_user_service),
+):
+    if user_id == current_user.id:
+        return Response(success=False, error="Cannot delete your own account", request=request, status_code=status.HTTP_400_BAD_REQUEST)
+
+    user = await service.get(user_id)
+    if not user:
+        return Response(success=False, error="User not found", request=request, status_code=status.HTTP_404_NOT_FOUND)
+
+    await service.delete(user_id)
+    return Response(success=True, message="User deleted successfully", request=request)
