@@ -6,7 +6,7 @@ from typing import Optional
 from celery.utils.log import get_task_logger
 
 from celery_app import celery_app
-from core.database import get_worker_db
+from core.database import get_db
 from services.academic.question import QuestionService
 
 logger = get_task_logger(__name__)
@@ -16,7 +16,7 @@ logger = get_task_logger(__name__)
 def detect_answer_task(question_id: str) -> dict:
     """Detect MCQ answer for a question (runs the existing async helper)."""
     async def _run():
-        async with get_worker_db() as db:
+        async with get_db() as db:
             svc = QuestionService(db)
             await svc.detect_answer_background(question_id)
 
@@ -33,7 +33,7 @@ def detect_answer_task(question_id: str) -> dict:
 def parse_and_create_task(pages: list, industry: str, exam_id: str, mark_per_question: Optional[float], tenant_id: Optional[str] = None) -> dict:
     """Parse exam pages and create questions in the DB (runs existing async helper)."""
     async def _run():
-        async with get_worker_db() as db:
+        async with get_db() as db:
             svc = QuestionService(db)
             await svc.parse_and_create_background(pages, industry, exam_id, mark_per_question, tenant_id)
 

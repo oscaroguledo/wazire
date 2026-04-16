@@ -1,13 +1,16 @@
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy import text
-from functools import lru_cache
+from __future__ import annotations
+
+from typing import AsyncGenerator
+
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.orm import declarative_base
 
 from core.config import get_settings
+from functools import lru_cache
 
 # Global engine and session factory (initialized lazily)
 _engine = None
-_AsyncSessionLocal = None
+_session_factory = None
 
 
 class Base(DeclarativeBase):
@@ -39,37 +42,33 @@ def get_engine():
     return _engine
 
 
-def get_session_factory():
-    """Get or create the async session factory."""
-    global _AsyncSessionLocal
-    if _AsyncSessionLocal is None:
+async def get_db() -> AsyncSession:
+    """Get database session (merged with session factory creation).
+
+    Usage in FastAPI:
+        async def endpoint(db: AsyncSession = Depends(get_db)):
+            ...
+    
+    Usage in Celery/tasks:
+        async with get_db() as db:
+            # use AsyncSession `db`
+    """
+    global _session_factory
+    if _session_factory is None:
         engine = get_engine()
-        _AsyncSessionLocal = async_sessionmaker(
+        _session_factory = async_sessionmaker(
             bind=engine,
             class_=AsyncSession,
             expire_on_commit=False,
             autocommit=False,
             autoflush=False
         )
-    return _AsyncSessionLocal
-
-
-async def get_db() -> AsyncSession:
-    """Async session dependency for FastAPI endpoints.
-
-    Usage in FastAPI:
-        async def endpoint(db: AsyncSession = Depends(get_db)):
-            async with db.begin():
-                ...
-    
-    Usage in Celery/tasks:
-        async with get_db() as db:
-            # use AsyncSession `db`
-    """
-    session_factory = get_session_factory()
-    session = session_factory()
+    session = _session_factory()
     try:
         yield session
+    except Exception:
+        await session.rollback()
+        raise
     finally:
         await session.close()
 

@@ -40,6 +40,10 @@ class User(Base):
         Index("ix_users_role", "role"),
         Index("ix_users_tenant_id", "tenant_id"),
         Index("ix_users_is_active", "is_active"),
+        # Composite indexes for common query patterns
+        Index("ix_users_tenant_role", "tenant_id", "role"),
+        Index("ix_users_tenant_active", "tenant_id", "is_active"),
+        Index("ix_users_email_tenant", "email", "tenant_id"),
         {"schema": "account"},
     )
 

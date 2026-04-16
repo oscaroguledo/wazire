@@ -31,6 +31,9 @@ class Course(Base):
         Index("ix_courses_course_code", "course_code", unique=True),
         Index("ix_courses_lecturer_id", "lecturer_id"),
         Index("ix_courses_tenant_id", "tenant_id"),
+        # Composite indexes for common query patterns
+        Index("ix_courses_lecturer_tenant", "lecturer_id", "tenant_id"),
+        Index("ix_courses_tenant_code", "tenant_id", "course_code"),
         {"schema": "academic"},
     )
 

@@ -377,10 +377,9 @@ class SubmissionService:
 
     async def grade_attempt_background(self, attempt_id: str, exam_id: str) -> None:
         """Grade an attempt in the background (used by Celery tasks)."""
-        from core.database import get_session_factory
+        from core.database import get_db
 
-        AsyncSessionLocal = get_session_factory()
-        async with AsyncSessionLocal() as db:
+        async with get_db() as db:
             attempt = (await db.execute(
                 select(SubmissionAttemptModel).where(
                     SubmissionAttemptModel.id == UUID(attempt_id)

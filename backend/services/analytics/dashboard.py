@@ -23,7 +23,7 @@ from services.account.user import UserService
 from core.utils.token import TokenService
 from core.config import get_settings
 from core.utils.logger import logger
-from core.database import get_session_factory
+from core.database import get_db
 
 
 class DashboardService:
@@ -552,8 +552,7 @@ async def refresh_dashboard_bg(user_id: uuid.UUID) -> None:
             # enqueue refresh to Celery worker
             refresh_dashboard_task.delay(str(user_id))
     """
-    AsyncSessionLocal = get_session_factory()
-    async with AsyncSessionLocal() as db:
+    async with get_db() as db:
         try:
             service = DashboardService(db)
             
@@ -569,19 +568,6 @@ async def refresh_dashboard_bg(user_id: uuid.UUID) -> None:
             logger.error(f"[DASHBOARD BG] Error refreshing dashboard for user {user_id}: {e}")
             import traceback
             logger.error(traceback.format_exc())
-
-
-def refresh_dashboard_bg_sync(user_id: uuid.UUID) -> None:
-    """Sync wrapper for refresh_dashboard_bg (kept for compatibility). Prefer Celery tasks."""
-    import asyncio
-    
-    # Create a new event loop and run the async function
-    try:
-        asyncio.run(refresh_dashboard_bg(user_id))
-    except Exception as e:
-        logger.error(f"[DASHBOARD BG SYNC] Error: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
 
 
 async def refresh_multiple_dashboards_bg(user_ids: list[uuid.UUID]) -> None:

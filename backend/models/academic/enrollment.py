@@ -35,6 +35,12 @@ class Enrollment(Base):
     __table_args__ = (
         Index('ix_enrollment_student_course', 'student_id', 'course_id'),
         Index('ix_enrollment_semester', 'semester'),
+        Index('ix_enrollment_status', 'status'),
+        Index('ix_enrollment_course_id', 'course_id'),
+        # Composite indexes for common query patterns
+        Index('ix_enrollment_student_status', 'student_id', 'status'),
+        Index('ix_enrollment_course_status', 'course_id', 'status'),
+        Index('ix_enrollment_student_semester', 'student_id', 'semester'),
         UniqueConstraint('student_id', 'course_id', name='uq_student_course'),
         {"schema": "academic"},
     )

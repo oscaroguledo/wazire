@@ -430,10 +430,9 @@ class QuestionService:
     async def detect_answer_background(self, question_id: str) -> None:
         """Run AI answer detection for an MCQ question in the background."""
         from services.engine.answer_grader import QuestionAnswerer
-        from core.database import get_session_factory
+        from core.database import get_db
 
-        AsyncSessionLocal = get_session_factory()
-        async with AsyncSessionLocal() as db:
+        async with get_db() as db:
             q = (await db.execute(
                 select(QuestionModel).where(QuestionModel.id == UUID(question_id))
             )).scalar_one_or_none()
@@ -507,8 +506,7 @@ class QuestionService:
         #     "created": 0
         # })
 
-        AsyncSessionLocal = get_session_factory()
-        async with AsyncSessionLocal() as db:
+        async with get_db() as db:
             service = QuestionService(db)
             for idx, raw in enumerate(raw_questions):
                 try:

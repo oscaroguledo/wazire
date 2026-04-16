@@ -45,7 +45,7 @@ class CourseRepository(BaseRepository[Course]):
     async def get_by_code(self, code: str, tenant_id: UUID) -> Optional[Course]:
         """Get a course by code and tenant ID."""
         stmt = select(Course).where(
-            and_(Course.code == code, Course.tenant_id == tenant_id)
+            and_(Course.course_code == code, Course.tenant_id == tenant_id)
         )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
