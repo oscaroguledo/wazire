@@ -122,7 +122,9 @@ class QuestionService:
         
         # attach exams if provided (no tenant constraint on questions/answers)
         if question_in.exam_ids:
-            stmt = select(ExamModel).where(ExamModel.id.in_(question_in.exam_ids))
+            stmt = select(ExamModel).options(
+                selectinload(ExamModel.course).selectinload(CourseModel.lecturer)
+            ).where(ExamModel.id.in_(question_in.exam_ids))
             if tenant_id:
                 stmt = stmt.where(ExamModel.tenant_id == tenant_id)
             res = await self.db.execute(stmt)
@@ -246,7 +248,9 @@ class QuestionService:
             check_tenant_id = tenant_id if tenant_id is not None else question.tenant_id
 
             # replace exams relationship - but first check for duplicates
-            stmt = select(ExamModel).where(ExamModel.id.in_(exam_ids))
+            stmt = select(ExamModel).options(
+                selectinload(ExamModel.course).selectinload(CourseModel.lecturer)
+            ).where(ExamModel.id.in_(exam_ids))
             if check_tenant_id:
                 stmt = stmt.where(ExamModel.tenant_id == check_tenant_id)
             res = await self.db.execute(stmt)

@@ -38,6 +38,9 @@ class Tenant(Base):
 	__table_args__ = (
 		Index("ix_tenants_domain", "domain", unique=True),
 		Index("ix_tenants_is_active", "is_active"),
+		Index("ix_tenants_name", "name"),
+		Index("ix_tenants_created_at", "created_at"),
+		Index("ix_tenants_updated_at", "updated_at"),
 		{"schema": "account"},
 	)
 

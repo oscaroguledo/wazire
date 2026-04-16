@@ -18,6 +18,12 @@ class StudentAnswer(Base):
         Index("ix_student_answers_student_id", "student_id"),
         Index("ix_student_answers_exam_id", "exam_id"),
         Index("ix_student_answers_question_id", "question_id"),
+        Index("ix_student_answers_last_saved_at", "last_saved_at"),
+        Index("ix_student_answers_created_at", "created_at"),
+        # Composite indexes for common query patterns
+        Index("ix_student_answers_student_exam", "student_id", "exam_id"),
+        Index("ix_student_answers_exam_question", "exam_id", "question_id"),
+        Index("ix_student_answers_student_question", "student_id", "question_id"),
         {"schema": "academic"},
     )
 

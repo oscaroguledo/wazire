@@ -22,6 +22,10 @@ class CurrentUsage(Base):
     __tablename__ = "current_usage"
     __table_args__ = (
         Index("ix_current_usage_plan", "plan"),
+        Index("ix_current_usage_tenant_id", "tenant_id"),
+        Index("ix_current_usage_created_at", "created_at"),
+        Index("ix_current_usage_updated_at", "updated_at"),
+        Index("ix_current_usage_tenant_plan", "tenant_id", "plan"),
         CheckConstraint("student_count >= 0", name="check_student_count_non_negative"),
         CheckConstraint("exams_graded >= 0", name="check_exams_graded_non_negative"),
         {"schema": "billings"},

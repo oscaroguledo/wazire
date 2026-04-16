@@ -35,6 +35,17 @@ class Exam(Base):
     __table_args__ = (
         Index("ix_exams_course_id", "course_id"),
         Index("ix_exams_tenant_id", "tenant_id"),
+        Index("ix_exams_status", "status"),
+        Index("ix_exams_start_time", "start_time"),
+        Index("ix_exams_created_by", "created_by"),
+        Index("ix_exams_updated_by", "updated_by"),
+        Index("ix_exams_created_at", "created_at"),
+        Index("ix_exams_updated_at", "updated_at"),
+        # Composite indexes for common query patterns
+        Index("ix_exams_tenant_status", "tenant_id", "status"),
+        Index("ix_exams_tenant_start_time", "tenant_id", "start_time"),
+        Index("ix_exams_course_status", "course_id", "status"),
+        Index("ix_exams_course_start_time", "course_id", "start_time"),
         CheckConstraint("duration > 0", name="ck_exams_duration_positive"),
         CheckConstraint("max_attempts > 0", name="ck_exams_max_attempts_positive"),
         {"schema": "academic"},

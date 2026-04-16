@@ -29,10 +29,14 @@ class User(Base):
         Index("ix_users_role", "role"),
         Index("ix_users_tenant_id", "tenant_id"),
         Index("ix_users_is_active", "is_active"),
+        Index("ix_users_institution_id", "institution_id"),
+        Index("ix_users_created_at", "created_at"),
+        Index("ix_users_updated_at", "updated_at"),
         # Composite indexes
         Index("ix_users_tenant_role", "tenant_id", "role"),
         Index("ix_users_tenant_active", "tenant_id", "is_active"),
         Index("ix_users_email_tenant", "email", "tenant_id"),
+        Index("ix_users_tenant_institution", "tenant_id", "institution_id"),
         {"schema": "account"},
     )
 

@@ -19,6 +19,7 @@ class PaymentMethodDetails(Base):
     __tablename__ = "payment_method_details"
     __table_args__ = (
         Index("ix_payment_method_details_payment_method_id", "payment_method_id"),
+        Index("ix_payment_method_details_created_at", "created_at"),
         {"schema": "billings"},
     )
     id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid7, comment="Primary key: UUIDv7 time-ordered")
@@ -45,6 +46,10 @@ class PaymentMethod(Base):
     __tablename__ = "payment_methods"
     __table_args__ = (
         Index("ix_payment_methods_type", "type"),
+        Index("ix_payment_methods_tenant_id", "tenant_id"),
+        Index("ix_payment_methods_created_at", "created_at"),
+        Index("ix_payment_methods_updated_at", "updated_at"),
+        Index("ix_payment_methods_tenant_type", "tenant_id", "type"),
         {"schema": "billings"},
     )
     id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid7, comment="Primary key: UUIDv7 time-ordered")

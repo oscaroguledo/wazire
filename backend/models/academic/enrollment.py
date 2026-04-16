@@ -36,10 +36,13 @@ class Enrollment(Base):
         Index('ix_enrollment_semester', 'semester'),
         Index('ix_enrollment_status', 'status'),
         Index('ix_enrollment_course_id', 'course_id'),
+        Index('ix_enrollment_created_at', 'created_at'),
+        Index('ix_enrollment_updated_at', 'updated_at'),
         # Composite indexes
         Index('ix_enrollment_student_status', 'student_id', 'status'),
         Index('ix_enrollment_course_status', 'course_id', 'status'),
         Index('ix_enrollment_student_semester', 'student_id', 'semester'),
+        Index('ix_enrollment_tenant_semester_status', 'student_id', 'semester', 'status'),
         UniqueConstraint('student_id', 'course_id', name='uq_student_course'),
         {"schema": "academic"},
     )

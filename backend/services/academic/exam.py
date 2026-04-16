@@ -21,7 +21,9 @@ class ExamService:
         # If tenant_id not provided but course has one, inherit it
         effective_tenant_id = tenant_id
         if not effective_tenant_id and exam_in.course_id:
-            course_stmt = select(CourseModel).where(CourseModel.id == exam_in.course_id)
+            course_stmt = select(CourseModel).options(
+                selectinload(CourseModel.lecturer)
+            ).where(CourseModel.id == exam_in.course_id)
             course_res = await self.db.execute(course_stmt)
             course = course_res.scalar_one_or_none()
             if course and course.tenant_id:

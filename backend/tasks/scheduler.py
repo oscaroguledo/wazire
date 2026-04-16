@@ -15,12 +15,7 @@ logger = get_task_logger(__name__)
 
 
 async def update_exam_statuses() -> Dict[str, int]:
-    """Update exam statuses (migrated from services.engine.scheduler).
-
-    This function is intended to be executed from a Celery worker (via
-    `update_exam_statuses_task`) and mirrors the logic previously in the
-    in-process scheduler.
-    """
+    """Update exam statuses (Celery task)."""
     async with get_db() as db:
         now = datetime.now(timezone.utc)
         activated = 0
@@ -108,7 +103,7 @@ async def update_exam_statuses() -> Dict[str, int]:
 
 @celery_app.task(name="tasks.scheduler.update_exam_statuses_task")
 def update_exam_statuses_task() -> Dict[str, Any]:
-    """Celery wrapper that runs the async exam status update job."""
+    """Celery wrapper for exam status update."""
     try:
         result = asyncio.run(update_exam_statuses())
         logger.info("Exam status update completed: %s", result)

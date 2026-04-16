@@ -18,9 +18,7 @@ class EnrollmentService:
         self.db = db
 
     async def list_enrollments(self, params: EnrollmentListParams, tenant_id: Optional[uuid.UUID] = None) -> Tuple[List[EnrollmentModel], int]:
-        """
-        List enrollments with filtering and pagination.
-        """
+        """List enrollments with filtering and pagination."""
         # Build base query with joins using select for async compatibility
         from sqlalchemy.orm import aliased
 
@@ -83,7 +81,26 @@ class EnrollmentService:
             )
         
         # Get total count
-        count_stmt = select(func.count()).select_from(stmt.subquery())
+        count_stmt = select(func.count()).select_from(
+            EnrollmentModel
+            .join(User, EnrollmentModel.student_id == User.id)
+            .join(CourseModel, EnrollmentModel.course_id == CourseModel.id)
+            .outerjoin(lecturer_alias, CourseModel.lecturer_id == lecturer_alias.id)
+        )
+        # Apply same filters as main query
+        if tenant_id:
+            count_stmt = count_stmt.filter(CourseModel.tenant_id == tenant_id)
+        if params.student_id:
+            count_stmt = count_stmt.filter(EnrollmentModel.student_id == uuid.UUID(params.student_id))
+        if params.course_id:
+            count_stmt = count_stmt.filter(EnrollmentModel.course_id == uuid.UUID(params.course_id))
+        if params.lecturer_id:
+            count_stmt = count_stmt.filter(CourseModel.lecturer_id == params.lecturer_id)
+        if params.status:
+            count_stmt = count_stmt.filter(EnrollmentModel.status == params.status)
+        if params.semester:
+            count_stmt = count_stmt.filter(EnrollmentModel.semester == params.semester)
+        
         total_result = await self.db.execute(count_stmt)
         total = total_result.scalar()
         
@@ -101,9 +118,7 @@ class EnrollmentService:
         return enrollments, total
 
     async def get_enrollment(self, enrollment_id: uuid.UUID, tenant_id: Optional[uuid.UUID] = None) -> EnrollmentModel:
-        """
-        Get a specific enrollment by ID.
-        """
+        """Get enrollment by ID."""
 
         from sqlalchemy.orm import aliased
         lecturer_alias = aliased(User)
@@ -133,9 +148,7 @@ class EnrollmentService:
         return enrollment
 
     async def enroll_student(self, enrollment_data: EnrollmentCreate, current_user: User, tenant_id: Optional[uuid.UUID] = None) -> EnrollmentModel:
-        """
-        Enroll a student in a course.
-        """
+        """Enroll student in course."""
         try:
             student_uuid = uuid.UUID(enrollment_data.student_id)
             course_uuid = uuid.UUID(enrollment_data.course_id)
@@ -208,10 +221,10 @@ class EnrollmentService:
         return enrollment_with_rels
 
     async def update_enrollment(self, enrollment_id: uuid.UUID, enrollment_data: EnrollmentUpdate, tenant_id: Optional[uuid.UUID] = None) -> EnrollmentModel:
-        """
-        Update an enrollment.
-        """
-        stmt = select(EnrollmentModel).filter(EnrollmentModel.id == enrollment_id)
+        """Update enrollment."""
+        stmt = select(EnrollmentModel).options(
+            selectinload(EnrollmentModel.course).selectinload(CourseModel.lecturer)
+        ).filter(EnrollmentModel.id == enrollment_id)
         if tenant_id:
             stmt = stmt.join(CourseModel, EnrollmentModel.course_id == CourseModel.id).filter(CourseModel.tenant_id == tenant_id)
         result = await self.db.execute(stmt)
@@ -224,21 +237,12 @@ class EnrollmentService:
         
         await self.db.commit()
         await self.db.refresh(enrollment)
-        
-        # Eager load relationships before returning
-        enrollment_with_rels = await self.get_enrollment(enrollment.id)
-        return enrollment_with_rels
+        return enrollment
 
     async def remove_enrollment(self, enrollment_id: uuid.UUID, current_user: User, tenant_id: Optional[uuid.UUID] = None) -> None:
-        """
-        Remove an enrollment (drop student from course).
-        """
-        from sqlalchemy.orm import aliased
-        lecturer_alias = aliased(User)
-
+        """Remove student enrollment."""
         stmt = (
             select(EnrollmentModel)
-            .join(CourseModel, EnrollmentModel.course_id == CourseModel.id)
             .options(
                 selectinload(EnrollmentModel.course).selectinload(CourseModel.lecturer)
             )
@@ -259,9 +263,7 @@ class EnrollmentService:
         await self.db.commit()
 
     async def bulk_enroll(self, enrollments_data: List[EnrollmentCreate], current_user: User, tenant_id: Optional[uuid.UUID] = None) -> List[EnrollmentModel]:
-        """
-        Bulk enroll multiple students in courses.
-        """
+        """Bulk enroll students."""
         results = []
 
         for enrollment_data in enrollments_data:
@@ -276,9 +278,7 @@ class EnrollmentService:
         return results
 
     async def check_enrollment(self, student_id: uuid.UUID, course_id: uuid.UUID, tenant_id: Optional[uuid.UUID] = None) -> EnrollmentModel:
-        """
-        Check if a student is enrolled in a course.
-        """
+        """Check if student is enrolled in course."""
         # Use async-compatible query with eager loading
         stmt = (
             select(EnrollmentModel)

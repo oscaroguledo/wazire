@@ -26,7 +26,7 @@ router = APIRouter(prefix="/questions", tags=["questions"])
 
 
 class ExamUpload(BaseModel):
-    """Payload for uploading a typed/scanned exam paper as page images."""
+    """Payload for exam paper upload."""
     pages: List[str]                        # base64 image strings, one per page
     exam_id: uuid.UUID                      # exam to link all extracted questions to
     industry: Industry                      # subject area
@@ -71,7 +71,7 @@ async def list_questions(
     db: AsyncSession = Depends(get_db),
 ):
     service = QuestionService(db)
-    """List all questions (no pagination - load all at once)."""
+    """List all questions."""
     # Questions are global (not tenant-scoped); still enforce role
 
     items = await service.list(exam_id=exam_id)
@@ -91,7 +91,7 @@ async def get_exam_questions(
     current_user: UserRead = authenticated_dep,
     db: AsyncSession = Depends(get_db),
 ):
-    """Get all questions for a specific exam."""
+    """Get questions for exam."""
     service = QuestionService(db)
     questions = await service.list_for_exam(exam_id)
     return Response(

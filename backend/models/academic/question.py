@@ -66,7 +66,14 @@ class Question(Base):
         Index("ix_questions_parent_id", "parent_id"),
         Index("ix_questions_created_at", "created_at"),
         Index("ix_questions_industry", "industry"),
+        Index("ix_questions_qtype", "qtype"),
+        Index("ix_questions_answer_id", "answer_id"),
+        Index("ix_questions_updated_at", "updated_at"),
         Index("ix_questions_tenant_created_at", "tenant_id", "created_at"),
+        # Composite indexes for common query patterns
+        Index("ix_questions_tenant_qtype", "tenant_id", "qtype"),
+        Index("ix_questions_tenant_industry", "tenant_id", "industry"),
+        Index("ix_questions_parent_qtype", "parent_id", "qtype"),
         CheckConstraint("qtype IN ('multiple_choice','theory','fill_in_blanks')", name="ck_questions_qtype"),
         {"schema": "academic"},
     )

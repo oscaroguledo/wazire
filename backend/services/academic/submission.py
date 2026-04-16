@@ -9,6 +9,7 @@ from uuid import UUID
 
 from sqlalchemy import select, func, exists
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 
 from services.analytics.dashboard import refresh_dashboard_bg, refresh_multiple_dashboards_bg
@@ -45,7 +46,9 @@ class SubmissionService:
         - Repeat call → reuses Submission, adds Attempt #N
         - Raises ValueError if exam not found or max attempts exceeded
         """
-        stmt = select(ExamModel).where(ExamModel.id == exam_id)
+        stmt = select(ExamModel).options(
+            selectinload(ExamModel.course).selectinload(CourseModel.lecturer)
+        ).where(ExamModel.id == exam_id)
         if tenant_id:
             stmt = stmt.where(ExamModel.tenant_id == tenant_id)
         exam = (await self.db.execute(stmt)).scalar_one_or_none()
@@ -109,7 +112,10 @@ class SubmissionService:
     # ------------------------------------------------------------------
 
     async def get(self, submission_id: UUID, tenant_id: Optional[UUID] = None) -> Optional[SubmissionModel]:
-        stmt = select(SubmissionModel).where(SubmissionModel.id == submission_id)
+        stmt = select(SubmissionModel).options(
+            selectinload(SubmissionModel.exam).selectinload(ExamModel.course).selectinload(CourseModel.lecturer),
+            selectinload(SubmissionModel.student)
+        ).where(SubmissionModel.id == submission_id)
         if tenant_id:
             stmt = stmt.join(ExamModel, ExamModel.id == SubmissionModel.exam_id).where(ExamModel.tenant_id == tenant_id)
         return (await self.db.execute(stmt)).scalar_one_or_none()
@@ -119,13 +125,16 @@ class SubmissionService:
 
     async def get_all_my_submissions(self, student_id: UUID, tenant_id: Optional[UUID] = None) -> List[SubmissionModel]:
         """Get all submissions for a specific student across all exams."""
-        stmt = select(SubmissionModel).where(SubmissionModel.student_id == student_id)
+        stmt = select(SubmissionModel).options(
+            selectinload(SubmissionModel.exam).selectinload(ExamModel.course),
+            selectinload(SubmissionModel.student)
+        ).where(SubmissionModel.student_id == student_id)
         if tenant_id:
             stmt = stmt.join(ExamModel, ExamModel.id == SubmissionModel.exam_id).where(ExamModel.tenant_id == tenant_id)
         stmt = stmt.order_by(SubmissionModel.created_at.desc())
         
         result = await self.db.execute(stmt)
-        return list(result.scalars().all())
+        return result.scalars().all()
 
     async def list_for_exam(
         self,
@@ -136,7 +145,10 @@ class SubmissionService:
         offset: int = 0,
     ) -> List[SubmissionModel]:
         """List submissions for an exam with limit/offset pagination."""
-        stmt = select(SubmissionModel).where(
+        stmt = select(SubmissionModel).options(
+            selectinload(SubmissionModel.exam).selectinload(ExamModel.course),
+            selectinload(SubmissionModel.student)
+        ).where(
             SubmissionModel.exam_id == exam_id
         ).order_by(SubmissionModel.created_at.desc()).offset(offset).limit(limit)
 
@@ -161,7 +173,9 @@ class SubmissionService:
     ) -> Tuple[List[dict], int]:
         """Return each student with their submission summary for a specific exam."""
         # Verify the exam exists and belongs to the tenant
-        exam_stmt = select(ExamModel).where(ExamModel.id == exam_id)
+        exam_stmt = select(ExamModel).options(
+            selectinload(ExamModel.course).selectinload(CourseModel.lecturer)
+        ).where(ExamModel.id == exam_id)
         if tenant_id:
             exam_stmt = exam_stmt.where(ExamModel.tenant_id == tenant_id)
         exam = (await self.db.execute(exam_stmt)).scalar_one_or_none()
@@ -171,6 +185,9 @@ class SubmissionService:
         stmt = (
             select(UserModel, SubmissionModel)
             .join(SubmissionModel, SubmissionModel.student_id == UserModel.id)
+            .options(
+                selectinload(SubmissionModel.attempts)
+            )
             .where(SubmissionModel.exam_id == exam_id)
         )
         if tenant_id:
@@ -189,11 +206,8 @@ class SubmissionService:
 
         results = []
         for user, submission in rows:
-            attempts = (await self.db.execute(
-                select(SubmissionAttemptModel)
-                .where(SubmissionAttemptModel.submission_id == submission.id)
-                .order_by(SubmissionAttemptModel.attempt_number)
-            )).scalars().all()
+            # Attempts already loaded via selectinload
+            attempts = submission.attempts
 
             results.append({
                 "student": {

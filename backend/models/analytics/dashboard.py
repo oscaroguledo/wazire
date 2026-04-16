@@ -17,6 +17,8 @@ class LecturerDashboard(Base):
     __tablename__ = "lecturer_dashboard"
     __table_args__ = (
         Index("ix_lecturer_dashboard_lecturer_id", "lecturer_id"),
+        Index("ix_lecturer_dashboard_created_at", "created_at"),
+        Index("ix_lecturer_dashboard_updated_at", "updated_at"),
         {"schema": "analytics"},
     )
     
@@ -55,6 +57,8 @@ class AdminDashboard(Base):
     __tablename__ = "admin_dashboard"
     __table_args__ = (
         Index("ix_admin_dashboard_admin_id", "admin_id"),
+        Index("ix_admin_dashboard_created_at", "created_at"),
+        Index("ix_admin_dashboard_updated_at", "updated_at"),
         {"schema": "analytics"},
     )
     
@@ -97,6 +101,8 @@ class StudentDashboard(Base):
     __tablename__ = "student_dashboard"
     __table_args__ = (
         Index("ix_student_dashboard_student_id", "student_id"),
+        Index("ix_student_dashboard_created_at", "created_at"),
+        Index("ix_student_dashboard_updated_at", "updated_at"),
         {"schema": "analytics"},
     )
 

@@ -12,11 +12,7 @@ ModelType = TypeVar("ModelType", bound=DeclarativeBase)
 
 
 class BaseRepository(Generic[ModelType]):
-    """Base repository for common database operations.
-    
-    This provides a clean separation between data access logic and business logic.
-    All repositories should inherit from this base class.
-    """
+    """Base repository for common database operations."""
     
     def __init__(self, model: Type[ModelType], db: AsyncSession):
         self.model = model
@@ -24,14 +20,7 @@ class BaseRepository(Generic[ModelType]):
     
     @asynccontextmanager
     async def transaction(self):
-        """Context manager for database transactions.
-        
-        Usage:
-            async with repo.transaction():
-                # Multiple operations
-                await repo.create(entity1)
-                await repo.create(entity2)
-        """
+        """Context manager for database transactions."""
         try:
             yield self
             await self.db.commit()
@@ -40,7 +29,7 @@ class BaseRepository(Generic[ModelType]):
             raise
     
     async def get_by_id(self, id: UUID) -> Optional[ModelType]:
-        """Get a single entity by ID."""
+        """Get entity by ID."""
         stmt = select(self.model).where(self.model.id == id)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
@@ -52,21 +41,21 @@ class BaseRepository(Generic[ModelType]):
         return result.scalars().all()
     
     async def create(self, entity: ModelType) -> ModelType:
-        """Create a new entity."""
+        """Create entity."""
         self.db.add(entity)
         await self.db.commit()
         await self.db.refresh(entity)
         return entity
     
     async def update(self, entity: ModelType) -> ModelType:
-        """Update an existing entity."""
+        """Update entity."""
         self.db.add(entity)
         await self.db.commit()
         await self.db.refresh(entity)
         return entity
     
     async def delete(self, id: UUID) -> bool:
-        """Delete an entity by ID."""
+        """Delete entity by ID."""
         entity = await self.get_by_id(id)
         if not entity:
             return False
@@ -75,11 +64,13 @@ class BaseRepository(Generic[ModelType]):
         return True
     
     async def count(self) -> int:
-        """Count total number of entities."""
+        """Count total entities."""
         stmt = select(func.count()).select_from(self.model)
         result = await self.db.execute(stmt)
         return result.scalar()
     
     async def exists(self, id: UUID) -> bool:
-        """Check if an entity exists by ID."""
-        return await self.get_by_id(id) is not None
+        """Check if entity exists."""
+        stmt = select(func.count()).where(self.model.id == id)
+        result = await self.db.execute(stmt)
+        return result.scalar() > 0

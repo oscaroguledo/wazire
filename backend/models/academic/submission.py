@@ -24,7 +24,12 @@ class Submission(Base):
         Index("ix_submissions_student_id", "student_id"),
         Index("ix_submissions_exam_id", "exam_id"),
         Index("ix_submissions_graded_at", "graded_at"),
+        Index("ix_submissions_created_at", "created_at"),
+        Index("ix_submissions_updated_at", "updated_at"),
         Index("uq_submissions_student_exam", "student_id", "exam_id", unique=True),
+        # Composite indexes for dashboard queries
+        Index("ix_submissions_exam_graded", "exam_id", "graded_at"),
+        Index("ix_submissions_student_graded", "student_id", "graded_at"),
         CheckConstraint("attempts_count >= 0", name="ck_submissions_attempts_nonnegative"),
         CheckConstraint("(latest_score IS NULL) OR (latest_score >= 0)", name="ck_submissions_latest_score_nonnegative"),
         {"schema": "academic"},
@@ -66,6 +71,7 @@ class SubmissionAttempt(Base):
         Index("ix_submission_attempts_submission_id", "submission_id"),
         Index("ix_submission_attempts_submission_attempt", "submission_id", "attempt_number", unique=True),
         Index("ix_submission_attempts_graded_at", "graded_at"),
+        Index("ix_submission_attempts_created_at", "created_at"),
         CheckConstraint("(score IS NULL) OR (score >= 0)", name="ck_submission_attempts_score_nonneg"),
         {"schema": "academic"},
     )

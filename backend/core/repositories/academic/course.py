@@ -11,7 +11,7 @@ from core.repositories.base import BaseRepository
 
 
 class CourseRepository(BaseRepository[Course]):
-    """Repository for Course entity operations."""
+    """Course repository."""
     
     def __init__(self, db: AsyncSession):
         super().__init__(Course, db)
@@ -22,7 +22,7 @@ class CourseRepository(BaseRepository[Course]):
         skip: int = 0, 
         limit: int = 100
     ) -> List[Course]:
-        """Get courses by lecturer ID with pagination."""
+        """Get courses by lecturer."""
         stmt = select(Course).where(
             Course.lecturer_id == lecturer_id
         ).offset(skip).limit(limit)
@@ -35,7 +35,7 @@ class CourseRepository(BaseRepository[Course]):
         skip: int = 0, 
         limit: int = 100
     ) -> List[Course]:
-        """Get courses by tenant ID with pagination."""
+        """Get courses by tenant."""
         stmt = select(Course).where(
             Course.tenant_id == tenant_id
         ).offset(skip).limit(limit)
@@ -43,7 +43,7 @@ class CourseRepository(BaseRepository[Course]):
         return result.scalars().all()
     
     async def get_by_code(self, code: str, tenant_id: UUID) -> Optional[Course]:
-        """Get a course by code and tenant ID."""
+        """Get course by code and tenant."""
         stmt = select(Course).where(
             and_(Course.course_code == code, Course.tenant_id == tenant_id)
         )

@@ -24,6 +24,10 @@ class Invoice(Base):
     __tablename__ = "invoices"
     __table_args__ = (
         Index("ix_invoice_status", "status"),
+        Index("ix_invoice_tenant_id", "tenant_id"),
+        Index("ix_invoice_created_at", "created_at"),
+        Index("ix_invoice_updated_at", "updated_at"),
+        Index("ix_invoice_tenant_status", "tenant_id", "status"),
         CheckConstraint("student_count >= 0", name="check_invoice_student_count_non_negative"),
         CheckConstraint("amount_per_student >= 0", name="check_amount_per_student_non_negative"),
         CheckConstraint("total_amount >= 0", name="check_total_amount_non_negative"),
