@@ -1,22 +1,8 @@
 import client, { handleEnvelope, handlePaginatedEnvelope, ApiError } from '@/apis/client'
+import type { Enrollment as SharedEnrollment, Semester } from '@/lib/types'
 
-export type Semester = 'fall' | 'spring' | 'summer' | 'winter' | 'interim' | 'first' | 'second' | 'third' | 'fourth' | 'fifth' | 'sixth' | 'seventh' | 'eighth'
-
-export interface Enrollment {
-  id: string
-  student_id: string
-  student_name?: string
-  student_email?: string
-  institution_id?: string
-  course_id: string
-  course_name?: string
-  lecturer_id?: string
-  semester: Semester
-  year?: number
-  status: 'active' | 'completed' | 'dropped' | 'pending'
-  created_at: string
-  updated_at: string
-}
+// Use shared Enrollment type from types.ts
+export type Enrollment = SharedEnrollment
 
 export interface EnrollmentCreate {
   student_id: string

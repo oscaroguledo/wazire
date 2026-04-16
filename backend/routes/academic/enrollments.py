@@ -19,7 +19,7 @@ from schemas.academic.enrollment import (
 )
 from core.dependencies.common import authenticated_dep
 from services.academic.enrollment import EnrollmentService
-from tasks.submission_tasks import refresh_dashboard_task
+from tasks.submission import refresh_dashboard_task
 from core.database import get_db
 from core.dependencies.common import get_token_service, lecturer_or_admin_dep, authenticated_dep
 

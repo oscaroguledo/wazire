@@ -1,18 +1,24 @@
 from __future__ import annotations
 
 import uuid
+import logging
 from typing import Optional, Union
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.analytics.dashboard import LecturerDashboard, AdminDashboard, StudentDashboard
 from models.account.users import User, UserRole
+from models.academic.course import Course
+from models.academic.exam import Exam
+from models.academic.submission import Submission
 from schemas.analytics.dashboard import (
     LecturerDashboardResponse,
     AdminDashboardResponse,
     StudentDashboardResponse,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class DashboardService:
@@ -56,17 +62,12 @@ class DashboardService:
         
         return dashboard
     
-    async def get_lecturer_dashboard(self, lecturer_id: uuid.UUID) -> Optional[LecturerDashboardResponse]:
-        """Get lecturer dashboard by lecturer ID."""
-        dashboard = await self.get_or_create_lecturer_dashboard(lecturer_id)
-        return LecturerDashboardResponse.model_validate(dashboard.to_dict()) if dashboard else None
-    
     
     # -------------------------------------------------------------------------
     # Admin Dashboard
     # -------------------------------------------------------------------------
     
-    async def get_or_create_admin_dashboard(self, admin_id: uuid.UUID) -> AdminDashboard:
+    async def get_or_create_admin_dashboard(self, admin_id: uuid.UUID, tenant_id: uuid.UUID = None) -> AdminDashboard:
         """Get existing or create new admin dashboard."""
         stmt = select(AdminDashboard).where(AdminDashboard.admin_id == admin_id)
         result = await self.db.execute(stmt)
@@ -90,10 +91,62 @@ class DashboardService:
         
         return dashboard
     
-    async def get_admin_dashboard(self, admin_id: uuid.UUID, tenant_id: Optional[uuid.UUID] = None) -> Optional[AdminDashboardResponse]:
-        """Get admin dashboard by admin ID. Returns cached data (auto-updated by triggers)."""
-        dashboard = await self.get_or_create_admin_dashboard(admin_id)
-        return AdminDashboardResponse.model_validate(dashboard.to_dict()) if dashboard else None
+    async def compute_admin_stats(self, tenant_id: uuid.UUID) -> dict:
+        """Compute aggregate statistics for a tenant."""
+        try:
+            # Count users by role
+            total_users_stmt = select(func.count()).select_from(User).where(User.tenant_id == tenant_id)
+            total_lecturers_stmt = select(func.count()).select_from(User).where(
+                User.tenant_id == tenant_id, User.role == UserRole.LECTURER
+            )
+            total_students_stmt = select(func.count()).select_from(User).where(
+                User.tenant_id == tenant_id, User.role == UserRole.STUDENT
+            )
+            
+            # Count courses
+            total_courses_stmt = select(func.count()).select_from(Course).where(Course.tenant_id == tenant_id)
+            
+            # Count exams
+            total_exams_stmt = select(func.count()).select_from(Exam).where(Exam.tenant_id == tenant_id)
+            
+            # Count submissions
+            total_submissions_stmt = select(func.count()).select_from(Submission).join(
+                Exam, Submission.exam_id == Exam.id
+            ).where(Exam.tenant_id == tenant_id)
+            
+            # Count graded submissions
+            total_graded_submissions_stmt = select(func.count()).select_from(Submission).join(
+                Exam, Submission.exam_id == Exam.id
+            ).where(Exam.tenant_id == tenant_id, Submission.graded_at.isnot(None))
+            
+            # Count pending submissions (not graded)
+            total_pending_submissions_stmt = select(func.count()).select_from(Submission).join(
+                Exam, Submission.exam_id == Exam.id
+            ).where(Exam.tenant_id == tenant_id, Submission.graded_at.is_(None))
+            
+            # Execute all queries
+            total_users = (await self.db.execute(total_users_stmt)).scalar() or 0
+            total_lecturers = (await self.db.execute(total_lecturers_stmt)).scalar() or 0
+            total_students = (await self.db.execute(total_students_stmt)).scalar() or 0
+            total_courses = (await self.db.execute(total_courses_stmt)).scalar() or 0
+            total_exams = (await self.db.execute(total_exams_stmt)).scalar() or 0
+            total_submissions = (await self.db.execute(total_submissions_stmt)).scalar() or 0
+            total_graded_submissions = (await self.db.execute(total_graded_submissions_stmt)).scalar() or 0
+            total_pending_submissions = (await self.db.execute(total_pending_submissions_stmt)).scalar() or 0
+            
+            return {
+                "total_users": total_users,
+                "total_lecturers": total_lecturers,
+                "total_students": total_students,
+                "total_courses": total_courses,
+                "total_exams": total_exams,
+                "total_submissions": total_submissions,
+                "total_graded_submissions": total_graded_submissions,
+                "total_pending_submissions": total_pending_submissions,
+            }
+        except Exception as e:
+            logger.error(f"[DASHBOARD] Error computing admin stats for tenant {tenant_id}: {e}")
+            raise
     
     
     # -------------------------------------------------------------------------
@@ -122,24 +175,29 @@ class DashboardService:
             await self.db.refresh(dashboard)
 
         return dashboard
+
+
+# -------------------------------------------------------------------------
+# Background refresh functions (for async tasks)
+# -------------------------------------------------------------------------
+
+async def refresh_dashboard_bg(user_id: uuid.UUID, db: AsyncSession) -> None:
+    """Refresh a single user's dashboard statistics in the background."""
+    service = DashboardService(db)
     
-    async def get_student_dashboard(self, student_id: uuid.UUID) -> Optional[StudentDashboardResponse]:
-        """Get student dashboard by student ID. Returns cached data (auto-updated by triggers)."""
-        dashboard = await self.get_or_create_student_dashboard(student_id)
-        return StudentDashboardResponse.model_validate(dashboard.to_dict()) if dashboard else None
+    # Get user to determine role
+    stmt = select(User).where(User.id == user_id)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
     
+    if not user:
+        logger.warning(f"[DASHBOARD] User not found for dashboard refresh: {user_id}")
+        return
     
-    # -------------------------------------------------------------------------
-    # User Dashboard (Unified)
-    # -------------------------------------------------------------------------
-    
-    async def get_user_dashboard(self, user: User) -> Union[LecturerDashboardResponse, AdminDashboardResponse, StudentDashboardResponse]:
-        """Get appropriate dashboard for user based on role."""
-        if user.role == UserRole.LECTURER:
-            return await self.get_lecturer_dashboard(user.id)
-        elif user.role == UserRole.ADMIN or user.role == UserRole.SUPERADMIN:
-            return await self.get_admin_dashboard(user.id, user.tenant_id)
-        elif user.role == UserRole.STUDENT:
-            return await self.get_student_dashboard(user.id)
-        else:
-            raise ValueError(f"Unknown user role: {user.role}")
+    # Refresh based on role
+    if user.role == UserRole.LECTURER:
+        await service.get_or_create_lecturer_dashboard(user_id)
+    elif user.role in (UserRole.ADMIN, UserRole.SUPERADMIN):
+        await service.get_or_create_admin_dashboard(user_id, user.tenant_id)
+    elif user.role == UserRole.STUDENT:
+        await service.get_or_create_student_dashboard(user_id)

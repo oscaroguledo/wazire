@@ -41,6 +41,15 @@ export interface AppConfig {
   CACHE_TTL: number; // in seconds
   ENABLE_CACHE: boolean;
 
+  // API Query Cache (React Query staleTime)
+  QUERY_CACHE_DEFAULT: number; // milliseconds
+  QUERY_CACHE_STATIC: number; // milliseconds - for static data
+  QUERY_CACHE_DYNAMIC: number; // milliseconds - for frequently changing data
+  QUERY_CACHE_USERS: number; // milliseconds - for user data
+
+  // Validation Rules
+  MIN_PASSWORD_LENGTH: number;
+
   // Theme
   DEFAULT_THEME: 'light' | 'dark' | 'system';
   PRIMARY_COLOR: string;
@@ -103,6 +112,15 @@ const DEFAULT_CONFIG: AppConfig = {
   // Cache Configuration
   CACHE_TTL: 300, // 5 minutes
   ENABLE_CACHE: true,
+
+  // API Query Cache (React Query staleTime)
+  QUERY_CACHE_DEFAULT: 30000, // 30 seconds
+  QUERY_CACHE_STATIC: 300000, // 5 minutes - for static data like courses, exams
+  QUERY_CACHE_DYNAMIC: 30000, // 30 seconds - for frequently changing data like submissions
+  QUERY_CACHE_USERS: 120000, // 2 minutes - for user data
+
+  // Validation Rules
+  MIN_PASSWORD_LENGTH: 8,
 
   // Theme
   DEFAULT_THEME: 'system',

@@ -71,7 +71,7 @@ async def create_tenant(
     return Response(
         success=True,
         message="Tenant created successfully",
-        data=TenantRead.model_validate(tenant),
+        data=tenant.to_dict(),
         request=request,
         status_code=status.HTTP_201_CREATED
     )
@@ -97,7 +97,7 @@ async def list_tenants(
     return Response(
         success=True, 
         message="Tenants retrieved successfully", 
-        data=[TenantRead.model_validate(t) for t in tenants], 
+        data=[t.to_dict() for t in tenants], 
         pagination={
             "next_cursor": next_cursor,
             "has_next": next_cursor is not None,
@@ -127,7 +127,7 @@ async def get_tenant(
     return Response(
         success=True,
         message="Tenant retrieved successfully",
-        data=TenantRead.model_validate(tenant),
+        data=tenant.to_dict(),
         request=request
     )
 
@@ -165,7 +165,7 @@ async def update_tenant(
     return Response(
         success=True,
         message="Tenant updated successfully",
-        data=TenantRead.model_validate(updated_tenant),
+        data=updated_tenant.to_dict(),
         request=request
     )
 

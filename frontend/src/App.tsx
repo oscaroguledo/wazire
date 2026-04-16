@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { config } from './config';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Layout } from './components/Layout';
@@ -24,11 +25,11 @@ import CreateTenantPage from './pages/tenants/CreateTenant';
 import EditTenantPage from './pages/tenants/EditTenant';
 import BillingPage from './pages/Billing';
 
-// Create QueryClient instance
+// Create QueryClient instance with optimized staleTimes per data type
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5000, // Data stays fresh for 5 seconds
+      staleTime: config.QUERY_CACHE_DEFAULT, // Default: 30 seconds for most data
       refetchOnWindowFocus: false,
       retry: 1,
     },

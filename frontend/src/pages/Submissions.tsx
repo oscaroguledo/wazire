@@ -1,20 +1,19 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { FileText, Calendar, Award, TrendingUp, AlertCircle } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import Icon from '@/components/Icon';
-import { useAuth } from '@/contexts/AuthContext';
-import { StatusBadge } from '@/components/StatusBadge';
-import Table from '@/components/Table';
-import Card from '@/components/Card';
-import Pagination from '@/components/Pagination';
-import { EmptyState } from '@/components/EmptyState';
-import Button from '@/components/Button';
-import SubmissionsSkeleton from './SubmissionsSkeleton';
-import * as submissionApi from '@/apis/submission';
-import type { Submission, SubmissionListParams } from '@/apis/submission';
-import Breadcrumbs from '@/components/Breadcrumbs';
+import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import { FileText, TrendingUp, Award, Calendar, Filter, ChevronDown } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import Icon from '@/components/Icon'
+import { useAuth } from '@/contexts/AuthContext'
+import * as submissionApi from '@/apis/submission'
+import Pagination from '@/components/Pagination'
+import SearchInput from '@/components/SearchInput'
+import Dropdown from '@/components/Dropdown'
+import Button from '@/components/Button'
+import { StatusBadge } from '@/components/StatusBadge'
+import Breadcrumbs from '@/components/Breadcrumbs'
+import SubmissionsSkeleton from './SubmissionsSkeleton'
+import { config } from '@/config';
 
 interface StatCardProps {
   label: string;
@@ -76,16 +75,18 @@ export function Submissions() {
         per_page: pageSize,
         lecturer_id: user?.id, // triggers /lecturer endpoint in the API client
       })
-      // Normalize latest_score → score for display
+      // Normalize fields from backend to_dict() to match frontend expectations
       const items = (result.items || []).map((s: any) => ({
         ...s,
         score: s.score ?? s.latest_score,
-        status: s.graded_at ? 'graded' : s.attempts_count > 0 ? 'submitted' : 'pending',
+        max_score: s.max_score ?? 100, // Default if not provided by backend
+        submitted_at: s.submitted_at ?? s.created_at, // Use created_at if submitted_at not available
+        status: s.status || (s.graded_at ? 'graded' : s.attempts_count > 0 ? 'submitted' : 'pending'),
       }))
       return { items, pagination: result.pagination }
     },
     enabled: !!user,
-    staleTime: 5000,
+    staleTime: config.QUERY_CACHE_DYNAMIC, // 30 seconds - submissions change more frequently
   })
 
   const submissions = data?.items || [];

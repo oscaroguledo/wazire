@@ -1,18 +1,10 @@
 import client, { handleEnvelope, handlePaginatedEnvelope, ApiResponse, ApiError } from '@/apis/client'
 import { config } from '@/config'
+import { validateRequiredFields, validateRequiredId, validateUpdatePayload, handleApiError } from './api-utils'
+import type { Course as SharedCourse } from '@/lib/types'
 
-// Course Types (matching backend schemas)
-export interface Course {
-  id: string
-  name: string
-  description?: string
-  course_code: string
-  lecturer: any
-  tenant_id?: string
-  tenant?: string
-  created_at: string
-  updated_at: string
-}
+// Use shared Course type from types.ts
+export type Course = SharedCourse
 
 export interface CourseCreate {
   name: string
@@ -95,31 +87,13 @@ export async function listCourses(params?: CourseListParams): Promise<CourseList
  * Matches backend GET /academic/courses/{course_id} endpoint
  */
 export async function getCourse(courseId: string): Promise<Course> {
-  if (!courseId) {
-    throw new ApiError('Course ID is required', 400)
-  }
+  validateRequiredId(courseId, 'Course ID')
 
   try {
     const response = await client.get<ApiResponse<Course>>(`/academic/courses/${courseId}`)
     return handleEnvelope<Course>(response)
   } catch (error) {
-    if (error instanceof ApiError) {
-      throw error
-    }
-    
-    if (error instanceof Error) {
-      if (error.message.includes('401') || error.message.includes('Not authenticated')) {
-        throw new ApiError('Authentication required to view course', 401)
-      }
-      if (error.message.includes('403') || error.message.includes('Forbidden')) {
-        throw new ApiError('Access denied to view this course', 403)
-      }
-      if (error.message.includes('404') || error.message.includes('Not Found')) {
-        throw new ApiError('Course not found', 404)
-      }
-    }
-    
-    throw new ApiError('Failed to fetch course', 500)
+    handleApiError(error, 'Get course')
   }
 }
 
@@ -128,34 +102,13 @@ export async function getCourse(courseId: string): Promise<Course> {
  * Matches backend POST /academic/courses endpoint
  */
 export async function createCourse(courseData: CourseCreate): Promise<Course> {
-  if (!courseData.name || !courseData.course_code) {
-    throw new ApiError('Course name and code are required', 400)
-  }
+  validateRequiredFields(courseData, ['name', 'course_code'])
 
   try {
     const response = await client.post<ApiResponse<Course>>('/academic/courses/', courseData)
     return handleEnvelope<Course>(response)
   } catch (error) {
-    if (error instanceof ApiError) {
-      throw error
-    }
-    
-    if (error instanceof Error) {
-      if (error.message.includes('401') || error.message.includes('Not authenticated')) {
-        throw new ApiError('Authentication required to create courses', 401)
-      }
-      if (error.message.includes('403') || error.message.includes('Forbidden')) {
-        throw new ApiError('Access denied to create courses', 403)
-      }
-      if (error.message.includes('400') || error.message.includes('Bad Request')) {
-        throw new ApiError('Invalid course data', 400)
-      }
-      if (error.message.includes('409') || error.message.includes('Conflict')) {
-        throw new ApiError('Course code already exists', 409)
-      }
-    }
-    
-    throw new ApiError('Failed to create course', 500)
+    handleApiError(error, 'Create course')
   }
 }
 
@@ -164,41 +117,14 @@ export async function createCourse(courseData: CourseCreate): Promise<Course> {
  * Matches backend PUT /academic/courses/{course_id} endpoint
  */
 export async function updateCourse(courseId: string, courseData: CourseUpdate): Promise<Course> {
-  if (!courseId) {
-    throw new ApiError('Course ID is required', 400)
-  }
-
-  if (Object.keys(courseData).length === 0) {
-    throw new ApiError('At least one field must be provided for update', 400)
-  }
+  validateRequiredId(courseId, 'Course ID')
+  validateUpdatePayload(courseData)
 
   try {
     const response = await client.put<ApiResponse<Course>>(`/academic/courses/${courseId}`, courseData)
     return handleEnvelope<Course>(response)
   } catch (error) {
-    if (error instanceof ApiError) {
-      throw error
-    }
-    
-    if (error instanceof Error) {
-      if (error.message.includes('401') || error.message.includes('Not authenticated')) {
-        throw new ApiError('Authentication required to update courses', 401)
-      }
-      if (error.message.includes('403') || error.message.includes('Forbidden')) {
-        throw new ApiError('Access denied to update this course', 403)
-      }
-      if (error.message.includes('404') || error.message.includes('Not Found')) {
-        throw new ApiError('Course not found', 404)
-      }
-      if (error.message.includes('400') || error.message.includes('Bad Request')) {
-        throw new ApiError('Invalid course data', 400)
-      }
-      if (error.message.includes('409') || error.message.includes('Conflict')) {
-        throw new ApiError('Course code already exists', 409)
-      }
-    }
-    
-    throw new ApiError('Failed to update course', 500)
+    handleApiError(error, 'Update course')
   }
 }
 
@@ -207,9 +133,7 @@ export async function updateCourse(courseId: string, courseData: CourseUpdate): 
  * Matches backend DELETE /academic/courses/{course_id} endpoint
  */
 export async function deleteCourse(courseId: string): Promise<void> {
-  if (!courseId) {
-    throw new ApiError('Course ID is required', 400)
-  }
+  validateRequiredId(courseId, 'Course ID')
 
   try {
     const response = await client.delete<ApiResponse<void>>(`/academic/courses/${courseId}`)
@@ -220,26 +144,7 @@ export async function deleteCourse(courseId: string): Promise<void> {
     // For other success responses, use handleEnvelope
     handleEnvelope<void>(response)
   } catch (error) {
-    if (error instanceof ApiError) {
-      throw error
-    }
-    
-    if (error instanceof Error) {
-      if (error.message.includes('401') || error.message.includes('Not authenticated')) {
-        throw new ApiError('Authentication required to delete courses', 401)
-      }
-      if (error.message.includes('403') || error.message.includes('Forbidden')) {
-        throw new ApiError('Access denied to delete this course', 403)
-      }
-      if (error.message.includes('404') || error.message.includes('Not Found')) {
-        throw new ApiError('Course not found', 404)
-      }
-      if (error.message.includes('400') || error.message.includes('Bad Request')) {
-        throw new ApiError('Cannot delete course with existing enrollments or exams', 400)
-      }
-    }
-    
-    throw new ApiError('Failed to delete course', 500)
+    handleApiError(error, 'Delete course')
   }
 }
 

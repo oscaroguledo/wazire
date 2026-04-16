@@ -18,6 +18,7 @@ import Input from '@/components/Input';
 import SearchInput from '@/components/SearchInput';
 import Dropdown from '@/components/Dropdown';
 import Button from '@/components/Button';
+import { config } from '@/config';
 import { EmptyState } from '@/components/EmptyState';
 import DateTimePicker from '@/components/DateTimePicker';
 import ExamsSkeleton from './ExamsSkeleton';
@@ -38,13 +39,13 @@ export function Exams() {
   // Form state for creating exam
   const [createFormData, setCreateFormData] = useState({
     title: '',
-    course_id: '',
-    duration_hours: '',
-    duration_minutes: 0,
+    courseId: '',
+    durationHours: '',
+    durationMinutes: 0,
     description: '',
-    total_marks: '',
-    passing_marks: '',
-    start_time: '',
+    totalMarks: '',
+    passingMarks: '',
+    startTime: '',
   });
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -64,7 +65,7 @@ export function Exams() {
       return Array.isArray(response) ? response : response.items;
     },
     enabled: !!user && user.role === 'student',
-    staleTime: 60000,
+    staleTime: config.QUERY_CACHE_STATIC, // 5 minutes - exams are relatively static
   });
 
   const enrolledCourseIds = enrollmentsData?.map((e: Enrollment) => e.course_id) || [];
@@ -121,7 +122,7 @@ export function Exams() {
       };
     },
     enabled: !!user && (user.role !== 'student' || enrolledCourseIds.length > 0),
-    staleTime: 5000,
+    staleTime: config.QUERY_CACHE_STATIC, // 5 minutes - exams are relatively static
   });
 
   const exams = data?.exams?.items || [];
@@ -146,13 +147,13 @@ export function Exams() {
 
     const examData = {
       title: createFormData.title,
-      course_id: createFormData.course_id,
-      duration_hours: parseInt(createFormData.duration_hours),
-      duration_minutes: parseInt(createFormData.duration_minutes.toString()) || 0,
+      course_id: createFormData.courseId,
+      duration_hours: parseInt(createFormData.durationHours),
+      duration_minutes: parseInt(createFormData.durationMinutes.toString()) || 0,
       description: createFormData.description,
-      total_marks: createFormData.total_marks ? parseInt(createFormData.total_marks) : undefined,
-      passing_marks: createFormData.passing_marks ? parseInt(createFormData.passing_marks) : undefined,
-      start_time: createFormData.start_time || undefined,
+      total_marks: createFormData.totalMarks ? parseInt(createFormData.totalMarks) : undefined,
+      passing_marks: createFormData.passingMarks ? parseInt(createFormData.passingMarks) : undefined,
+      start_time: createFormData.startTime || undefined,
     };
 
     examApi.createExam(examData)
@@ -160,13 +161,13 @@ export function Exams() {
         // Reset form and close modal
         setCreateFormData({
           title: '',
-          course_id: '',
-          duration_hours: '',
-          duration_minutes: 0,
+          courseId: '',
+          durationHours: '',
+          durationMinutes: 0,
           description: '',
-          total_marks: '',
-          passing_marks: '',
-          start_time: '',
+          totalMarks: '',
+          passingMarks: '',
+          startTime: '',
         });
         setIsCreateModalOpen(false);
         // Refresh exams list
@@ -471,13 +472,13 @@ export function Exams() {
           setIsCreateModalOpen(false);
           setCreateFormData({
             title: '',
-            course_id: '',
-            duration_hours: '',
-            duration_minutes: 0,
+            courseId: '',
+            durationHours: '',
+            durationMinutes: 0,
             description: '',
-            total_marks: '',
-            passing_marks: '',
-            start_time: ''
+            totalMarks: '',
+            passingMarks: '',
+            startTime: ''
           });
           setSelectedCourse('');
           setCreateError(null);
@@ -515,9 +516,9 @@ export function Exams() {
                 label: `${course.name} (${course.course_code})`,
                 subtitle: course.course_code
               }))}
-              value={createFormData.course_id}
+              value={createFormData.courseId}
               onChange={(v) => {
-                handleCreateFormChange('course_id', v);
+                handleCreateFormChange('courseId', v);
                 setSelectedCourse(v);
               }}
               searchable={true}
@@ -531,8 +532,8 @@ export function Exams() {
               Start Time
             </label>
             <DateTimePicker
-              value={createFormData.start_time}
-              onChange={(value) => handleCreateFormChange('start_time', value)}
+              value={createFormData.startTime}
+              onChange={(value) => handleCreateFormChange('startTime', value)}
               disabled={createLoading}
               placeholder="Date/time"
             />
@@ -547,11 +548,11 @@ export function Exams() {
                 type="number"
                 min="1"
                 max="24"
-                placeholder="e.g., 2"
-                value={createFormData.duration_hours}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleCreateFormChange('duration_hours', e.target.value)}
-                required
+                value={createFormData.durationHours}
+                onChange={(e) => handleCreateFormChange('durationHours', e.target.value)}
                 disabled={createLoading}
+                placeholder="Hours"
+                className="w-full"
               />
             </div>
             <div>
@@ -560,12 +561,13 @@ export function Exams() {
               </label>
               <Input
                 type="number"
+                value={createFormData.durationMinutes}
+                onChange={(e) => handleCreateFormChange('durationMinutes', e.target.value)}
+                disabled={createLoading}
+                placeholder="Minutes"
                 min="0"
                 max="59"
-                placeholder="e.g., 30"
-                value={createFormData.duration_minutes}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleCreateFormChange('duration_minutes', e.target.value)}
-                disabled={createLoading}
+                className="w-full"
               />
             </div>
           </div>
@@ -575,24 +577,28 @@ export function Exams() {
               <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-2">
                 Total Marks
               </label>
-              <Input 
-                type="number" 
-                placeholder="100"
-                value={createFormData.total_marks}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleCreateFormChange('total_marks', e.target.value)}
+              <Input
+                type="number"
+                value={createFormData.totalMarks}
+                onChange={(e) => handleCreateFormChange('totalMarks', e.target.value)}
                 disabled={createLoading}
+                placeholder="Optional"
+                min="0"
+                className="w-full"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-2">
                 Passing Marks
               </label>
-              <Input 
-                type="number" 
-                placeholder="50"
-                value={createFormData.passing_marks}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleCreateFormChange('passing_marks', e.target.value)}
+              <Input
+                type="number"
+                value={createFormData.passingMarks}
+                onChange={(e) => handleCreateFormChange('passingMarks', e.target.value)}
                 disabled={createLoading}
+                placeholder="Optional"
+                min="0"
+                className="w-full"
               />
             </div>
           </div>
@@ -608,24 +614,38 @@ export function Exams() {
               value={createFormData.description}
               onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleCreateFormChange('description', e.target.value)}
               disabled={createLoading}
+              className="w-full"
             />
           </div>
 
-          <div className="flex gap-3 pt-4">
+          <div className="flex justify-end gap-3 pt-4">
             <Button 
+              type="button"
               variant="secondary" 
-              className="flex-1" 
-              type="button" 
-              onClick={() => setIsCreateModalOpen(false)}
+              onClick={() => {
+                setIsCreateModalOpen(false);
+                setCreateFormData({
+                  title: '',
+                  courseId: '',
+                  durationHours: '',
+                  durationMinutes: 0,
+                  description: '',
+                  totalMarks: '',
+                  passingMarks: '',
+                  startTime: ''
+                });
+                setSelectedCourse('');
+                setCreateError(null);
+              }}
               disabled={createLoading}
             >
               Cancel
             </Button>
             <Button
-              className="flex-1"
               type="submit"
+              variant="primary"
+              disabled={createLoading || !createFormData.title || !createFormData.courseId || !createFormData.durationHours}
               loading={createLoading}
-              disabled={!createFormData.title || !createFormData.course_id || !createFormData.duration_hours}
             >
               Create Exam
             </Button>

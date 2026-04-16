@@ -16,7 +16,7 @@ const STATUS_STYLES: Record<string, string> = {
   submitted: 'bg-[var(--color-info-100)] text-[var(--color-info-600)] border-[var(--color-info-100)]',
 }
 
-export function StatusBadge({ status, size = 'md' }: StatusBadgeProps) {
+function StatusBadgeComponent({ status, size = 'md' }: StatusBadgeProps) {
   const statusStr = (status || 'not_started') as string
   const key = statusStr.toLowerCase()
   const style = STATUS_STYLES[key] ?? STATUS_STYLES.not_started
@@ -28,3 +28,5 @@ export function StatusBadge({ status, size = 'md' }: StatusBadgeProps) {
     </span>
   )
 }
+
+export const StatusBadge = React.memo(StatusBadgeComponent)

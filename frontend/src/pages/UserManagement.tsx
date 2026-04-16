@@ -1,22 +1,21 @@
 import React, { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Users, AlertCircle, UserPlus, BookOpen, GraduationCap, Pencil, Trash2 } from 'lucide-react'
+import { Users, Plus, Edit, Trash2, Search, Filter, UserPlus } from 'lucide-react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Icon from '@/components/Icon'
 import { useAuth } from '@/contexts/AuthContext'
 import * as authApi from '@/apis/auth'
-import type { User } from '@/apis/auth'
-import Button from '@/components/Button'
-import Input from '@/components/Input'
+import Pagination from '@/components/Pagination'
 import SearchInput from '@/components/SearchInput'
 import Dropdown from '@/components/Dropdown'
+import Button from '@/components/Button'
 import { Modal } from '@/components/Modal'
-import Table from '@/components/Table'
+import Input from '@/components/Input'
 import { StatusBadge } from '@/components/StatusBadge'
 import Breadcrumbs from '@/components/Breadcrumbs'
-import { EmptyState } from '@/components/EmptyState'
-import Pagination from '@/components/Pagination'
-import { UserManagementSkeleton } from './UserManagementSkeleton'
+import UserManagementSkeleton from './UserManagementSkeleton'
+import { config } from '@/config'
 
 type RoleFilter = User['role'] | 'all'
 
@@ -106,7 +105,7 @@ export function UserManagement() {
       return res
     },
     enabled: !!currentUser,
-    staleTime: 5000,
+    staleTime: config.QUERY_CACHE_USERS, // 2 minutes - users are relatively static
   })
 
   const users = data?.items || []

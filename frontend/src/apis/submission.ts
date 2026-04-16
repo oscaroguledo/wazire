@@ -1,41 +1,10 @@
 import client, { handleEnvelope, handlePaginatedEnvelope, ApiResponse, ApiError } from '@/apis/client'
 import { config } from '@/config'
+import type { Submission as SharedSubmission, SubmissionAttempt as SharedSubmissionAttempt } from '@/lib/types'
 
-// Submission Types (matching backend schemas)
-export interface Submission {
-  id: string
-  exam_id: string
-  exam_title?: string
-  student_id: string
-  student_name?: string
-  lecturer_id: string
-  lecturer_name?: string
-  tenant_id?: string
-  status: 'pending' | 'submitted' | 'graded' | 'returned'
-  score?: number
-  max_score: number
-  percentage?: number
-  started_at?: string
-  submitted_at?: string
-  graded_at?: string
-  feedback?: string
-  attempts: SubmissionAttempt[]
-  created_at: string
-  updated_at: string
-}
-
-export interface SubmissionAttempt {
-  id: string
-  submission_id: string
-  attempt_number: number
-  score?: number
-  max_score: number
-  started_at: string
-  submitted_at?: string
-  graded_at?: string
-  feedback?: string
-  created_at: string
-}
+// Use shared types from types.ts
+export type Submission = SharedSubmission
+export type SubmissionAttempt = SharedSubmissionAttempt
 
 export interface SubmissionAnswer {
   id: string

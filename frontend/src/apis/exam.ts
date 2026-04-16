@@ -1,48 +1,10 @@
 import client, { handleEnvelope, handlePaginatedEnvelope, ApiResponse, ApiError } from '@/apis/client'
 import { config } from '@/config'
+import type { Exam as SharedExam, Question as SharedQuestion } from '@/lib/types'
 
-// Exam Types (matching backend schemas)
-export interface Exam {
-  id: string
-  title: string
-  description?: string
-  course: any
-  lecturer: any
-  tenant_id?: string
-  duration_hours: number
-  duration_minutes: number
-  total_marks: number
-  passing_marks?: number
-  status: 'not_started' | 'in_progress' | 'finished'
-  max_attempts: number
-  start_time?: string
-  created_by?: string
-  updated_by?: string
-  created_at: string
-  updated_at: string
-  question_count: number
-  submission_count: number
-  questions?: ExamQuestion[]
-}
-
-export interface ExamQuestion {
-  id: string
-  number: string
-  text: string
-  images?: string[]  // array of base64 encoded images
-  parent_id?: string
-  tenant_id?: string
-  rules?: string
-  mark: number
-  industry: string
-  qtype: 'multiple_choice' | 'theory' | 'fill_in_blanks'
-  options?: Array<{label: string; text: string}>
-  parsed_options?: Array<{ label: string; text: string }>
-  exams?: { id: string }[]
-  answer?: Answer
-  created_at: string
-  updated_at: string
-}
+// Use shared types from types.ts
+export type Exam = SharedExam
+export type Question = SharedQuestion
 
 export interface Answer {
   id: string
@@ -81,11 +43,11 @@ export interface QuestionListParams {
   page?: number
   per_page?: number
   search?: string
-  question_type?: ExamQuestion['qtype']
+  question_type?: Question['qtype']
 }
 
 export interface QuestionListResponse {
-  items: ExamQuestion[]
+  items: Question[]
   pagination: {
     page: number
     per_page: number
@@ -379,11 +341,11 @@ export async function listQuestions(examId: string, params?: QuestionListParams)
       question_type: params?.question_type,
     }
 
-    const response = await client.get<ApiResponse<ExamQuestion[]>>(`/academic/questions`, { 
+    const response = await client.get<ApiResponse<Question[]>>(`/academic/questions`, { 
       params: requestParams 
     })
     
-    return handlePaginatedEnvelope<ExamQuestion>(response)
+    return handlePaginatedEnvelope<Question>(response)
   } catch (error) {
     if (error instanceof ApiError) {
       throw error
@@ -409,14 +371,14 @@ export async function listQuestions(examId: string, params?: QuestionListParams)
  * Get a single question by ID
  * Matches backend GET /academic/exams/{exam_id}/questions/{question_id} endpoint
  */
-export async function getQuestion(examId: string, questionId: string): Promise<ExamQuestion> {
+export async function getQuestion(examId: string, questionId: string): Promise<Question> {
   if (!examId || !questionId) {
     throw new ApiError('Exam ID and Question ID are required', 400)
   }
 
   try {
-    const response = await client.get<ApiResponse<ExamQuestion>>(`/academic/questions/${questionId}`)
-    return handleEnvelope<ExamQuestion>(response)
+    const response = await client.get<ApiResponse<Question>>(`/academic/questions/${questionId}`)
+    return handleEnvelope<Question>(response)
   } catch (error) {
     if (error instanceof ApiError) {
       throw error
@@ -442,7 +404,7 @@ export async function getQuestion(examId: string, questionId: string): Promise<E
  * Create a new question for an exam
  * Matches backend POST /academic/exams/{exam_id}/questions endpoint
  */
-export async function createQuestion(examId: string, questionData: QuestionCreate): Promise<ExamQuestion> {
+export async function createQuestion(examId: string, questionData: QuestionCreate): Promise<Question> {
   if (!examId) {
     throw new ApiError('Exam ID is required', 400)
   }
@@ -451,8 +413,8 @@ export async function createQuestion(examId: string, questionData: QuestionCreat
   }
 
   try {
-    const response = await client.post<ApiResponse<ExamQuestion>>(`/academic/questions`, questionData)
-    return handleEnvelope<ExamQuestion>(response)
+    const response = await client.post<ApiResponse<Question>>(`/academic/questions`, questionData)
+    return handleEnvelope<Question>(response)
   } catch (error) {
     if (error instanceof ApiError) {
       throw error
@@ -478,14 +440,14 @@ export async function createQuestion(examId: string, questionData: QuestionCreat
  * Update an existing question
  * Matches backend PUT /academic/exams/{exam_id}/questions/{question_id} endpoint
  */
-export async function updateQuestion(examId: string, questionId: string, questionData: QuestionUpdate): Promise<ExamQuestion> {
+export async function updateQuestion(examId: string, questionId: string, questionData: QuestionUpdate): Promise<Question> {
   if (!examId || !questionId) {
     throw new ApiError('Exam ID and Question ID are required', 400)
   }
 
   try {
-    const response = await client.put<ApiResponse<ExamQuestion>>(`/academic/questions/${questionId}`, questionData)
-    return handleEnvelope<ExamQuestion>(response)
+    const response = await client.put<ApiResponse<Question>>(`/academic/questions/${questionId}`, questionData)
+    return handleEnvelope<Question>(response)
   } catch (error) {
     if (error instanceof ApiError) {
       throw error

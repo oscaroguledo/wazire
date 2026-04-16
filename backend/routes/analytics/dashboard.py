@@ -36,8 +36,11 @@ async def get_my_dashboard(
     service = DashboardService(db)
     """Get dashboard data for the currently authenticated user."""
     try:
-        dashboard = await service.get_user_dashboard(current_user)
-        return Response(success=True, data=dashboard, request=request)
+        # Get the raw dashboard model and call to_dict()
+        dashboard_model = await service.get_or_create_lecturer_dashboard(current_user.id) if current_user.role == UserRole.LECTURER else \
+                          await service.get_or_create_admin_dashboard(current_user.id, current_user.tenant_id) if current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else \
+                          await service.get_or_create_student_dashboard(current_user.id)
+        return Response(success=True, data=dashboard_model.to_dict() if dashboard_model else None, request=request)
     except Exception as e:
         return Response(
             success=False,
@@ -74,16 +77,16 @@ async def get_lecturer_dashboard(
                 status_code=status.HTTP_403_FORBIDDEN
             )
         
-        dashboard = await service.get_lecturer_dashboard(lecturer_id)
-        if not dashboard:
+        # Get raw dashboard model and call to_dict()
+        dashboard_model = await service.get_or_create_lecturer_dashboard(lecturer_id)
+        if not dashboard_model:
             return Response(
                 success=False,
                 error="Dashboard not found",
                 request=request,
                 status_code=status.HTTP_404_NOT_FOUND
             )
-        
-        return Response(success=True, data=dashboard, request=request)
+        return Response(success=True, data=dashboard_model.to_dict(), request=request)
     except Exception as e:
         return Response(
             success=False,
@@ -107,25 +110,25 @@ async def get_admin_dashboard(
     service = DashboardService(db)
     """Get dashboard for a specific admin (superadmin only)."""
     try:
-        # Only superadmins can view other admins' dashboards
-        if current_user.role != UserRole.SUPERADMIN and current_user.id != admin_id:
+        # Access control
+        if current_user.role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
             return Response(
                 success=False,
-                error="Can only view your own dashboard",
+                error="Admin access required",
                 request=request,
                 status_code=status.HTTP_403_FORBIDDEN
             )
         
-        dashboard = await service.get_admin_dashboard(admin_id)
-        if not dashboard:
+        # Get raw dashboard model and call to_dict()
+        dashboard_model = await service.get_or_create_admin_dashboard(admin_id)
+        if not dashboard_model:
             return Response(
                 success=False,
                 error="Dashboard not found",
                 request=request,
                 status_code=status.HTTP_404_NOT_FOUND
             )
-        
-        return Response(success=True, data=dashboard, request=request)
+        return Response(success=True, data=dashboard_model.to_dict(), request=request)
     except Exception as e:
         return Response(
             success=False,
@@ -154,7 +157,7 @@ async def get_student_dashboard(
     """
     try:
         # Access control
-        if current_user.role == UserRole.STUDENT and current_user.id != student_id:
+        if current_user.role not in (UserRole.ADMIN, UserRole.SUPERADMIN) and current_user.id != student_id:
             return Response(
                 success=False,
                 error="Can only view your own dashboard",
@@ -162,16 +165,16 @@ async def get_student_dashboard(
                 status_code=status.HTTP_403_FORBIDDEN
             )
         
-        dashboard = await service.get_student_dashboard(student_id)
-        if not dashboard:
+        # Get raw dashboard model and call to_dict()
+        dashboard_model = await service.get_or_create_student_dashboard(student_id)
+        if not dashboard_model:
             return Response(
                 success=False,
                 error="Dashboard not found",
                 request=request,
                 status_code=status.HTTP_404_NOT_FOUND
             )
-        
-        return Response(success=True, data=dashboard, request=request)
+        return Response(success=True, data=dashboard_model.to_dict(), request=request)
     except Exception as e:
         return Response(
             success=False,

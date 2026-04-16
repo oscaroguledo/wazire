@@ -8,7 +8,8 @@ import {
 import { useAuth } from '@/contexts/AuthContext'
 import Button from '@/components/Button'
 import Breadcrumbs from '@/components/Breadcrumbs'
-import { TenantsSkeleton } from './TenantsSkeleton'
+import { EmptyState } from '@/components/EmptyState'
+import TenantsSkeleton from './TenantsSkeleton'
 import * as tenantApi from '@/apis/tenant'
 import { getCompactAbbreviation } from '@/utils/tenantAbbreviations'
 
@@ -85,13 +86,11 @@ export default function TenantsPage() {
 
   if (!tenant) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center">
-        <div className="w-14 h-14 rounded-2xl bg-[var(--color-bg-hover)] flex items-center justify-center mb-4">
-          <Building2 size={28} className="text-[var(--color-text-muted)]" />
-        </div>
-        <p className="text-[var(--color-text-primary)] font-semibold mb-1">No institution found</p>
-        <p className="text-[var(--color-text-muted)] text-sm">Your account is not linked to an institution.</p>
-      </div>
+      <EmptyState
+        icon={Building2}
+        title="No institution found"
+        description="Your account is not linked to an institution."
+      />
     )
   }
 

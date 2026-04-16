@@ -1,3 +1,4 @@
+import React from 'react'
 import { motion } from 'framer-motion'
 import { LucideIcon } from 'lucide-react'
 import Button from './Button'
@@ -9,7 +10,7 @@ interface EmptyStateProps {
   action?: { label: string; onClick: () => void }
 }
 
-export function EmptyState({ icon: IconComp, title, description, action }: EmptyStateProps) {
+function EmptyStateComponent({ icon: IconComp, title, description, action }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
       <motion.div
@@ -40,3 +41,5 @@ export function EmptyState({ icon: IconComp, title, description, action }: Empty
     </div>
   )
 }
+
+export const EmptyState = React.memo(EmptyStateComponent)

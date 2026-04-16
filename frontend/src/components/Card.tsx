@@ -1,7 +1,7 @@
 import React from 'react'
 import { motion } from 'framer-motion'
 
-export default function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+function CardComponent({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
     <motion.div
       className={`surface-card p-6 ${className}`}
@@ -13,3 +13,5 @@ export default function Card({ children, className = '' }: { children: React.Rea
     </motion.div>
   )
 }
+
+export default React.memo(CardComponent)

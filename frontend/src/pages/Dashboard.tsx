@@ -16,6 +16,7 @@ import Icon from '@/components/Icon';
 import { useAuth } from '@/contexts/AuthContext';
 import Button from '@/components/Button';
 import Breadcrumbs from '@/components/Breadcrumbs';
+import { EmptyState } from '@/components/EmptyState';
 import DashboardSkeleton from './DashboardSkeleton';
 import * as dashboardApi from '@/apis/dashboard';
 import { errorTracker } from '@/utils/errorTracking';
@@ -218,15 +219,13 @@ export function Dashboard() {
           </motion.div>
 
           {studentStats.enrolledCourses === 0 && (
-            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="surface-card p-8 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-[var(--color-bg-hover)] flex items-center justify-center mx-auto mb-4">
-                <Icon as={GraduationCap} size={28} className="text-[var(--color-text-muted)]" />
-              </div>
-              <h3 className="text-base font-semibold text-[var(--color-text-primary)] mb-2">Ready to Start Learning!</h3>
-              <p className="text-sm text-[var(--color-text-secondary)] mb-5 max-w-sm mx-auto">
-                You're not enrolled in any courses yet. Browse available courses to begin your journey.
-              </p>
-              <Button onClick={() => navigate('/courses')}>Browse Courses</Button>
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+              <EmptyState
+                icon={GraduationCap}
+                title="Ready to Start Learning!"
+                description="You're not enrolled in any courses yet. Browse available courses to begin your journey."
+                action={{ label: "Browse Courses", onClick: () => navigate('/courses') }}
+              />
             </motion.div>
           )}
         </div>

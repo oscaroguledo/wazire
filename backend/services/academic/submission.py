@@ -11,8 +11,7 @@ from sqlalchemy import select, func, exists
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-
-from services.analytics.dashboard import refresh_dashboard_bg, refresh_multiple_dashboards_bg
+from tasks.submission import refresh_dashboard_task
 
 from models.academic.submission import Submission as SubmissionModel, SubmissionAttempt as SubmissionAttemptModel
 from models.academic.exam import Exam as ExamModel
@@ -439,7 +438,7 @@ class SubmissionService:
             
             # Refresh dashboards after grading
             if submission:
-                await refresh_dashboard_bg(submission.student_id)
+                refresh_dashboard_task.delay(str(submission.student_id))
                 # Get exam to find lecturer for dashboard refresh
                 exam_result = await db.execute(select(ExamModel).where(ExamModel.id == UUID(exam_id)))
                 exam = exam_result.scalar_one_or_none()
@@ -447,7 +446,7 @@ class SubmissionService:
                     course_result = await db.execute(select(CourseModel).where(CourseModel.id == exam.course_id))
                     course = course_result.scalar_one_or_none()
                     if course and course.lecturer_id:
-                        await refresh_dashboard_bg(course.lecturer_id)
+                        refresh_dashboard_task.delay(str(course.lecturer_id))
 
     async def list_for_lecturer(
         self,
@@ -570,7 +569,9 @@ async def grade_attempt_bg(
             course = course_result.scalar_one_or_none()
             if course and course.lecturer_id:
                 user_ids_to_refresh.append(str(course.lecturer_id))
-        await refresh_multiple_dashboards_bg(user_ids_to_refresh)
+        # Refresh dashboards via Celery
+        for user_id in user_ids_to_refresh:
+            refresh_dashboard_task.delay(user_id)
 
     # WebSocket notification — commented out until WS is enabled
     # from core.websockets import notify

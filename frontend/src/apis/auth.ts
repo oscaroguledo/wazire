@@ -1,23 +1,10 @@
 import client, { handleEnvelope, handlePaginatedEnvelope, ApiResponse, ApiError } from '@/apis/client'
 import { config } from '@/config'
+import { validateRequiredFields, validatePassword, validateEmail, validateRequiredId, validateUpdatePayload, handleApiError } from './api-utils'
+import type { User as SharedUser } from '@/lib/types'
 
-// Auth Types (matching backend schemas)
-export interface User {
-  id: string
-  email: string
-  first_name: string
-  middle_name?: string
-  last_name: string
-  role: 'student' | 'lecturer' | 'admin'
-  tenant_id?: string
-  tenant_name?: string
-  logo_url?: string
-  institution_id?: string  // Matric number / Reg No
-  is_active: boolean
-  created_at: string
-  updated_at: string
-  avatar?: string
-}
+// Use shared User type from types.ts
+export type User = SharedUser
 
 export interface AuthTokens {
   access_token: string
@@ -75,14 +62,12 @@ export interface UserListResponse {
  * Matches backend POST /auth/login endpoint
  */
 export async function login(payload: LoginPayload): Promise<AuthResponse> {
-  if (!payload.email || !payload.password) {
-    throw new ApiError('Email and password are required', 400)
-  }
+  validateRequiredFields(payload, ['email', 'password'])
 
   try {
     const response = await client.post<ApiResponse<AuthResponse>>('/auth/login', payload)
     const data = handleEnvelope<AuthResponse>(response)
-    
+
     // Validate response structure
     if (!data.user || !data.tokens) {
       throw new ApiError('Invalid authentication response', 500)
@@ -102,27 +87,7 @@ export async function login(payload: LoginPayload): Promise<AuthResponse> {
 
     return data
   } catch (error) {
-    if (error instanceof ApiError) {
-      throw error
-    }
-    
-    // Handle specific backend error responses
-    if (error instanceof Error) {
-      if (error.message.includes('Invalid email or password')) {
-        throw new ApiError('Invalid email or password', 401)
-      }
-      if (error.message.includes('Email already registered')) {
-        throw new ApiError('Email already registered', 409)
-      }
-      if (error.message.includes('401') || error.message.includes('Unauthorized')) {
-        throw new ApiError('Invalid credentials', 401)
-      }
-      if (error.message.includes('429') || error.message.includes('Too many requests')) {
-        throw new ApiError('Too many login attempts. Please try again later.', 429)
-      }
-    }
-    
-    throw new ApiError('Login failed. Please try again.', 500)
+    handleApiError(error, 'Login')
   }
 }
 
@@ -131,36 +96,15 @@ export async function login(payload: LoginPayload): Promise<AuthResponse> {
  * Matches backend POST /auth/register endpoint
  */
 export async function register(payload: RegisterPayload): Promise<User> {
-  if (!payload.email || !payload.password || !payload.first_name || !payload.last_name) {
-    throw new ApiError('All required fields must be provided', 400)
-  }
-
-  if (payload.password.length < 8) {
-    throw new ApiError('Password must be at least 8 characters long', 400)
-  }
-
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {
-    throw new ApiError('Please provide a valid email address', 400)
-  }
+  validateRequiredFields(payload, ['email', 'password', 'first_name', 'last_name'])
+  validatePassword(payload.password)
+  validateEmail(payload.email)
 
   try {
     const response = await client.post<ApiResponse<User>>('/auth/register', payload)
     return handleEnvelope<User>(response)
   } catch (error) {
-    if (error instanceof ApiError) {
-      throw error
-    }
-    
-    if (error instanceof Error) {
-      if (error.message.includes('Email already registered')) {
-        throw new ApiError('Email already registered', 409)
-      }
-      if (error.message.includes('400') || error.message.includes('Bad Request')) {
-        throw new ApiError('Invalid registration data', 400)
-      }
-    }
-    
-    throw new ApiError('Registration failed. Please try again.', 500)
+    handleApiError(error, 'Registration')
   }
 }
 
@@ -169,16 +113,14 @@ export async function register(payload: RegisterPayload): Promise<User> {
  * Matches backend POST /auth/refresh endpoint
  */
 export async function refresh(refreshToken: string): Promise<AuthTokens> {
-  if (!refreshToken) {
-    throw new ApiError('Refresh token is required', 400)
-  }
+  validateRequiredId(refreshToken, 'Refresh token')
 
   try {
-    const response = await client.post<ApiResponse<AuthTokens>>('/auth/refresh', { 
-      refresh_token: refreshToken 
+    const response = await client.post<ApiResponse<AuthTokens>>('/auth/refresh', {
+      refresh_token: refreshToken
     })
     const tokens = handleEnvelope<AuthTokens>(response)
-    
+
     // Update stored access token
     try {
       localStorage.setItem(config.TOKEN_KEY, tokens.access_token)
@@ -191,20 +133,7 @@ export async function refresh(refreshToken: string): Promise<AuthTokens> {
 
     return tokens
   } catch (error) {
-    if (error instanceof ApiError) {
-      throw error
-    }
-    
-    if (error instanceof Error) {
-      if (error.message.includes('Invalid or expired refresh token')) {
-        throw new ApiError('Session expired. Please login again.', 401)
-      }
-      if (error.message.includes('401') || error.message.includes('Unauthorized')) {
-        throw new ApiError('Session expired. Please login again.', 401)
-      }
-    }
-    
-    throw new ApiError('Token refresh failed', 500)
+    handleApiError(error, 'Token refresh')
   }
 }
 
@@ -217,17 +146,7 @@ export async function me(): Promise<User> {
     const response = await client.get<ApiResponse<User>>('/auth/me')
     return handleEnvelope<User>(response)
   } catch (error) {
-    if (error instanceof ApiError) {
-      throw error
-    }
-    
-    if (error instanceof Error) {
-      if (error.message.includes('401') || error.message.includes('Unauthorized')) {
-        throw new ApiError('Authentication required', 401)
-      }
-    }
-    
-    throw new ApiError('Failed to get user profile', 500)
+    handleApiError(error, 'Get user profile')
   }
 }
 
@@ -295,14 +214,12 @@ export async function getAdminStats(): Promise<{
  * Matches backend PUT /auth/me endpoint
  */
 export async function updateMe(payload: Partial<Omit<User, 'id' | 'created_at' | 'updated_at'>>): Promise<User> {
-  if (Object.keys(payload).length === 0) {
-    throw new ApiError('At least one field must be provided for update', 400)
-  }
+  validateUpdatePayload(payload)
 
   try {
     const response = await client.put<ApiResponse<User>>('/auth/me', payload)
     const updatedUser = handleEnvelope<User>(response)
-    
+
     // Update stored user data
     try {
       localStorage.setItem('wazire_user', JSON.stringify(updatedUser))
@@ -312,20 +229,7 @@ export async function updateMe(payload: Partial<Omit<User, 'id' | 'created_at' |
 
     return updatedUser
   } catch (error) {
-    if (error instanceof ApiError) {
-      throw error
-    }
-    
-    if (error instanceof Error) {
-      if (error.message.includes('401') || error.message.includes('Unauthorized')) {
-        throw new ApiError('Authentication required', 401)
-      }
-      if (error.message.includes('400') || error.message.includes('Bad Request')) {
-        throw new ApiError('Invalid update data', 400)
-      }
-    }
-    
-    throw new ApiError('Profile update failed', 500)
+    handleApiError(error, 'Profile update')
   }
 }
 
@@ -344,13 +248,7 @@ export async function listUsers(params?: UserListParams): Promise<UserListRespon
     const response = await client.get<ApiResponse<User[]>>('/auth/', { params: requestParams })
     return handlePaginatedEnvelope<User>(response)
   } catch (error) {
-    if (error instanceof ApiError) throw error
-    if (error instanceof Error) {
-      if (error.message.includes('401') || error.message.includes('403')) {
-        throw new ApiError('Admin access required', 403)
-      }
-    }
-    throw new ApiError('Failed to list users', 500)
+    handleApiError(error, 'List users')
   }
 }
 
@@ -359,31 +257,13 @@ export async function listUsers(params?: UserListParams): Promise<UserListRespon
  * Matches backend GET /auth/{user_id} endpoint
  */
 export async function getUser(userId: string): Promise<User> {
-  if (!userId) {
-    throw new ApiError('User ID is required', 400)
-  }
+  validateRequiredId(userId, 'User ID')
 
   try {
     const response = await client.get<ApiResponse<User>>(`/auth/${userId}`)
     return handleEnvelope<User>(response)
   } catch (error) {
-    if (error instanceof ApiError) {
-      throw error
-    }
-    
-    if (error instanceof Error) {
-      if (error.message.includes('401') || error.message.includes('Unauthorized')) {
-        throw new ApiError('Authentication required', 401)
-      }
-      if (error.message.includes('403') || error.message.includes('Forbidden')) {
-        throw new ApiError('Admin access required', 403)
-      }
-      if (error.message.includes('404') || error.message.includes('Not Found')) {
-        throw new ApiError('User not found', 404)
-      }
-    }
-    
-    throw new ApiError('Failed to get user', 500)
+    handleApiError(error, 'Get user')
   }
 }
 
@@ -392,38 +272,14 @@ export async function getUser(userId: string): Promise<User> {
  * Matches backend PUT /auth/{user_id} endpoint
  */
 export async function updateUser(userId: string, payload: Partial<Omit<User, 'id' | 'created_at' | 'updated_at'>>): Promise<User> {
-  if (!userId) {
-    throw new ApiError('User ID is required', 400)
-  }
-
-  if (Object.keys(payload).length === 0) {
-    throw new ApiError('At least one field must be provided for update', 400)
-  }
+  validateRequiredId(userId, 'User ID')
+  validateUpdatePayload(payload)
 
   try {
     const response = await client.put<ApiResponse<User>>(`/auth/${userId}`, payload)
     return handleEnvelope<User>(response)
   } catch (error) {
-    if (error instanceof ApiError) {
-      throw error
-    }
-    
-    if (error instanceof Error) {
-      if (error.message.includes('401') || error.message.includes('Unauthorized')) {
-        throw new ApiError('Authentication required', 401)
-      }
-      if (error.message.includes('403') || error.message.includes('Forbidden')) {
-        throw new ApiError('Admin access required', 403)
-      }
-      if (error.message.includes('404') || error.message.includes('Not Found')) {
-        throw new ApiError('User not found', 404)
-      }
-      if (error.message.includes('400') || error.message.includes('Bad Request')) {
-        throw new ApiError('Invalid update data', 400)
-      }
-    }
-    
-    throw new ApiError('Failed to update user', 500)
+    handleApiError(error, 'Update user')
   }
 }
 
@@ -432,31 +288,13 @@ export async function updateUser(userId: string, payload: Partial<Omit<User, 'id
  * Matches backend DELETE /auth/{user_id} endpoint
  */
 export async function deleteUser(userId: string): Promise<void> {
-  if (!userId) {
-    throw new ApiError('User ID is required', 400)
-  }
+  validateRequiredId(userId, 'User ID')
 
   try {
     const response = await client.delete<ApiResponse<void>>(`/auth/${userId}`)
     handleEnvelope<void>(response)
   } catch (error) {
-    if (error instanceof ApiError) {
-      throw error
-    }
-    
-    if (error instanceof Error) {
-      if (error.message.includes('401') || error.message.includes('Unauthorized')) {
-        throw new ApiError('Authentication required', 401)
-      }
-      if (error.message.includes('403') || error.message.includes('Forbidden')) {
-        throw new ApiError('Admin access required', 403)
-      }
-      if (error.message.includes('404') || error.message.includes('Not Found')) {
-        throw new ApiError('User not found', 404)
-      }
-    }
-    
-    throw new ApiError('Failed to delete user', 500)
+    handleApiError(error, 'Delete user')
   }
 }
 

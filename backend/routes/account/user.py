@@ -45,7 +45,7 @@ async def register(
     if await service.get_by_email(user_in.email):
         return Response(success=False, error="Email already registered", request=request, status_code=status.HTTP_400_BAD_REQUEST)
     user = await service.create(user_in)
-    return Response(success=True, message="Registered successfully", data=UserRead.model_validate(user), request=request, status_code=status.HTTP_201_CREATED)
+    return Response(success=True, message="Registered successfully", data=user.to_dict(), request=request, status_code=status.HTTP_201_CREATED)
 
 
 @router.post("/login")
@@ -59,7 +59,7 @@ async def login(
     if not user:
         return Response(success=False, error="Invalid email or password", request=request, status_code=status.HTTP_401_UNAUTHORIZED)
     tokens = await service.generate_auth_tokens(user)
-    return Response(success=True, message="Login successful", data=AuthResponse(user=UserRead.model_validate(user), tokens=AuthTokens(**tokens)), request=request)
+    return Response(success=True, message="Login successful", data=AuthResponse(user=user.to_dict(), tokens=AuthTokens(**tokens)), request=request)
 
 
 @router.post("/refresh")
@@ -98,7 +98,7 @@ async def update_me(
     if not user:
         return Response(success=False, error="User not found", request=request, status_code=status.HTTP_404_NOT_FOUND)
     updated = await service.update(user, user_in)
-    return Response(success=True, message="Profile updated", data=UserRead.model_validate(updated), request=request)
+    return Response(success=True, message="Profile updated", data=updated.to_dict(), request=request)
 
 
 # ---------------------------------------------------------------------------
@@ -133,7 +133,7 @@ async def list_users(
         return Response(
             success=True, 
             message="Users retrieved", 
-            data=[UserRead.model_validate(u) for u in users], 
+            data=[u.to_dict() for u in users], 
             pagination=pagination_meta.model_dump(),
             request=request
         )
@@ -160,7 +160,7 @@ async def get_user(
     user = await service.get(user_id, tenant_id=tenant_id)
     if not user:
         return Response(success=False, error="User not found", request=request, status_code=status.HTTP_404_NOT_FOUND)
-    return Response(success=True, message="User retrieved", data=UserRead.model_validate(user), request=request)
+    return Response(success=True, message="User retrieved", data=user.to_dict(), request=request)
 
 
 @router.put("/{user_id}")
@@ -175,7 +175,7 @@ async def update_user(
     if not user:
         return Response(success=False, error="User not found", request=request, status_code=status.HTTP_404_NOT_FOUND)
     updated = await service.update(user, user_in)
-    return Response(success=True, message="User updated", data=UserRead.model_validate(updated), request=request)
+    return Response(success=True, message="User updated", data=updated.to_dict(), request=request)
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)

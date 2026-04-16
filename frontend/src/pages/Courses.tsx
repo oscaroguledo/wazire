@@ -18,6 +18,7 @@ import Dropdown from '@/components/Dropdown';
 import * as courseApi from '@/apis/course';
 import * as enrollmentApi from '@/apis/enrollment';
 import * as authApi from '@/apis/auth';
+import { config } from '@/config';
 import type { Course } from '@/lib/types';
 import type { CourseListParams } from '@/apis/course';
 import type { Enrollment } from '@/apis/enrollment';
@@ -137,7 +138,7 @@ export function Courses() {
       };
     },
     enabled: !!user,
-    staleTime: 5000,
+    staleTime: config.QUERY_CACHE_STATIC, // 5 minutes - courses are relatively static
   });
 
   const courses = data?.courses?.items || [];

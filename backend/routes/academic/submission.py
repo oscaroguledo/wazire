@@ -15,7 +15,7 @@ from core.dependencies.common import get_token_service, lecturer_or_admin_dep, a
 from services.academic.submission import SubmissionService
 # StudentAnswerService is used in services and grading; not required at route-level
 from services.engine.answer_sheet_extractor import AnswerSheetParser
-from tasks.submission_tasks import grade_submission_attempt_task, refresh_dashboard_task
+from tasks.submission import grade_submission_attempt_task, refresh_dashboard_task
 from models.academic.question import Question as QuestionModel
 from models.academic.exam import Exam as ExamModel
 from models.academic.course import Course
@@ -34,10 +34,7 @@ router = APIRouter(prefix="/submissions", tags=["submissions"])
 
 async def _enrich_submission(s, db) -> dict:
     """Add student_name, exam_title, course_id, and status to a submission dict."""
-    data = SubmissionRead.model_validate(s).model_dump()
-    data['id'] = str(data['id'])
-    data['student_id'] = str(data['student_id'])
-    data['exam_id'] = str(data['exam_id'])
+    data = s.to_dict()
     # Compute status based on graded_at and latest_score
     if s.graded_at and s.latest_score is not None:
         data['status'] = 'graded'
@@ -122,8 +119,8 @@ async def submit_exam(
         success=True,
         message=f"Attempt #{attempt.attempt_number} submitted — grading in progress",
         data=ExamSubmitResponse(
-            submission=SubmissionRead.model_validate(submission),
-            attempt=SubmissionAttemptRead.model_validate(attempt),
+            submission=submission.to_dict(),
+            attempt=attempt.to_dict(),
         ),
         request=request,
         status_code=status.HTTP_201_CREATED,
@@ -154,7 +151,7 @@ async def start_submission(
     return Response(
         success=True,
         message="Submission started",
-        data=SubmissionRead.model_validate(submission),
+        data=submission.to_dict(),
         request=request,
         status_code=status.HTTP_201_CREATED,
     )
@@ -233,7 +230,7 @@ async def list_submissions(
     return Response(
         success=True, 
         message="Submissions retrieved", 
-        data=[SubmissionRead.model_validate(s) for s in items], 
+        data=[s.to_dict() for s in items], 
         pagination={
             "page": page,
             "per_page": per_page,
@@ -326,8 +323,8 @@ async def my_submission(
             success=True,
             message="Your submission retrieved",
             data=SubmissionWithAttemptsRead(
-                **SubmissionRead.model_validate(submission).model_dump(),
-                attempts=[SubmissionAttemptRead.model_validate(a) for a in attempts],
+                **submission.to_dict(),
+                attempts=[a.to_dict() for a in attempts],
             ),
             request=request,
         )
@@ -376,7 +373,7 @@ async def get_attempts(
     if not submission:
         return Response(success=False, error="Submission not found", request=request, status_code=status.HTTP_404_NOT_FOUND)
     attempts = await service.get_attempts(submission_id)
-    return Response(success=True, message="Attempts retrieved", data=[SubmissionAttemptRead.model_validate(a) for a in attempts], request=request)
+    return Response(success=True, message="Attempts retrieved", data=[a.to_dict() for a in attempts], request=request)
 
 
 # ... (rest of the code remains the same)
@@ -462,8 +459,8 @@ async def scan_answer_sheet(
         success=True,
         message=f"Answer sheet scanned. Attempt #{attempt.attempt_number} — grading in progress",
         data=ExamSubmitResponse(
-            submission=SubmissionRead.model_validate(submission),
-            attempt=SubmissionAttemptRead.model_validate(attempt),
+            submission=submission.to_dict(),
+            attempt=attempt.to_dict(),
         ),
         request=request,
         status_code=status.HTTP_201_CREATED,

@@ -1,13 +1,13 @@
 import React, { useState, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { 
-  Plus, 
-  Edit, 
-  Trash2, 
-  FileText, 
-  CheckCircle, 
-  XCircle, 
+import {
+  Plus,
+  Edit,
+  Trash2,
+  FileText,
+  CheckCircle,
+  XCircle,
   AlertCircle,
   ArrowLeft,
   Upload,
@@ -18,6 +18,7 @@ import Icon from '@/components/Icon'
 import { useAuth } from '@/contexts/AuthContext'
 import examApi from '@/apis/exam'
 import questionApi from '@/apis/question'
+import { config } from '@/config'
 import { compressImageToWebP, validateImageFile } from '@/lib/imageUtils'
 import { processDocument } from '@/lib/pdfConverter'
 import { useWebSocket, WebSocketMessage } from '@/hooks/useWebSocket'
@@ -95,7 +96,7 @@ export default function ExamQuestions() {
       };
     },
     enabled: !!examId && !!user,
-    staleTime: 5000,
+    staleTime: config.QUERY_CACHE_STATIC, // 5 minutes - questions are relatively static
   })
 
   const exam = data?.exam

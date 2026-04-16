@@ -1,3 +1,4 @@
+import React from 'react'
 import { Menu, Cloud, CloudOff } from 'lucide-react'
 import Icon from './Icon'
 import { motion } from 'framer-motion'
@@ -25,7 +26,7 @@ function getPageMeta(pathname: string) {
   return key ? ROUTE_TITLES[key] : null
 }
 
-export function Header({ onToggleMobileSidebar }: HeaderProps) {
+function HeaderComponent({ onToggleMobileSidebar }: HeaderProps) {
   const { pathname } = useLocation()
   const meta = getPageMeta(pathname)
 
@@ -101,3 +102,5 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
     </motion.header>
   )
 }
+
+export const Header = React.memo(HeaderComponent)

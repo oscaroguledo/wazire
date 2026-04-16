@@ -33,7 +33,7 @@ async def upsert_answer(
     except ValueError as e:
         return Response(success=False, error=str(e), request=request, status_code=status.HTTP_400_BAD_REQUEST)
 
-    return Response(success=True, message="Answer saved", data=StudentAnswerRead.model_validate(sa), request=request)
+    return Response(success=True, message="Answer saved", data=sa.to_dict(), request=request)
 
 
 @router.get("/student")
@@ -47,7 +47,7 @@ async def list_student_answers(
     if not exam_id:
         return Response(success=False, error="exam_id query param required", request=request, status_code=status.HTTP_400_BAD_REQUEST)
     rows = await service.list_for_student_exam(current_user.id, exam_id)
-    return Response(success=True, message="Answers retrieved", data=[StudentAnswerRead.model_validate(r) for r in rows], request=request)
+    return Response(success=True, message="Answers retrieved", data=[r.to_dict() for r in rows], request=request)
 
 
 @router.get("/")

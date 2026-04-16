@@ -1,3 +1,4 @@
+import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -22,7 +23,7 @@ interface SidebarProps {
   isMobile?: boolean;
 }
 
-export function Sidebar({ isCollapsed, onToggle, isMobile = false }: SidebarProps) {
+function SidebarComponent({ isCollapsed, onToggle, isMobile = false }: SidebarProps) {
   const { user, logout } = useAuth();
   const rawTenantName = user?.tenant_name || 'Wazire';
   const tenantName = abbreviateTenantName(rawTenantName);
@@ -159,5 +160,6 @@ export function Sidebar({ isCollapsed, onToggle, isMobile = false }: SidebarProp
         </Button>
       </div>
     </motion.aside>);
-
 }
+
+export const Sidebar = React.memo(SidebarComponent);
