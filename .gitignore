@@ -2,6 +2,9 @@
 .env
 .env.local
 .env.*.local
+backend/.env
+frontend/.env
+frontend/.env.local
 
 # Python
 __pycache__/
@@ -49,6 +52,11 @@ Thumbs.db
 # Logs
 *.log
 logs/
+celerybeat-schedule
+
+# Docker
+.docker/
+docker-compose.override.yml
 
 # Node modules
 node_modules/

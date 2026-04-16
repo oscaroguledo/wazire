@@ -23,13 +23,17 @@ class Settings(BaseModel):
     DATABASE_URL: Optional[str] = "sqlite+aiosqlite:///./wazire_dev.db"
     REDIS_URL: Optional[str] = None
 
-    SECRET_KEY: Optional[SecretStr] = SecretStr('sasaassasdsfsdfs')
+    SECRET_KEY: Optional[SecretStr] = SecretStr("change-me-in-production")
     ACCESS_TOKEN_EXPIRE_SECONDS: int = 3600
 
     CORS_ORIGINS: List[str] = Field(default_factory=lambda: ["*"])
     REQUEST_ID_HEADERS: str = "X-Request-ID,X-Correlation-ID"
 
-    GROQ_API_KEY: str = "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"
+    GROQ_API_KEY: Optional[str] = None
+
+    CELERY_BROKER_URL: Optional[str] = None
+    CELERY_RESULT_BACKEND: Optional[str] = None
+    USE_INTERNAL_SCHEDULER: bool = False
 
     def cors_origins_list(self) -> List[str]:
         if isinstance(self.CORS_ORIGINS, str):
@@ -121,6 +125,10 @@ def get_settings(force_reload: bool = False) -> Settings:
             ACCESS_TOKEN_EXPIRE_SECONDS=int(os.getenv("ACCESS_TOKEN_EXPIRE_SECONDS", str(_defaults.ACCESS_TOKEN_EXPIRE_SECONDS))),
             CORS_ORIGINS=_parse_list(os.getenv("CORS_ORIGINS"), _defaults.CORS_ORIGINS),
             REQUEST_ID_HEADERS=os.getenv("REQUEST_ID_HEADERS", _defaults.REQUEST_ID_HEADERS),
+            GROQ_API_KEY=os.getenv("GROQ_API_KEY", _defaults.GROQ_API_KEY),
+            CELERY_BROKER_URL=os.getenv("CELERY_BROKER_URL", os.getenv("REDIS_URL", _defaults.CELERY_BROKER_URL)),
+            CELERY_RESULT_BACKEND=os.getenv("CELERY_RESULT_BACKEND", os.getenv("REDIS_URL", _defaults.CELERY_RESULT_BACKEND)),
+            USE_INTERNAL_SCHEDULER=os.getenv("USE_INTERNAL_SCHEDULER", str(_defaults.USE_INTERNAL_SCHEDULER)).lower() in ("1", "true", "yes"),
         )
         _settings = s
     return _settings

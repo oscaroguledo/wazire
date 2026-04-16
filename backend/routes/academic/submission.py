@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from typing import Optional, List
 
-from fastapi import APIRouter, Depends, status, Request, BackgroundTasks
+from fastapi import APIRouter, Depends, status, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,8 +14,8 @@ from core.utils.token import TokenService
 from core.dependencies.common import get_token_service, lecturer_or_admin_dep, authenticated_dep, student_only_dep
 from services.academic.submission import SubmissionService
 # StudentAnswerService is used in services and grading; not required at route-level
-from services.analytics.dashboard import refresh_dashboard_bg_sync
 from services.engine.answer_sheet_extractor import AnswerSheetParser
+from tasks.submission_tasks import grade_submission_attempt_task, refresh_dashboard_task
 from models.academic.question import Question as QuestionModel
 from models.academic.exam import Exam as ExamModel
 from models.academic.course import Course
@@ -80,7 +80,6 @@ def _tenant(user: UserRead) -> Optional[uuid.UUID]:
 async def submit_exam(
     body: ExamSubmit,
     request: Request,
-    background_tasks: BackgroundTasks,
     current_user: UserRead = student_only_dep,
     db: AsyncSession = Depends(get_db),
 ):
@@ -100,16 +99,11 @@ async def submit_exam(
     except ValueError as e:
         return Response(success=False, error=str(e), request=request, status_code=status.HTTP_400_BAD_REQUEST)
 
-    # Grade in background using FastAPI BackgroundTasks
-    background_tasks.add_task(
-        service.grade_attempt_background,
-        str(attempt.id),
-        str(body.exam_id)
-    )
+    # Grade in background using Celery worker
+    grade_submission_attempt_task.delay(str(attempt.id), str(body.exam_id))
 
     # Refresh dashboards in background after submission
-    # Refresh student dashboard in background
-    background_tasks.add_task(refresh_dashboard_bg_sync, current_user.id)
+    refresh_dashboard_task.delay(str(current_user.id))
     # Get exam to find lecturer for background refresh
     exam_stmt = select(ExamModel).where(ExamModel.id == body.exam_id)
     exam_result = await service.db.execute(exam_stmt)
@@ -120,15 +114,9 @@ async def submit_exam(
         course_result = await service.db.execute(course_stmt)
         course = course_result.scalar_one_or_none()
         if course and course.lecturer_id:
-            background_tasks.add_task(refresh_dashboard_bg_sync, course.lecturer_id)
+            refresh_dashboard_task.delay(str(course.lecturer_id))
 
-    # Lightweight task: log submission activity
-    background_tasks.add_task(
-        lambda student_id, exam_id, attempt_number: print(f"[log] Student {student_id} submitted exam {exam_id}, attempt #{attempt_number}"),
-        str(current_user.id),
-        str(body.exam_id),
-        attempt.attempt_number
-    )
+    print(f"[log] Student {current_user.id} submitted exam {body.exam_id}, attempt #{attempt.attempt_number}")
 
     return Response(
         success=True,
@@ -401,7 +389,6 @@ async def get_attempts(
 async def scan_answer_sheet(
     body: ScanSubmit,
     request: Request,
-    background_tasks: BackgroundTasks,
     current_user: UserRead = lecturer_or_admin_dep,
     db: AsyncSession = Depends(get_db),
 ):
@@ -454,16 +441,11 @@ async def scan_answer_sheet(
     except ValueError as e:
         return Response(success=False, error=str(e), request=request, status_code=status.HTTP_400_BAD_REQUEST)
 
-    # Grade scanned attempt in background using FastAPI BackgroundTasks
-    background_tasks.add_task(
-        service.grade_attempt_background,
-        str(attempt.id),
-        str(body.exam_id)
-    )
+    # Grade scanned attempt in background using Celery worker
+    grade_submission_attempt_task.delay(str(attempt.id), str(body.exam_id))
 
     # Refresh dashboards in background after scan submission
-    # Refresh student dashboard in background
-    background_tasks.add_task(refresh_dashboard_bg_sync, body.student_id)
+    refresh_dashboard_task.delay(str(body.student_id))
     # Get exam to find lecturer for background refresh
     exam_stmt = select(ExamModel).where(ExamModel.id == body.exam_id)
     exam_result = await db.execute(exam_stmt)
@@ -474,7 +456,7 @@ async def scan_answer_sheet(
         course_result = await db.execute(course_stmt)
         course = course_result.scalar_one_or_none()
         if course and course.lecturer_id:
-            background_tasks.add_task(refresh_dashboard_bg_sync, course.lecturer_id)
+            refresh_dashboard_task.delay(str(course.lecturer_id))
 
     return Response(
         success=True,

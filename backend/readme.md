@@ -1,5 +1,24 @@
 # Wazire Backend Setup
 
+## Docker Compose (Recommended)
+
+From the repository root, run:
+
+```bash
+docker compose up --build
+```
+
+This starts:
+- `backend` (FastAPI on port 8000)
+- `postgres` (PostgreSQL on port 5432)
+- `redis` (Redis on port 6379)
+- `celery-worker` (async/background jobs)
+- `celery-beat` (scheduled jobs, including exam-status updates and email queue ticks)
+
+Notes:
+- Backend container runs `alembic upgrade head` on startup.
+- Scheduler in `main.py` is disabled by default (`USE_INTERNAL_SCHEDULER=false`) to avoid double-running jobs when Celery Beat is enabled.
+
 ## Setup Instructions
 
 ### 1. Install Dependencies

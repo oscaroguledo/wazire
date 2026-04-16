@@ -7,7 +7,7 @@ import models
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from core.config import Settings
+from core.config import get_settings
 from core.database import close_db
 from core.utils.logger import logger
 from core.middleware.rate_limit import limiter, rate_limit_exceeded_handler
@@ -15,16 +15,18 @@ from core.middleware.error_handler import setup_error_handlers
 from slowapi.errors import RateLimitExceeded
 from services.engine import start_scheduler
 
-settings = Settings()
+settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 	scheduler = None
 	try:
-		# Start scheduler background task for exam and other periodic tasks
-		logger.info("Starting scheduler for exam etc...")
-		scheduler = await start_scheduler(default_interval=60)
-		logger.info("Scheduler started.")
+		if settings.USE_INTERNAL_SCHEDULER:
+			logger.info("Starting in-process scheduler...")
+			scheduler = await start_scheduler(default_interval=60)
+			logger.info("In-process scheduler started.")
+		else:
+			logger.info("In-process scheduler disabled (use Celery beat for scheduled jobs).")
 	except Exception as e:
 		logger.error(f"Startup failed: {e}")
 		raise
