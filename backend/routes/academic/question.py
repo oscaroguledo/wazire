@@ -12,7 +12,7 @@ from core.utils.response import Response
 from core.utils.token import TokenService
 from core.dependencies.common import get_token_service, lecturer_or_admin_dep, authenticated_dep
 from services.academic.question import QuestionService
-from tasks.question_tasks import detect_answer_task, parse_and_create_task
+from tasks.question import detect_answer_task, parse_and_create_task
 from services.engine.exam_extractor import ExamParser
 from schemas.academic.question import (
     QuestionCreate,

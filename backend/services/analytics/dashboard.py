@@ -544,7 +544,7 @@ async def refresh_dashboard_bg(user_id: uuid.UUID) -> None:
     """Background task to refresh a user's dashboard.
     
     Usage in routes (prefer Celery):
-        from tasks.submission_tasks import refresh_dashboard_task
+        from tasks.submission import refresh_dashboard_task
 
         @router.post("/some-endpoint")
         async def some_endpoint(...):

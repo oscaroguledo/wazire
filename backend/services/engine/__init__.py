@@ -8,7 +8,7 @@ from .similarity_grader import SimilarityGrader
 
 # Note: the in-process scheduler was removed in favor of Celery + Celery Beat.
 # Keep engine exports for the core helpers; heavy scheduler logic was migrated
-# into Celery tasks (see `backend/tasks/scheduler_tasks.py`).
+# into Celery tasks (see `backend/tasks/scheduler.py`).
 __all__ = [
     "GroqEngineBase",
     "ExamParser",

@@ -9,7 +9,7 @@ from celery_app import celery_app
 logger = get_task_logger(__name__)
 
 
-@celery_app.task(name="tasks.email_tasks.send_email_task")
+@celery_app.task(name="tasks.email.send_email_task")
 def send_email_task(to_email: str, subject: str, body: str) -> Dict[str, Any]:
     """Queueable email sender task.
 
@@ -20,7 +20,7 @@ def send_email_task(to_email: str, subject: str, body: str) -> Dict[str, Any]:
     return {"queued": True, "to_email": to_email, "subject": subject}
 
 
-@celery_app.task(name="tasks.email_tasks.send_queued_emails_task")
+@celery_app.task(name="tasks.email.send_queued_emails_task")
 def send_queued_emails_task() -> Dict[str, Any]:
     """Periodic email scheduler hook executed by Celery beat."""
     logger.info("Periodic email scheduler tick")

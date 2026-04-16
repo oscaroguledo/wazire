@@ -10,7 +10,7 @@ from core.utils.response import Response
 from core.utils.token import TokenService
 from core.dependencies.common import get_token_service, lecturer_or_admin_dep, authenticated_dep
 from services.academic.course import CourseService
-from tasks.submission_tasks import refresh_dashboard_task
+from tasks.submission import refresh_dashboard_task
 from schemas.academic.course import CourseCreate, CourseUpdate
 from schemas.account.users import UserRead
 

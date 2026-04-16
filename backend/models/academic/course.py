@@ -14,24 +14,14 @@ from core.utils.uuid7 import uuid7
 
 
 class Course(Base):
-    """Course offered by an institution.
-
-    Fields:
-    - id: UUID primary key (uuid7 time-ordered)
-    - name: human-readable course name
-    - description: optional description
-    - course_code: short code (unique) used for lookups
-    - lecturer_id: FK to `account.users.id` (lecturer)
-    - tenant_id: FK to `account.tenants.id` (tenant/organization)
-    - created_at / updated_at timestamps
-    """
+    """Course model with lecturer and tenant support."""
 
     __tablename__ = "courses"
     __table_args__ = (
         Index("ix_courses_course_code", "course_code", unique=True),
         Index("ix_courses_lecturer_id", "lecturer_id"),
         Index("ix_courses_tenant_id", "tenant_id"),
-        # Composite indexes for common query patterns
+        # Composite indexes
         Index("ix_courses_lecturer_tenant", "lecturer_id", "tenant_id"),
         Index("ix_courses_tenant_code", "tenant_id", "course_code"),
         {"schema": "academic"},

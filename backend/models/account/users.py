@@ -18,29 +18,18 @@ class UserRole(str, Enum):
     STUDENT = "student"
     LECTURER = "lecturer"
     ADMIN = "admin"
-    SUPERADMIN = "superadmin"  # For APP OWNER ONLY, not assignable to users via API
+    SUPERADMIN = "superadmin"  # App owner only
 
 
 class User(Base):
-    """User model representing an application user.
-
-    Fields:
-    - id: UUID primary key (uuid7 time-ordered)
-    - first_name / middle_name / last_name: user full name parts
-    - email: unique login email
-    - password: hashed password
-    - role: user role enum (student/lecturer/admin/superadmin)
-    - is_active: account enabled flag
-    - tenant_id : optional UUID references for tenancy
-    - created_at / updated_at timestamps
-    """
+    """User model with authentication and tenant support."""
     __tablename__ = "users"
     __table_args__ = (
         Index("ix_users_email", "email"),
         Index("ix_users_role", "role"),
         Index("ix_users_tenant_id", "tenant_id"),
         Index("ix_users_is_active", "is_active"),
-        # Composite indexes for common query patterns
+        # Composite indexes
         Index("ix_users_tenant_role", "tenant_id", "role"),
         Index("ix_users_tenant_active", "tenant_id", "is_active"),
         Index("ix_users_email_tenant", "email", "tenant_id"),

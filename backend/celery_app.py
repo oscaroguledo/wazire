@@ -49,11 +49,11 @@ celery_app.conf.update(
     
     beat_schedule={
         "update-exam-status-every-minute": {
-            "task": "tasks.scheduler_tasks.update_exam_statuses_task",
+            "task": "tasks.scheduler.update_exam_statuses_task",
             "schedule": settings.CELERY_EXAM_STATUS_UPDATE_INTERVAL,
         },
         "send-queued-emails-every-minute": {
-            "task": "tasks.email_tasks.send_queued_emails_task",
+            "task": "tasks.email.send_queued_emails_task",
             "schedule": settings.CELERY_EMAIL_SEND_INTERVAL,
         },
     },

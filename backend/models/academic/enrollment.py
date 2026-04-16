@@ -31,13 +31,12 @@ class Semester(str, enum.Enum):
 
 class Enrollment(Base):
     __tablename__ = "enrollments"
-    # Ensure a student can only be enrolled in a course once
     __table_args__ = (
         Index('ix_enrollment_student_course', 'student_id', 'course_id'),
         Index('ix_enrollment_semester', 'semester'),
         Index('ix_enrollment_status', 'status'),
         Index('ix_enrollment_course_id', 'course_id'),
-        # Composite indexes for common query patterns
+        # Composite indexes
         Index('ix_enrollment_student_status', 'student_id', 'status'),
         Index('ix_enrollment_course_status', 'course_id', 'status'),
         Index('ix_enrollment_student_semester', 'student_id', 'semester'),

@@ -12,7 +12,7 @@ from services.academic.question import QuestionService
 logger = get_task_logger(__name__)
 
 
-@celery_app.task(name="tasks.question_tasks.detect_answer_task")
+@celery_app.task(name="tasks.question.detect_answer_task")
 def detect_answer_task(question_id: str) -> dict:
     """Detect MCQ answer for a question (runs the existing async helper)."""
     async def _run():
@@ -29,7 +29,7 @@ def detect_answer_task(question_id: str) -> dict:
         return {"detected": False, "question_id": question_id, "error": str(e)}
 
 
-@celery_app.task(name="tasks.question_tasks.parse_and_create_task")
+@celery_app.task(name="tasks.question.parse_and_create_task")
 def parse_and_create_task(pages: list, industry: str, exam_id: str, mark_per_question: Optional[float], tenant_id: Optional[str] = None) -> dict:
     """Parse exam pages and create questions in the DB (runs existing async helper)."""
     async def _run():

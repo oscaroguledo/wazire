@@ -14,7 +14,7 @@ from services.analytics.dashboard import refresh_dashboard_bg
 logger = get_task_logger(__name__)
 
 
-@celery_app.task(name="tasks.submission_tasks.grade_submission_attempt_task")
+@celery_app.task(name="tasks.submission.grade_submission_attempt_task")
 def grade_submission_attempt_task(attempt_id: str, exam_id: str) -> Dict[str, Any]:
     """Grade a stored submission attempt asynchronously."""
 
@@ -28,7 +28,7 @@ def grade_submission_attempt_task(attempt_id: str, exam_id: str) -> Dict[str, An
     return result
 
 
-@celery_app.task(name="tasks.submission_tasks.refresh_dashboard_task")
+@celery_app.task(name="tasks.submission.refresh_dashboard_task")
 def refresh_dashboard_task(user_id: str) -> Dict[str, Any]:
     """Refresh a single user's dashboard asynchronously."""
     uid = uuid.UUID(user_id)

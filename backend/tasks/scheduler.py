@@ -106,7 +106,7 @@ async def update_exam_statuses() -> Dict[str, int]:
         }
 
 
-@celery_app.task(name="tasks.scheduler_tasks.update_exam_statuses_task")
+@celery_app.task(name="tasks.scheduler.update_exam_statuses_task")
 def update_exam_statuses_task() -> Dict[str, Any]:
     """Celery wrapper that runs the async exam status update job."""
     try:
