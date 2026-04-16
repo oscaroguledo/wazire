@@ -2,6 +2,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import text
 from functools import lru_cache
+from contextlib import asynccontextmanager
 
 from core.config import get_settings
 
@@ -68,4 +69,17 @@ async def get_db() -> AsyncSession:
         yield session
     finally:
         await session.close()
+
+
+@asynccontextmanager
+async def get_worker_db():
+    """Async context manager for worker / Celery usage.
+
+    Usage in Celery/tasks or scripts:
+        async with get_worker_db() as db:
+            # use AsyncSession `db`
+    """
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        yield session
 
