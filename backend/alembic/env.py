@@ -14,18 +14,22 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 # Load environment variables
 load_dotenv()
 
-# Import models - we need to patch DATABASE_URL before importing core.database
-# to avoid async engine creation during migration
-original_db_url = os.environ.get('DATABASE_URL')
-if original_db_url:
-    # Temporarily use sync URL for migrations
-    os.environ['DATABASE_URL'] = original_db_url.replace('postgresql+asyncpg://', 'postgresql+psycopg2://', 1)
+# Import models - we need to use sync URL for migrations
+from core.config import get_settings
+settings = get_settings()
+
+# Get DATABASE_URL from config and convert to sync URL for Alembic
+db_url = settings.DATABASE_URL
+if db_url:
+    # Convert async URL to sync URL for migrations
+    if db_url.startswith('postgresql+asyncpg://'):
+        db_url = db_url.replace('postgresql+asyncpg://', 'postgresql+psycopg2://', 1)
+    elif db_url.startswith('postgresql://'):
+        db_url = db_url.replace('postgresql://', 'postgresql+psycopg2://', 1)
+    elif db_url.startswith('sqlite+aiosqlite://'):
+        db_url = db_url.replace('sqlite+aiosqlite://', 'sqlite://', 1)
 
 from core.database import Base
-
-# Restore original async URL
-if original_db_url:
-    os.environ['DATABASE_URL'] = original_db_url
 
 # Import all models to register with Base
 from models.account.users import User
@@ -69,9 +73,9 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
+    # Use the db_url from config (already converted to sync)
     context.configure(
-        url=url,
+        url=db_url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -94,14 +98,8 @@ def run_migrations_online() -> None:
     # So we use the synchronous driver for migrations
     from sqlalchemy.engine import Engine
     from sqlalchemy import create_engine
-    
-    # Convert async URL to sync URL for migrations
-    db_url = config.get_main_option("sqlalchemy.url")
-    if db_url.startswith("postgresql+asyncpg://"):
-        db_url = db_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://", 1)
-    elif db_url.startswith("postgresql://"):
-        db_url = db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
-    
+
+    # Use the db_url from config (already converted to sync)
     connectable = create_engine(db_url, poolclass=pool.NullPool)
 
     with connectable.connect() as connection:

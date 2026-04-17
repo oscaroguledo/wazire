@@ -3,10 +3,8 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     container_name: wazire-postgres
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-wazire}
-      POSTGRES_USER: ${POSTGRES_USER:-wazire}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    env_file:
+      - ./backend/.env
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -62,9 +60,6 @@ services:
     restart: unless-stopped
     env_file:
       - ./backend/.env
-    environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-wazire}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-wazire}
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-}@redis:6379/0
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
@@ -91,12 +86,6 @@ services:
     container_name: wazire-celery-worker
     env_file:
       - ./backend/.env
-    environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-wazire}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-wazire}
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-}@redis:6379/0
-      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-}@redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-}@redis:6379/0
-      - CELERY_WORKER_CONCURRENCY=${CELERY_WORKER_CONCURRENCY:-2}
     command: celery -A celery_app.celery_app worker --loglevel=info --concurrency=${CELERY_WORKER_CONCURRENCY:-2}
     depends_on:
       postgres:
@@ -122,11 +111,6 @@ services:
     container_name: wazire-celery-beat
     env_file:
       - ./backend/.env
-    environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-wazire}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-wazire}
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-}@redis:6379/0
-      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-}@redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-}@redis:6379/0
     command: celery -A celery_app.celery_app beat --loglevel=info
     depends_on:
       postgres:

@@ -24,10 +24,11 @@ async def health(request: Request):
     
     # Check database connectivity
     try:
-        db: AsyncSession = next(get_db())
-        await db.execute(text("SELECT 1"))
-        health_data["dependencies"]["database"] = "healthy"
-        await db.close()
+        async for db in get_db():
+            await db.execute(text("SELECT 1"))
+            health_data["dependencies"]["database"] = "healthy"
+            await db.close()
+            break
     except Exception as e:
         logger.error(f"Health check - database unhealthy: {e}")
         health_data["dependencies"]["database"] = "unhealthy"

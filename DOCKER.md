@@ -193,7 +193,7 @@ docker-compose exec backend alembic current
 # 2. Make code changes to models or business logic
 
 # 3. If model changes, create migration
-./start_app.sh migrate-create "add new field"
+./start_app.sh migrate-create "init db"
 
 # 4. Review and apply migration
 ./start_app.sh migrate

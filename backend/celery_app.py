@@ -65,4 +65,5 @@ celery_app.conf.update(
     },
 )
 
-celery_app.autodiscover_tasks(["tasks"])
+# Import tasks explicitly to avoid autodiscovery issues
+from tasks import email, question, scheduler, submission

@@ -20,7 +20,7 @@ class Settings(BaseModel):
     # DATABASE_URL = "postgresql+asyncpg://user:password@localhost/exam_db"
     # DATABASE_URL = "sqlite+aiosqlite:///exam_db.sqlite"
     # DATABASE_URL = "mysql+aiomysql://user:password@localhost/exam_db"
-    DATABASE_URL: Optional[str] = "sqlite+aiosqlite:///./wazire_dev.db"
+    DATABASE_URL: Optional[str] = "postgresql+asyncpg://wazire:wazire@localhost:5432/wazire"
     REDIS_URL: Optional[str] = None
     REDIS_PASSWORD: Optional[str] = None
 

@@ -175,29 +175,3 @@ class DashboardService:
             await self.db.refresh(dashboard)
 
         return dashboard
-
-
-# -------------------------------------------------------------------------
-# Background refresh functions (for async tasks)
-# -------------------------------------------------------------------------
-
-async def refresh_dashboard_bg(user_id: uuid.UUID, db: AsyncSession) -> None:
-    """Refresh a single user's dashboard statistics in the background."""
-    service = DashboardService(db)
-    
-    # Get user to determine role
-    stmt = select(User).where(User.id == user_id)
-    result = await db.execute(stmt)
-    user = result.scalar_one_or_none()
-    
-    if not user:
-        logger.warning(f"[DASHBOARD] User not found for dashboard refresh: {user_id}")
-        return
-    
-    # Refresh based on role
-    if user.role == UserRole.LECTURER:
-        await service.get_or_create_lecturer_dashboard(user_id)
-    elif user.role in (UserRole.ADMIN, UserRole.SUPERADMIN):
-        await service.get_or_create_admin_dashboard(user_id, user.tenant_id)
-    elif user.role == UserRole.STUDENT:
-        await service.get_or_create_student_dashboard(user_id)
