@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { FileText, TrendingUp, Award, Calendar, Filter, ChevronDown } from 'lucide-react'
+import { FileText, TrendingUp, Award, Calendar, Filter, ChevronDown, AlertCircle } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import Icon from '@/components/Icon'
 import { useAuth } from '@/contexts/AuthContext'
@@ -13,6 +13,8 @@ import Button from '@/components/Button'
 import { StatusBadge } from '@/components/StatusBadge'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import SubmissionsSkeleton from './SubmissionsSkeleton'
+import { EmptyState } from '@/components/EmptyState'
+import Table from '@/components/Table'
 import { config } from '@/config';
 
 interface StatCardProps {

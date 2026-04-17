@@ -68,7 +68,7 @@ export function Exams() {
     staleTime: config.QUERY_CACHE_STATIC, // 5 minutes - exams are relatively static
   });
 
-  const enrolledCourseIds = enrollmentsData?.map((e: Enrollment) => e.course_id) || [];
+  const enrolledCourseIds = enrollmentsData?.map((e: Enrollment) => e.course.id) || [];
 
   // React Query hook for fetching exams and courses in parallel using Promise.all
   const { data, isLoading, error, refetch } = useQuery({

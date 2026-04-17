@@ -44,28 +44,20 @@ async def list_enrollment(
         # Get tenant_id from current_user (admins can access all tenants)
         tenant_id = None if current_user.role in ("admin", "superadmin") else current_user.tenant_id
 
-        # Build filters
-        filters = {}
-        if search:
-            filters["search"] = search
-        if student_id:
-            filters["student_id"] = student_id
-        if course_id:
-            filters["course_id"] = course_id
-        if lecturer_id:
-            filters["lecturer_id"] = lecturer_id
-        if enrollment_status:
-            filters["status"] = enrollment_status
-        if semester:
-            filters["semester"] = semester
-
-        # Get enrollments with pagination
-        items, total = await enrollment_service.list_enrollments(
+        # Build params object
+        params = EnrollmentListParams(
             page=pagination.page,
             per_page=pagination.per_page,
-            tenant_id=tenant_id,
-            filters=filters
+            search=search,
+            student_id=student_id,
+            course_id=course_id,
+            lecturer_id=lecturer_id,
+            status=enrollment_status,
+            semester=semester
         )
+
+        # Get enrollments with pagination
+        items, total = await enrollment_service.list_enrollments(params, tenant_id=tenant_id)
 
         # Create pagination metadata
         pagination_meta = PaginationResponse.create(

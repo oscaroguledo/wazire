@@ -46,7 +46,7 @@ class User(Base):
     last_name: Mapped[str] = mapped_column(String(100), comment="Family name")
     email: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, comment="Login email (unique)")
     password: Mapped[str] = mapped_column(String(255), comment="Hashed password")
-    role: Mapped[UserRole] = mapped_column(SAEnum(UserRole, name="user_role", create_type=True), nullable=False, comment="User role enum")
+    role: Mapped[UserRole] = mapped_column(SAEnum(UserRole, name="user_role", create_type=True, values_callable=lambda x: [e.value for e in x]), nullable=False, comment="User role enum")
     is_active: Mapped[bool] = mapped_column(default=False, comment="Account active flag")
     tenant_id: Mapped[uuid.UUID] = mapped_column(GUID(), nullable=True, comment="FK: tenant id for multi-tenancy")
     institution_id: Mapped[str] = mapped_column(String(100), nullable=True, comment="Institution ID e.g., Student matric/registration number")

@@ -358,7 +358,7 @@ async def all_my_submissions(
     return Response(
         success=True,
         message="All your submissions retrieved",
-        data=submissions,
+        data=[s.to_dict() for s in submissions],
         request=request,
     )
 

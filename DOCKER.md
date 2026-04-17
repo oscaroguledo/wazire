@@ -190,8 +190,14 @@ docker-compose exec backend alembic current
 # 1. Start the application
 ./start_app.sh start
 
-# 2. Make code changes to models or business logic
+# 2. Run migrations (creates schemas and tables)
+./start_app.sh migrate
 
+# 3. Seed the database
+./start_app.sh seed
+
+# 2. Make code changes to models or business logic
+docker-compose exec backend alembic stamp head
 # 3. If model changes, create migration
 ./start_app.sh migrate-create "init db"
 

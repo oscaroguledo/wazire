@@ -81,6 +81,28 @@ export function TakeExam() {
           setExistingSubmission(null);
         }
 
+        // Fetch saved answers for this exam
+        try {
+          const savedAnswers = await answerApi.listAnswers(id as string);
+          if (savedAnswers && savedAnswers.length > 0) {
+            const answersMap: Record<string, any> = {};
+            savedAnswers.forEach((sa: any) => {
+              if (sa.answer && typeof sa.answer === 'object') {
+                // Extract the value from the answer object
+                if (sa.answer.option) {
+                  answersMap[sa.question_id] = sa.answer.option;
+                } else if (sa.answer.text) {
+                  answersMap[sa.question_id] = sa.answer.text;
+                }
+              }
+            });
+            setAnswers(answersMap);
+          }
+        } catch (answersError) {
+          // No saved answers found, that's okay
+          console.log('No saved answers found');
+        }
+
         // set timer if exam has duration
         if (examData?.duration_hours || examData?.duration_minutes) {
           const totalHours = (examData.duration_hours || 0) + (examData.duration_minutes || 0) / 60;
@@ -157,10 +179,24 @@ export function TakeExam() {
 
   const saveAnswerImmediate = useCallback(async (questionId: string, answerValue: string | number | boolean | string[]) => {
     try {
+      // Format answer as dictionary based on type
+      let formattedAnswer: Record<string, unknown>;
+      if (typeof answerValue === 'string') {
+        formattedAnswer = { option: answerValue };
+      } else if (typeof answerValue === 'number') {
+        formattedAnswer = { option: answerValue.toString() };
+      } else if (typeof answerValue === 'boolean') {
+        formattedAnswer = { option: answerValue.toString() };
+      } else if (Array.isArray(answerValue)) {
+        formattedAnswer = { text: answerValue.join(', ') };
+      } else {
+        formattedAnswer = { text: String(answerValue) };
+      }
+
       await answerApi.upsertAnswer(questionId, {
         exam_id: id as string,
         question_id: questionId,
-        answer: answerValue as unknown as Record<string, unknown>
+        answer: formattedAnswer
       });
     } catch (err) {
       // Add to pending queue if save fails

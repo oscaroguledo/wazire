@@ -80,26 +80,8 @@ class EnrollmentService:
                 )
             )
         
-        # Get total count
-        count_stmt = select(func.count()).select_from(
-            EnrollmentModel
-            .join(User, EnrollmentModel.student_id == User.id)
-            .join(CourseModel, EnrollmentModel.course_id == CourseModel.id)
-            .outerjoin(lecturer_alias, CourseModel.lecturer_id == lecturer_alias.id)
-        )
-        # Apply same filters as main query
-        if tenant_id:
-            count_stmt = count_stmt.filter(CourseModel.tenant_id == tenant_id)
-        if params.student_id:
-            count_stmt = count_stmt.filter(EnrollmentModel.student_id == uuid.UUID(params.student_id))
-        if params.course_id:
-            count_stmt = count_stmt.filter(EnrollmentModel.course_id == uuid.UUID(params.course_id))
-        if params.lecturer_id:
-            count_stmt = count_stmt.filter(CourseModel.lecturer_id == params.lecturer_id)
-        if params.status:
-            count_stmt = count_stmt.filter(EnrollmentModel.status == params.status)
-        if params.semester:
-            count_stmt = count_stmt.filter(EnrollmentModel.semester == params.semester)
+        # Get total count (subquery already has filters applied)
+        count_stmt = select(func.count()).select_from(stmt.subquery())
         
         total_result = await self.db.execute(count_stmt)
         total = total_result.scalar()

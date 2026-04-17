@@ -28,7 +28,7 @@ export async function upsertAnswer(questionId: string, payload: StudentAnswerCre
 export async function listAnswers(examId: string): Promise<StudentAnswerRead[]> {
   if (!examId) throw new ApiError('Exam ID is required', 400)
   try {
-    const response = await client.get<ApiResponse<StudentAnswerRead[]>>('/academic/answers/', { params: { exam_id: examId } })
+    const response = await client.get<ApiResponse<StudentAnswerRead[]>>('/academic/answers/student', { params: { exam_id: examId } })
     return handleEnvelope<StudentAnswerRead[]>(response)
   } catch (error) {
     if (error instanceof ApiError) throw error

@@ -124,13 +124,12 @@ class SubmissionService:
     async def get_all_my_submissions(self, student_id: UUID, tenant_id: Optional[UUID] = None) -> List[SubmissionModel]:
         """Get all submissions for a specific student across all exams."""
         stmt = select(SubmissionModel).options(
-            selectinload(SubmissionModel.exam).selectinload(ExamModel.course),
-            selectinload(SubmissionModel.student)
+            selectinload(SubmissionModel.exam).selectinload(ExamModel.course)
         ).where(SubmissionModel.student_id == student_id)
         if tenant_id:
             stmt = stmt.join(ExamModel, ExamModel.id == SubmissionModel.exam_id).where(ExamModel.tenant_id == tenant_id)
         stmt = stmt.order_by(SubmissionModel.created_at.desc())
-        
+
         result = await self.db.execute(stmt)
         return result.scalars().all()
 

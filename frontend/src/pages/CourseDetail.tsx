@@ -207,7 +207,7 @@ export function CourseDetail() {
       if (!isEnrollModalOpen) return;
       try {
         const response = await authApi.listUsers({ per_page: 100 });
-        const enrolledIds = new Set(enrollments.map((e: Enrollment) => e.student_id))
+        const enrolledIds = new Set(enrollments.map((e: Enrollment) => e.student.id))
         const studentList = response.items
           .filter((u: { role: string; id: string }) => u.role === 'student' && !enrolledIds.has(u.id))
           .map((u: { id: string; first_name: string; last_name: string; email: string }) => ({
@@ -660,11 +660,11 @@ export function CourseDetail() {
                     </div>
                     <div>
                       <p className="font-medium text-[var(--color-text-primary)]">
-                        {enrollment.student_name || 'Unknown Student'}
+                        {enrollment.student ? `${enrollment.student.first_name} ${enrollment.student.last_name}` : 'Unknown Student'}
                       </p>
-                      {enrollment.institution_id ? (
+                      {enrollment.student?.institution_id ? (
                         <p className="text-sm text-[var(--color-text-muted)]">
-                          Matric/Reg No: <span className="font-medium text-[var(--color-primary-600)]">{enrollment.institution_id}</span>
+                          Matric/Reg No: <span className="font-medium text-[var(--color-primary-600)]">{enrollment.student.institution_id}</span>
                         </p>
                       ) : (
                         <p className="text-sm text-[var(--color-text-muted)]">
@@ -970,14 +970,14 @@ export function CourseDetail() {
             <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-2">
               Select Student *
             </label>
-            {students.filter((s: { id: string }) => !(Array.isArray(enrollments) ? enrollments : []).some(e => e.student_id === s.id)).length === 0 ? (
+            {students.filter((s: { id: string }) => !(Array.isArray(enrollments) ? enrollments : []).some(e => e.student.id === s.id)).length === 0 ? (
               <div className="p-3 bg-[var(--color-bg-hover)] rounded-lg text-sm text-[var(--color-text-muted)] text-center">
                 All students in this institution are already enrolled in this course.
               </div>
             ) : (
               <Dropdown
                 options={students
-                  .filter((s: { id: string }) => !(Array.isArray(enrollments) ? enrollments : []).some(e => e.student_id === s.id))
+                  .filter((s: { id: string }) => !(Array.isArray(enrollments) ? enrollments : []).some(e => e.student.id === s.id))
                   .map((s: { id: string; name: string; email: string; institution_id?: string }) => ({
                     value: s.id,
                     label: s.institution_id
@@ -1037,7 +1037,7 @@ export function CourseDetail() {
               className="flex-1" 
               type="submit"
               loading={enrollLoading}
-              disabled={!selectedStudentId || students.filter((s: { id: string }) => !(Array.isArray(enrollments) ? enrollments : []).some(e => e.student_id === s.id)).length === 0}
+              disabled={!selectedStudentId || students.filter((s: { id: string }) => !(Array.isArray(enrollments) ? enrollments : []).some(e => e.student.id === s.id)).length === 0}
             >
               Enroll Student
             </Button>

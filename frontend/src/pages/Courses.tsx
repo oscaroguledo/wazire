@@ -104,7 +104,7 @@ export function Courses() {
       if (user?.role === 'student') {
         try {
           const enrollmentsResponse = await enrollmentApi.listEnrollment({ student_id: user.id });
-          const enrolledCourseIds = enrollmentsResponse.items.map((e: Enrollment) => e.course_id);
+          const enrolledCourseIds = enrollmentsResponse.items.map((e: Enrollment) => e.course.id);
 
           filteredCourses = response.items.filter(course =>
             enrolledCourseIds.includes(course.id)

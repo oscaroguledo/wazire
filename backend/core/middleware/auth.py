@@ -4,6 +4,7 @@ from typing import Optional, List, Callable
 from functools import wraps
 import uuid
 import time
+import logging
 
 from fastapi import HTTPException, status, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -14,6 +15,8 @@ from core.utils.token import TokenService
 from services.account.user import UserService
 from schemas.account.users import UserRead
 from models.account.users import UserRole
+
+logger = logging.getLogger(__name__)
 
 security = HTTPBearer()
 

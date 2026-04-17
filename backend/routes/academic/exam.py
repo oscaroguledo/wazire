@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
 from fastapi import APIRouter, Depends, status, Request, Response as FastAPIResponse
@@ -189,42 +190,18 @@ async def update_exam(
     # Store old course info for dashboard refresh
     old_course_id = exam.course_id
 
-    # PostgreSQL handles timezone-aware datetimes natively - no conversion needed
-    exam_data = exam_in.model_copy()
-
-    # Handle duration fields separately if provided
-    if exam_data.duration_hours is not None or exam_data.duration_minutes is not None:
-        # Get current duration from exam
-        current_duration = exam.duration if exam.duration else Decimal("0")
-        current_hours = int(current_duration)
-        current_minutes = int(round((current_duration - Decimal(current_hours)) * Decimal(60)))
-
-        # Update with new values
-        new_hours = exam_data.duration_hours if exam_data.duration_hours is not None else current_hours
-        new_minutes = exam_data.duration_minutes if exam_data.duration_minutes is not None else current_minutes
-
-        # Calculate total duration as decimal
-        exam_data.duration = Decimal(new_hours) + Decimal(new_minutes) / Decimal(60)
-
-        # Clear the separate fields
-        exam_data.duration_hours = None
-        exam_data.duration_minutes = None
-
     # Handle start_time timezone conversion if provided
-    if exam_data.start_time:
-        from datetime import timezone
-        import pytz
-        utc = pytz.UTC
-        exam_data.start_time = exam_data.start_time.astimezone(utc)
+    if exam_in.start_time:
+        exam_in.start_time = exam_in.start_time.astimezone(timezone.utc)
 
     # Auto-update exam status based on start_time and duration
-    if exam_data.start_time and (exam_data.duration_hours is not None or exam_data.duration_minutes is not None):
-        new_start_time = exam_data.start_time
+    if exam_in.start_time and (exam_in.duration_hours is not None or exam_in.duration_minutes is not None):
+        new_start_time = exam_in.start_time
         new_duration = exam.duration if exam.duration else Decimal("0")
 
-        if exam_data.duration_hours is not None or exam_data.duration_minutes is not None:
-            new_hours = exam_data.duration_hours if exam_data.duration_hours is not None else 0
-            new_minutes = exam_data.duration_minutes if exam_data.duration_minutes is not None else 0
+        if exam_in.duration_hours is not None or exam_in.duration_minutes is not None:
+            new_hours = exam_in.duration_hours if exam_in.duration_hours is not None else 0
+            new_minutes = exam_in.duration_minutes if exam_in.duration_minutes is not None else 0
             new_duration = Decimal(new_hours) + Decimal(new_minutes) / Decimal(60)
 
         now = datetime.now(timezone.utc)
@@ -233,7 +210,7 @@ async def update_exam(
             comparison_start_time = comparison_start_time.replace(tzinfo=timezone.utc)
 
         if new_start_time and new_duration:
-            end_time = comparison_start_time + timedelta(hours=new_duration)
+            end_time = comparison_start_time + timedelta(hours=float(new_duration))
 
             if now < comparison_start_time:
                 exam_in.status = "not_started"
