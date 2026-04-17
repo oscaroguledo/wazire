@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import uuid
-from fastapi import APIRouter, Request, Depends, Query
+from typing import Optional
+from fastapi import APIRouter, Request, Depends, Query, status
+from core.utils.logger import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
@@ -10,7 +12,7 @@ from core.utils.encryption import EncryptionService
 from core.utils.token import TokenService
 from core.config import get_settings
 from core.dependencies.common import get_token_service, authenticated_dep, admin_only_dep, lecturer_or_admin_dep
-from core.dependencies.pagination import get_pagination, PaginationResponse
+from core.dependencies.pagination import get_pagination, PaginationParams, PaginationResponse
 from services.account.user import UserService
 from schemas.account.auth import AuthLogin, AuthTokens, AuthRefresh, AuthResponse
 from schemas.account.users import UserCreate, UserUpdate, UserRead

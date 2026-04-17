@@ -17,6 +17,7 @@ MODE="dev"
 SEED=false
 COMMAND=""
 COMPOSE_FILE="docker-compose.yml"
+MIGRATE_MESSAGE=""
 
 # Print colored output
 print_info() {
@@ -79,7 +80,18 @@ EOF
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
-        start|stop|restart|clear|logs|status|seed|migrate|migrate-create|migrate-rollback)
+        migrate-create)
+            COMMAND="$1"
+            if [[ $# -gt 1 ]]; then
+                MIGRATE_MESSAGE="$2"
+                shift 2
+            else
+                print_error "Please provide a migration message"
+                show_usage
+                exit 1
+            fi
+            ;;
+        start|stop|restart|clear|logs|status|seed|migrate|migrate-rollback)
             COMMAND="$1"
             shift
             ;;
@@ -211,6 +223,17 @@ case $COMMAND in
     start)
         print_info "Starting Wazire application in $MODE mode..."
         
+        # Ensure project root .env exists for docker-compose variable substitution
+        if [ ! -f ".env" ]; then
+            print_warning "Project .env file not found. Creating from backend/.env.example..."
+            if [ -f "backend/.env.example" ]; then
+                cp backend/.env.example .env
+                print_warning "Created project .env from backend/.env.example. Review values if needed."
+            else
+                print_warning "backend/.env.example not found; docker-compose variables may be unset."
+            fi
+        fi
+
         # Build and start containers
         docker-compose -f $COMPOSE_FILE up -d --build
         
@@ -282,12 +305,12 @@ case $COMMAND in
         ;;
         
     migrate-create)
-        if [ -z "$2" ]; then
+        if [ -z "$MIGRATE_MESSAGE" ]; then
             print_error "Please provide a migration message"
-            print_info "Usage: ./start_app.sh migrate-create "your message""
+            print_info 'Usage: ./start_app.sh migrate-create "your message"'
             exit 1
         fi
-        create_migration "$2"
+        create_migration "$MIGRATE_MESSAGE"
         ;;
         
     migrate-rollback)

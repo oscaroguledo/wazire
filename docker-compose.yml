@@ -31,13 +31,15 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     container_name: wazire-redis
-    command: redis-server --requirepass ${REDIS_PASSWORD:-}
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    command: sh -c 'if [ -n "${REDIS_PASSWORD}" ]; then redis-server --requirepass "${REDIS_PASSWORD}"; else redis-server; fi'
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      test: ["CMD-SHELL", 'if [ -n "${REDIS_PASSWORD}" ]; then redis-cli -a "${REDIS_PASSWORD}" ping || exit 1; else redis-cli ping || exit 1; fi']
       interval: 10s
       timeout: 5s
       retries: 5

@@ -1,5 +1,13 @@
 from __future__ import annotations
 
+import os
+import sys
+
+# Ensure project root is on sys.path so top-level packages (like `tasks`) are importable
+ROOT_DIR = os.path.abspath(os.path.dirname(__file__))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
 from celery import Celery
 
 from core.config import get_settings
@@ -26,8 +34,6 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
-    worker_prefetch_multiplier=1,
-    task_acks_late=True,
     
     # Critical production settings
     task_default_retry_delay=60,  # Retry after 60 seconds

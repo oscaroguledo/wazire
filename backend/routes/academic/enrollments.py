@@ -1,14 +1,14 @@
-from fastapi import APIRouter, Request, Depends, Query
+from fastapi import APIRouter, Request, Depends, Query, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_
-from uuid import UUID
+import uuid
 from typing import Optional, List
 
 from core.database import get_db
 from core.utils.response import Response
 from core.utils.logger import logger
 from core.middleware.error_handler import NotFoundError, BadRequestError, ForbiddenError
-from core.dependencies.pagination import get_pagination, PaginationResponse
+from core.dependencies.pagination import get_pagination, PaginationParams, PaginationResponse
 from models.account.users import User, UserRole
 from models.academic.course import Course
 from models.academic.enrollment import Enrollment
@@ -17,11 +17,9 @@ from schemas.academic.enrollment import (
     EnrollmentListResponse, EnrollmentListParams, EnrollmentStatus, EnrollmentCheckResponse,
     BulkEnrollmentRequest, Semester
 )
-from core.dependencies.common import authenticated_dep
+from core.dependencies.common import authenticated_dep, get_token_service, lecturer_or_admin_dep
 from services.academic.enrollment import EnrollmentService
 from tasks.submission import refresh_dashboard_task
-from core.database import get_db
-from core.dependencies.common import get_token_service, lecturer_or_admin_dep, authenticated_dep
 
 router = APIRouter(prefix="/enrollment", tags=["enrollment"])
 

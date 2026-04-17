@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import DeclarativeBase
 
 from core.config import get_settings
 from functools import lru_cache
@@ -71,4 +71,24 @@ async def get_db() -> AsyncSession:
         raise
     finally:
         await session.close()
+
+
+async def close_db() -> None:
+    """Dispose the async engine and clear the session factory.
+
+    Intended for use during application shutdown to close all pooled
+    connections cleanly.
+    """
+    global _engine, _session_factory
+    # Clear session factory reference
+    _session_factory = None
+
+    # Dispose engine if initialized
+    if _engine is not None:
+        try:
+            await _engine.dispose()
+        except Exception:
+            # Best-effort dispose; ignore errors during shutdown
+            pass
+        _engine = None
 
