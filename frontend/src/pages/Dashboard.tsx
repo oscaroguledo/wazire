@@ -146,7 +146,7 @@ export function Dashboard() {
         setStudentStats({
           enrolledCourses: studentDash.total_courses,
           upcomingExams: studentDash.upcoming_exams,
-          completedExams: studentDash.total_submissions,
+          completedExams: studentDash.total_graded_submissions,
           missedExams: studentDash.missed_exams,
           totalSubmissions: studentDash.total_submissions,
           pendingGrades: studentDash.total_pending_submissions,

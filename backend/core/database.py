@@ -3,7 +3,8 @@ from __future__ import annotations
 from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy import create_engine
 
 from core.config import get_settings
 from functools import lru_cache
@@ -11,6 +12,8 @@ from functools import lru_cache
 # Global engine and session factory (initialized lazily)
 _engine = None
 _session_factory = None
+_sync_engine = None
+_sync_session_factory = None
 
 
 class Base(DeclarativeBase):
@@ -40,6 +43,51 @@ def get_engine():
             },
         )
     return _engine
+
+
+@lru_cache(maxsize=1)
+def get_sync_engine():
+    """Get or create the synchronous engine singleton for Celery tasks."""
+    global _sync_engine
+    if _sync_engine is None:
+        settings = get_settings()
+        database_url = settings.SQLALCHEMY_DATABASE_URI or settings.DATABASE_URL
+
+        # Convert async URL to sync URL for Celery
+        sync_url = database_url.replace("postgresql+asyncpg://", "postgresql://")
+        sync_url = sync_url.replace("sqlite+aiosqlite://", "sqlite://")
+
+        _sync_engine = create_engine(
+            sync_url,
+            echo=bool(settings.DEBUG),
+            pool_size=10,
+            max_overflow=20,
+            pool_pre_ping=True,
+            pool_recycle=1800,
+            pool_timeout=30,
+        )
+    return _sync_engine
+
+
+def get_sync_db():
+    """Get synchronous database session for Celery tasks."""
+    global _sync_session_factory
+    if _sync_session_factory is None:
+        engine = get_sync_engine()
+        _sync_session_factory = sessionmaker(
+            bind=engine,
+            expire_on_commit=False,
+            autocommit=False,
+            autoflush=False
+        )
+    session = _sync_session_factory()
+    try:
+        yield session
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
 
 
 async def get_db() -> AsyncSession:

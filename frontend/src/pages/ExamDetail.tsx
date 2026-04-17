@@ -59,7 +59,8 @@ export function ExamDetail() {
           try {
             const submission = await submissionApi.getMySubmission(id)
             // API returns null if no submission, submission object if exists
-            setHasSubmission(submission !== null && submission !== undefined)
+            // Check if submission has attempts (actually submitted) vs just started
+            setHasSubmission(submission !== null && submission !== undefined && submission.attempts_count > 0)
           } catch (err: any) {
             console.error('Failed to check submission:', err)
             setHasSubmission(false)

@@ -365,7 +365,7 @@ class SubmissionService:
                 grade_kwargs["question_text"] = q.text
                 grade_kwargs["rules"] = q.rules
 
-            answer_score, reason = grader.grade(**grade_kwargs)
+            answer_score, reason = await grader.grade(**grade_kwargs)
 
             answer_score_d = Decimal(str(answer_score)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             question_score = (answer_score_d * mark).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)

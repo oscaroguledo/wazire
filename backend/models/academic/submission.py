@@ -54,7 +54,7 @@ class Submission(Base):
         return {
             "id": str(self.id),
             "student_id": str(self.student_id),
-            "exam_id": str(self.exam_id),
+            "exam": self.exam.to_dict() if self.exam else None,
             "latest_score": str(self.latest_score) if self.latest_score is not None else None,
             "attempts_count": self.attempts_count,
             "graded_at": self.graded_at.isoformat() if self.graded_at else None,

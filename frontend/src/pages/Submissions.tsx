@@ -15,6 +15,7 @@ import Breadcrumbs from '@/components/Breadcrumbs'
 import SubmissionsSkeleton from './SubmissionsSkeleton'
 import { EmptyState } from '@/components/EmptyState'
 import Table from '@/components/Table'
+import Card from '@/components/Card'
 import { config } from '@/config';
 
 interface StatCardProps {
@@ -94,8 +95,11 @@ export function Submissions() {
   const submissions = data?.items || [];
   const pagination = data?.pagination || { page: 1, per_page: pageSize, total: 0, pages: 0, has_next: false, has_prev: false };
 
+  console.log('Submissions data:', submissions);
+  console.log('Pagination:', pagination);
+
   const avgScore = submissions.length > 0
-    ? (submissions.reduce((a, s) => a + (s.score || 0), 0) / (submissions.filter((s) => s.score).length || 1)).toFixed(1)
+    ? (submissions.reduce((a, s) => a + (s.latest_score ? parseFloat(s.latest_score) : 0), 0) / (submissions.filter((s) => s.latest_score !== null && s.latest_score !== undefined).length || 1)).toFixed(1)
     : '0';
 
   const renderTable = (cols: string[], rows: React.ReactNode) => (
@@ -117,15 +121,8 @@ export function Submissions() {
 
   const renderStudentView = () => (
     <>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
-        <StatCard label="Total Submissions" value={pagination.total} icon={FileText} iconBg="bg-[var(--color-primary-50)]" iconColor="text-[var(--color-primary-600)]" delay={0} />
-        <StatCard label="Average Score" value={avgScore} icon={TrendingUp} iconBg="bg-[var(--color-primary-50)]" iconColor="text-[var(--color-primary-600)]" delay={0.05} />
-        <StatCard label="Passed Exams" value={submissions.filter((s) => s.score && s.score >= 60).length} icon={Award} iconBg="bg-[var(--color-success-100)]" iconColor="text-[var(--color-success-600)]" delay={0.1} />
-        <StatCard label="Pending" value={submissions.filter((s) => s.status === 'pending' || s.status === 'submitted').length} icon={Calendar} iconBg="bg-[var(--color-warning-100)]" iconColor="text-[var(--color-warning-600)]" delay={0.15} />
-      </div>
-
       {renderTable(
-        ['Exam', 'Submitted', 'Score', 'Status', 'Action'],
+        ['Exam', 'Submitted', 'Score', 'Graded At'],
         submissions.map((s, idx) => (
           <motion.tr
             key={s.id}
@@ -140,29 +137,28 @@ export function Submissions() {
                   <Icon as={FileText} size={18} className="text-[var(--color-primary-600)]" />
                 </div>
                 <div>
-                  <p className="font-medium text-[var(--color-text-primary)]">{s.exam_title || 'N/A'}</p>
-                  <p className="text-xs text-[var(--color-text-muted)]">{s.max_marks} marks</p>
+                  <p className="font-medium text-[var(--color-text-primary)]">{s.exam?.title || 'N/A'}</p>
+                  <p className="text-xs text-[var(--color-text-muted)]">{s.exam?.total_marks || 0} marks</p>
                 </div>
               </div>
             </td>
             <td className="px-6 py-4 text-sm text-[var(--color-text-secondary)]">
-              {s.submitted_at ? new Date(s.submitted_at).toLocaleDateString() : 'Not submitted'}
+              {s.created_at ? new Date(s.created_at).toLocaleDateString() : 'Not submitted'}
             </td>
             <td className="px-6 py-4">
-              {s.score !== undefined ? (
-                <span className={`font-medium ${scoreColor(s.score)}`}>
-                  {s.score}/{s.max_score}
+              {s.latest_score !== null && s.latest_score !== undefined ? (
+                <span className={`font-medium ${scoreColor(parseFloat(s.latest_score))}`}>
+                  {s.latest_score}/{s.exam?.total_marks || 100}
                   <span className="text-xs text-[var(--color-text-muted)] ml-1">
-                    ({((s.score / s.max_score) * 100).toFixed(0)}%)
+                    ({((parseFloat(s.latest_score) / (s.exam?.total_marks || 100)) * 100).toFixed(0)}%)
                   </span>
                 </span>
               ) : (
                 <span className="text-[var(--color-text-muted)] text-sm">Not graded</span>
               )}
             </td>
-            <td className="px-6 py-4"><StatusBadge status={s.status} /></td>
-            <td className="px-6 py-4">
-              <Button variant="secondary" className="px-3 py-1.5 text-xs">View Details</Button>
+            <td className="px-6 py-4 text-sm text-[var(--color-text-secondary)]">
+              {s.graded_at ? new Date(s.graded_at).toLocaleDateString() : 'Not graded'}
             </td>
           </motion.tr>
         ))
@@ -179,18 +175,20 @@ export function Submissions() {
                     <Icon as={FileText} size={18} className="text-[var(--color-primary-600)]" />
                   </div>
                   <div>
-                    <p className="font-medium text-[var(--color-text-primary)]">{s.exam_title || 'N/A'}</p>
-                    <p className="text-xs text-[var(--color-text-muted)]">{s.max_marks} marks</p>
+                    <p className="font-medium text-[var(--color-text-primary)]">{s.exam?.title || 'N/A'}</p>
+                    <p className="text-xs text-[var(--color-text-muted)]">{s.exam?.total_marks || 0} marks</p>
                   </div>
                 </div>
-                <StatusBadge status={s.status} />
+                <span className="text-xs text-[var(--color-text-secondary)]">
+                  Graded: {s.graded_at ? new Date(s.graded_at).toLocaleDateString() : 'Not graded'}
+                </span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-[var(--color-text-secondary)]">
-                  {s.submitted_at ? new Date(s.submitted_at).toLocaleDateString() : 'Not submitted'}
+                  {s.created_at ? new Date(s.created_at).toLocaleDateString() : 'Not submitted'}
                 </span>
-                {s.score !== undefined && (
-                  <span className={`font-medium ${scoreColor(s.score)}`}>{s.score}/{s.max_score}</span>
+                {s.latest_score !== null && s.latest_score !== undefined && (
+                  <span className={`font-medium ${scoreColor(parseFloat(s.latest_score))}`}>{s.latest_score}/{s.exam?.total_marks || 100}</span>
                 )}
               </div>
             </Card>
@@ -208,8 +206,8 @@ export function Submissions() {
         <StatCard label="Average Score" value={avgScore} icon={TrendingUp} iconBg="bg-[var(--color-primary-50)]" iconColor="text-[var(--color-primary-600)]" delay={0.1} />
         <StatCard
           label="Pass Rate"
-          value={`${submissions.filter((s) => s.score).length > 0
-            ? ((submissions.filter((s) => s.score && s.score >= 60).length / submissions.filter((s) => s.score).length) * 100).toFixed(0)
+          value={`${submissions.filter((s) => s.latest_score !== null && s.latest_score !== undefined).length > 0
+            ? ((submissions.filter((s) => s.latest_score && parseFloat(s.latest_score) >= 60).length / submissions.filter((s) => s.latest_score !== null && s.latest_score !== undefined).length) * 100).toFixed(0)
             : 0}%`}
           icon={Award}
           iconBg="bg-[var(--color-success-100)]"
@@ -237,20 +235,20 @@ export function Submissions() {
                   <Icon as={FileText} size={18} className="text-[var(--color-primary-600)]" />
                 </div>
                 <div>
-                  <p className="font-medium text-[var(--color-text-primary)]">{s.exam_title || 'N/A'}</p>
-                  <p className="text-xs text-[var(--color-text-muted)]">{s.max_marks} marks</p>
+                  <p className="font-medium text-[var(--color-text-primary)]">{s.exam?.title || 'N/A'}</p>
+                  <p className="text-xs text-[var(--color-text-muted)]">{s.exam?.total_marks || 0} marks</p>
                 </div>
               </div>
             </td>
             <td className="px-6 py-4 text-sm text-[var(--color-text-secondary)]">
-              {s.submitted_at ? new Date(s.submitted_at).toLocaleDateString() : 'Not submitted'}
+              {s.created_at ? new Date(s.created_at).toLocaleDateString() : 'Not submitted'}
             </td>
             <td className="px-6 py-4">
-              {s.score !== undefined ? (
-                <span className={`font-medium ${scoreColor(s.score)}`}>
-                  {s.score}/{s.max_score}
+              {s.latest_score !== null && s.latest_score !== undefined ? (
+                <span className={`font-medium ${scoreColor(parseFloat(s.latest_score))}`}>
+                  {s.latest_score}/{s.exam?.total_marks || 100}
                   <span className="text-xs text-[var(--color-text-muted)] ml-1">
-                    ({((s.score / s.max_score) * 100).toFixed(0)}%)
+                    ({((parseFloat(s.latest_score) / (s.exam?.total_marks || 100)) * 100).toFixed(0)}%)
                   </span>
                 </span>
               ) : (
@@ -276,16 +274,16 @@ export function Submissions() {
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <p className="font-medium text-[var(--color-text-primary)]">{s.student_name || 'N/A'}</p>
-                  <p className="text-sm text-[var(--color-text-secondary)]">{s.exam_title || 'N/A'}</p>
+                  <p className="text-sm text-[var(--color-text-secondary)]">{s.exam?.title || 'N/A'}</p>
                 </div>
                 <StatusBadge status={s.status} />
               </div>
               <div className="flex items-center justify-between text-sm mb-3">
                 <span className="text-[var(--color-text-secondary)]">
-                  {s.submitted_at ? new Date(s.submitted_at).toLocaleDateString() : 'Not submitted'}
+                  {s.created_at ? new Date(s.created_at).toLocaleDateString() : 'Not submitted'}
                 </span>
-                {s.score !== undefined && (
-                  <span className={`font-medium ${scoreColor(s.score)}`}>{s.score}/{s.max_score}</span>
+                {s.latest_score !== null && s.latest_score !== undefined && (
+                  <span className={`font-medium ${scoreColor(parseFloat(s.latest_score))}`}>{s.latest_score}/{s.exam?.total_marks || 100}</span>
                 )}
               </div>
               <div className="flex gap-2 pt-2 border-t border-[var(--color-border-light)]">

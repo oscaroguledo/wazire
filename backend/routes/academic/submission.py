@@ -33,7 +33,7 @@ router = APIRouter(prefix="/submissions", tags=["submissions"])
 
 
 async def _enrich_submission(s, db) -> dict:
-    """Add student_name, exam_title, course_id, and status to a submission dict."""
+    """Add student_name, exam object, course_id, and status to a submission dict."""
     data = s.to_dict()
     # Compute status based on graded_at and latest_score
     if s.graded_at and s.latest_score is not None:
@@ -49,7 +49,7 @@ async def _enrich_submission(s, db) -> dict:
     # Fetch exam and course info
     exam = (await db.execute(select(ExamModel).where(ExamModel.id == s.exam_id))).scalar_one_or_none()
     if exam:
-        data['exam_title'] = exam.title
+        data['exam'] = exam.to_dict()
         if exam.course_id:
             data['course_id'] = str(exam.course_id)
     return data

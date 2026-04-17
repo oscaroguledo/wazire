@@ -75,7 +75,7 @@ class Exam(Base):
     # Relationship to course
     course: Mapped["Course"] = relationship("Course", back_populates="exams", lazy="selectin")
     # Relationship to submissions
-    submissions: Mapped[list] = relationship("Submission", back_populates="exam", lazy="selectin")
+    submissions: Mapped[list] = relationship("Submission", back_populates="exam", lazy="joined")
 
 
     def __repr__(self) -> str:
@@ -87,7 +87,14 @@ class Exam(Base):
         duration_hours = int(self.duration) if self.duration else 0
         duration_minutes = int(round((self.duration - Decimal(duration_hours)) * Decimal(60))) if self.duration else 0
 
-        
+        # Handle submissions that might be loaded as scalar or list
+        submission_count = 0
+        if self.submissions:
+            if isinstance(self.submissions, list):
+                submission_count = len(self.submissions)
+            else:
+                submission_count = 1  # Single submission loaded as scalar
+
         return {
             "id": str(self.id) if self.id else None,
             "title": self.title,
@@ -107,5 +114,5 @@ class Exam(Base):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "question_count": len(self.questions) if self.questions and isinstance(self.questions, list) else 0,
-            "submission_count": len(self.submissions) if self.submissions and isinstance(self.submissions, list) else 0,
+            "submission_count": submission_count,
         }

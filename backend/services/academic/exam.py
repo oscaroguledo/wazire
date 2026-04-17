@@ -51,6 +51,7 @@ class ExamService:
         # Re-load with relationships for serialization
         stmt = select(ExamModel).options(
             selectinload(ExamModel.course).selectinload(CourseModel.lecturer),
+            selectinload(ExamModel.submissions),
         ).where(ExamModel.id == exam.id)
         result = await self.db.execute(stmt)
         return result.scalar_one()
@@ -58,6 +59,7 @@ class ExamService:
     async def get(self, exam_id: UUID, tenant_id: Optional[UUID]) -> Optional[ExamModel]:
         stmt = select(ExamModel).options(
             selectinload(ExamModel.course).selectinload(CourseModel.lecturer),
+            selectinload(ExamModel.submissions),
         ).where(ExamModel.id == exam_id)
         if tenant_id:
             stmt = stmt.where(ExamModel.tenant_id == tenant_id)
@@ -99,6 +101,7 @@ class ExamService:
         # Re-load with relationships for serialization
         stmt = select(ExamModel).options(
             selectinload(ExamModel.course).selectinload(CourseModel.lecturer),
+            selectinload(ExamModel.submissions),
         ).where(ExamModel.id == exam.id)
         result = await self.db.execute(stmt)
         return result.scalar_one()

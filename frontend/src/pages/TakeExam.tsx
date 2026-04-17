@@ -107,7 +107,17 @@ export function TakeExam() {
         if (examData?.duration_hours || examData?.duration_minutes) {
           const totalHours = (examData.duration_hours || 0) + (examData.duration_minutes || 0) / 60;
           setTotalDuration(totalHours * 3600);
-          setTimeRemaining(totalHours * 3600);
+          
+          // Calculate remaining time based on submission start time if exists
+          if (existingSubmission && existingSubmission.created_at) {
+            const startTime = new Date(existingSubmission.created_at).getTime();
+            const currentTime = Date.now();
+            const elapsedSeconds = (currentTime - startTime) / 1000;
+            const remaining = Math.max(0, totalHours * 3600 - elapsedSeconds);
+            setTimeRemaining(remaining);
+          } else {
+            setTimeRemaining(totalHours * 3600);
+          }
         }
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : 'Failed to load exam');
@@ -316,8 +326,8 @@ export function TakeExam() {
   };
 
   if (!examStarted) {
-    // Show submitted message only if submission is completed
-    if (existingSubmission && existingSubmission.status === 'completed') {
+    // Show submitted message only if submission has attempts (actually submitted)
+    if (existingSubmission && existingSubmission.attempts_count > 0) {
       return (
         <div className="min-h-screen bg-[var(--color-bg-primary)] p-6">
           <div className="max-w-2xl mx-auto">

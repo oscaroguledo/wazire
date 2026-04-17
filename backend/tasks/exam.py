@@ -7,16 +7,18 @@ from datetime import datetime, timezone, timedelta
 from celery.utils.log import get_task_logger
 
 from celery_app import celery_app
-from core.database import get_db
+from core.database import get_sync_db
 from sqlalchemy import select
 from models.academic.exam import Exam
 
 logger = get_task_logger(__name__)
 
 
-async def update_exam_statuses() -> Dict[str, int]:
-    """Update exam statuses (Celery task)."""
-    async with get_db() as db:
+def update_exam_statuses() -> Dict[str, int]:
+    """Update exam statuses (Celery task) - using synchronous DB session."""
+    db_gen = get_sync_db()
+    db = next(db_gen)
+    try:
         now = datetime.now(timezone.utc)
         activated = 0
         completed = 0
@@ -24,7 +26,7 @@ async def update_exam_statuses() -> Dict[str, int]:
         timezone_conversions = 0
         total_tenants_processed = 0
 
-        tenant_ids_result = await db.execute(
+        tenant_ids_result = db.execute(
             select(Exam.tenant_id).where(Exam.start_time.is_not(None)).distinct()
         )
         tenant_ids = [row[0] for row in tenant_ids_result.all() if row[0] is not None]
@@ -36,7 +38,7 @@ async def update_exam_statuses() -> Dict[str, int]:
             tenant_activated = 0
             tenant_completed = 0
 
-            tenant_exams_result = await db.execute(
+            tenant_exams_result = db.execute(
                 select(Exam).where(
                     Exam.start_time.is_not(None),
                     Exam.tenant_id == tenant_id
@@ -82,7 +84,7 @@ async def update_exam_statuses() -> Dict[str, int]:
                         tenant_completed += 1
                         logger.info(f"[ExamTask] Completed exam {exam.id}: start={exam_start}, end={end_time}, now={now}")
 
-            await db.commit()
+            db.commit()
 
             if tenant_activated > 0 or tenant_completed > 0:
                 logger.info(f"[ExamTask] Tenant {tenant_id}: Activated {tenant_activated}, completed {tenant_completed}")
@@ -99,13 +101,18 @@ async def update_exam_statuses() -> Dict[str, int]:
             "skipped_no_duration": skipped_no_duration,
             "timezone_conversions": timezone_conversions,
         }
+    finally:
+        try:
+            next(db_gen)
+        except StopIteration:
+            pass
 
 
-@celery_app.task(name="tasks.scheduler.update_exam_statuses_task")
+@celery_app.task(name="tasks.exam.update_exam_statuses_task")
 def update_exam_statuses_task() -> Dict[str, Any]:
     """Celery wrapper for exam status update."""
     try:
-        result = asyncio.run(update_exam_statuses())
+        result = update_exam_statuses()
         logger.info("Exam status update completed: %s", result)
         return result
     except Exception as exc:

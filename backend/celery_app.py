@@ -55,7 +55,7 @@ celery_app.conf.update(
     
     beat_schedule={
         "update-exam-status-every-minute": {
-            "task": "tasks.scheduler.update_exam_statuses_task",
+            "task": "tasks.exam.update_exam_statuses_task",
             "schedule": settings.CELERY_EXAM_STATUS_UPDATE_INTERVAL,
         },
         "send-queued-emails-every-minute": {
@@ -66,4 +66,4 @@ celery_app.conf.update(
 )
 
 # Import tasks explicitly to avoid autodiscovery issues
-from tasks import email, question, scheduler, submission
+from tasks import email, question, exam, submission
