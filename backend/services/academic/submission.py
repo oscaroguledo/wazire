@@ -357,7 +357,8 @@ class SubmissionService:
                 student_answer=student_answer,
             )
             if q.qtype == "multiple_choice":
-                grade_kwargs["mcq_answer"] = str(a.value).strip() if a and a.value else None
+                grade_kwargs["mcq_answer"] = str(a.value).strip().lower() if a and a.value else None
+                student_answer = student_answer.lower() if student_answer else student_answer
             elif q.qtype == "fill_in_blanks":
                 grade_kwargs["fitb_answer"] = a.text_value.strip() if a and a.text_value else None
                 grade_kwargs["fitb_variations"] = a.acceptable_variations if a and a.acceptable_variations else None

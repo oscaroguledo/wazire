@@ -9,7 +9,7 @@ from celery.utils.log import get_task_logger
 
 from celery_app import celery_app
 from core.database import get_sync_db
-from sqlalchemy import select
+from sqlalchemy import select, and_
 from sqlalchemy.orm import Session
 from models.account.users import User, UserRole
 from models.academic.submission import Submission, SubmissionAttempt
@@ -91,6 +91,57 @@ async def _grade_attempt_sync(attempt_id: str, exam_id: str, db: Session) -> Non
             refresh_dashboard_task.delay(uid)
     finally:
         await db_gen.aclose()
+
+
+@celery_app.task(name="tasks.submission.grade_tenant_submissions_task")
+def grade_tenant_submissions_task(tenant_id: str) -> Dict[str, Any]:
+    """Grade all ungraded submissions for a tenant."""
+    db_gen = get_sync_db()
+    db = next(db_gen)
+    try:
+        asyncio.run(_grade_tenant_submissions_sync(tenant_id=tenant_id, db=db))
+    finally:
+        try:
+            next(db_gen)
+        except StopIteration:
+            pass
+    logger.info("Graded all submissions for tenant=%s", tenant_id)
+    return {"graded": True, "tenant_id": tenant_id}
+
+
+async def _grade_tenant_submissions_sync(tenant_id: str, db: Session) -> None:
+    """Grade all ungraded submissions for a tenant."""
+    # Get all exams for the tenant
+    exams = db.execute(
+        select(Exam).where(Exam.tenant_id == uuid.UUID(tenant_id))
+    ).scalars().all()
+
+    graded_count = 0
+    for exam in exams:
+        # Get all submissions for this exam that haven't been graded
+        submissions = db.execute(
+            select(Submission).where(
+                and_(
+                    Submission.exam_id == exam.id,
+                    Submission.graded_at.is_(None)
+                )
+            )
+        ).scalars().all()
+
+        for submission in submissions:
+            # Get the latest attempt
+            attempt = db.execute(
+                select(SubmissionAttempt)
+                .where(SubmissionAttempt.submission_id == submission.id)
+                .order_by(SubmissionAttempt.created_at.desc())
+            ).scalar_one_or_none()
+
+            if attempt:
+                # Trigger grading for this attempt
+                grade_submission_attempt_task.delay(str(attempt.id), str(exam.id))
+                graded_count += 1
+
+    logger.info(f"Triggered grading for {graded_count} submissions for tenant {tenant_id}")
 
 
 @celery_app.task(name="tasks.submission.refresh_dashboard_task")
