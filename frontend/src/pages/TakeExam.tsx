@@ -232,9 +232,9 @@ export function TakeExam() {
       await submissionApi.submitExam({
         exam_id: id as string
       });
-      
-      // Navigate to success page
-      navigate(`/exams/${id}/submitted`);
+
+      // Navigate to exam detail page
+      navigate(`/exams/${id}`);
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : 'Failed to submit exam');
     } finally {

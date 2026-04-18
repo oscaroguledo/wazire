@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { config } from './config';
@@ -24,6 +24,7 @@ import TenantsPage from './pages/Tenants';
 import CreateTenantPage from './pages/tenants/CreateTenant';
 import EditTenantPage from './pages/tenants/EditTenant';
 import BillingPage from './pages/Billing';
+import { runAllApiTests } from './apis/test-apis';
 
 // Create QueryClient instance with optimized staleTimes per data type
 const queryClient = new QueryClient({
@@ -38,6 +39,11 @@ const queryClient = new QueryClient({
 
 function AppRoutes() {
   const { isAuthenticated, user, authLoading } = useAuth();
+
+  // Make testApis available in browser console
+  useEffect(() => {
+    (window as any).testApis = runAllApiTests;
+  }, []);
   
   // While auth is resolving, show nothing (avoids flash redirects)
   if (authLoading) return null;

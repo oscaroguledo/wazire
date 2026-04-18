@@ -15,6 +15,7 @@ import Input from '@/components/Input'
 import { StatusBadge } from '@/components/StatusBadge'
 import Table from '@/components/Table'
 import Breadcrumbs from '@/components/Breadcrumbs'
+import { EmptyState } from '@/components/EmptyState'
 import UserManagementSkeleton from './UserManagementSkeleton'
 import { config } from '@/config'
 

@@ -326,7 +326,7 @@ export async function submitExam(submitData: ExamSubmitData): Promise<ExamSubmit
     if (error instanceof ApiError) {
       throw error
     }
-    
+
     if (error instanceof Error) {
       if (error.message.includes('401') || error.message.includes('Not authenticated')) {
         throw new ApiError('Authentication required to submit exam', 401)
@@ -338,10 +338,13 @@ export async function submitExam(submitData: ExamSubmitData): Promise<ExamSubmit
         throw new ApiError('Exam or submission not found', 404)
       }
       if (error.message.includes('400') || error.message.includes('Bad Request')) {
-        throw new ApiError('Invalid submission data - check your answers', 400)
+        // Pass through the actual backend error message
+        const match = error.message.match(/"error":"([^"]+)"/)
+        const backendError = match ? match[1] : 'Invalid submission data - check your answers'
+        throw new ApiError(backendError, 400)
       }
     }
-    
+
     throw new ApiError('Failed to submit exam', 500)
   }
 }

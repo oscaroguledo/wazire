@@ -235,8 +235,10 @@ export async function runAllApiTests() {
 }
 
 // Export for use in browser console
-if (typeof window !== 'undefined') {
+try {
   (window as any).testApis = runAllApiTests
+} catch (e) {
+  // Ignore if window not available (SSR)
 }
 
 export default { runAllApiTests }

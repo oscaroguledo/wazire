@@ -24,8 +24,8 @@ class SubmissionRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     student_id: UUID
-    exam_id: UUID
-    course_id: Optional[UUID] = None  # Added for frontend dashboard
+    exam: Dict[str, Any]
+    course_id: Optional[UUID] = None
     latest_score: Optional[Decimal]
     attempts_count: int
     # in_progress_answers removed: drafts are stored in student_answers table

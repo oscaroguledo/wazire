@@ -22,8 +22,7 @@ Users must log in with roles:
 * Student
 * Lecturer / Examiner
 * School Admin
-* External Examiner
-* Super Admin (exam body)
+* Super Admin
 
 👉 Use **RBAC (Role-Based Access Control)**
 
@@ -72,9 +71,9 @@ You are entering **proctoring territory**—this is complex and sensitive.
 ## **E. Result Management**
 
 * Instant result generation
-* No “missing scripts” → everything stored
+* No “missing scripts” → all results stored digitally
 * Grade computation
-* Export to PDF / school systems
+* Export to PDF / school systems(using external apis or csv or excel)
 
 ---
 
@@ -85,6 +84,7 @@ You are entering **proctoring territory**—this is complex and sensitive.
   * Who created exam
   * Who edited
   * Who marked
+  etc
 * Immutable logs (cannot be changed)
 
 👉 This is how you eliminate “missing results”

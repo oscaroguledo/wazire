@@ -100,14 +100,9 @@ Admin can:
 
 ---
 
-# 🚫 DO NOT BUILD YET
-
-These will slow you down:
-
-* Webcam monitoring
 * AI cheating detection
 * Mobile app
-* Complex analytics
+
 * Multi-school support
 
 ---

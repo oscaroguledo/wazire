@@ -30,7 +30,7 @@ export function useWebSocket(onMessage?: (msg: WebSocketMessage) => void) {
       wsRef.current.close();
     }
 
-    const wsUrl = `${import.meta.env.VITE_WS_URL || 'ws://localhost:8000'}/ws/${user.id}`;
+    const wsUrl = `${import.meta.env.VITE_WS_URL || 'ws://localhost:8000'}/api/v1/ws/${user.id}`;
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {

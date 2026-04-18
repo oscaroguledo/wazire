@@ -33,6 +33,8 @@ export function Exams() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [appliedCourse, setAppliedCourse] = useState('');
+  const [appliedStatus, setAppliedStatus] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10);
   
@@ -72,7 +74,7 @@ export function Exams() {
 
   // React Query hook for fetching exams and courses in parallel using Promise.all
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['exams-and-courses', currentPage, pageSize, searchQuery, selectedCourse, selectedStatus, user?.tenant_id, user?.role, enrolledCourseIds],
+    queryKey: ['exams-and-courses', currentPage, pageSize, searchQuery, appliedCourse, appliedStatus, user?.tenant_id, user?.role, enrolledCourseIds],
     queryFn: async () => {
       // Fetch both exams and courses in parallel
       const [examsResult, coursesResponse] = await Promise.all([
@@ -81,8 +83,8 @@ export function Exams() {
             page: currentPage,
             per_page: pageSize,
             search: searchQuery || undefined,
-            course_id: selectedCourse || undefined,
-            status: selectedStatus && selectedStatus !== 'all' ? selectedStatus as Exam['status'] : undefined,
+            course_id: appliedCourse || undefined,
+            status: appliedStatus && appliedStatus !== 'all' ? appliedStatus as Exam['status'] : undefined,
             // tenant_id sent for non-admin users; backend handles lecturer filtering server-side
             tenant_id: user?.role !== 'admin' ? (user?.tenant_id || undefined) : undefined,
           }
@@ -209,6 +211,14 @@ export function Exams() {
     setCurrentPage(page);
   };
 
+  // Handle search - apply selected filters
+  const handleSearch = () => {
+    setAppliedCourse(selectedCourse);
+    setAppliedStatus(selectedStatus);
+    setSearchQuery(searchInput);
+    setCurrentPage(1);
+  };
+
   // Handle exam deletion
   const handleDeleteExam = async () => {
     if (!examToDelete) return;
@@ -268,15 +278,12 @@ export function Exams() {
         <SearchInput
           value={searchInput}
           onChange={setSearchInput}
-          onSearch={(value) => {
-            setSearchQuery(value);
-            setCurrentPage(1);
-          }}
+          onSearch={handleSearch}
           placeholder="Search exams..."
           disabled={loading}
           className="flex-1 max-w-md"
         />
-        
+
         {/* Course Filter Dropdown */}
         <Dropdown
             options={[
@@ -290,7 +297,7 @@ export function Exams() {
             showClearButton={false}
             className='w-full sm:w-64'
           />
-        
+
         {/* Status Filter Dropdown */}
         <Dropdown
           options={[
