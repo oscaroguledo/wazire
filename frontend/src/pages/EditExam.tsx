@@ -274,7 +274,7 @@ export function EditExam() {
                 </div>
                 <Input
                   type="number"
-                  min="1"
+                  min="0"
                   max="24"
                   value={formData.duration_hours || ''}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('duration_hours', parseInt(e.target.value))}

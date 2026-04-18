@@ -42,7 +42,7 @@ export function Exams() {
   const [createFormData, setCreateFormData] = useState({
     title: '',
     courseId: '',
-    durationHours: '',
+    durationHours: 0,
     durationMinutes: 0,
     description: '',
     totalMarks: '',
@@ -147,10 +147,16 @@ export function Exams() {
     setCreateLoading(true);
     setCreateError(null);
 
+    const durationHours = parseInt(createFormData.durationHours);
+    if (!durationHours || durationHours < 1) {
+      setCreateError('Duration must be at least 1 hour');
+      return;
+    }
+
     const examData = {
       title: createFormData.title,
       course_id: createFormData.courseId,
-      duration_hours: parseInt(createFormData.durationHours),
+      duration_hours: durationHours,
       duration_minutes: parseInt(createFormData.durationMinutes.toString()) || 0,
       description: createFormData.description,
       total_marks: createFormData.totalMarks ? parseInt(createFormData.totalMarks) : undefined,
@@ -553,8 +559,9 @@ export function Exams() {
               </label>
               <Input
                 type="number"
-                min="1"
+                min="0"
                 max="24"
+                defaultValue="0"
                 value={createFormData.durationHours}
                 onChange={(e) => handleCreateFormChange('durationHours', e.target.value)}
                 disabled={createLoading}
