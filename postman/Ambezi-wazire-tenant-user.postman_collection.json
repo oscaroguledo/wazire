@@ -1,0 +1,165 @@
+{
+  "info": {
+    "_postman_id": "ambezi-wazire-tenant-user",
+    "name": "Ambezi Wazire - Tenant & User APIs",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Collection documenting Tenant and User (auth) APIs. Set `{{baseUrl}}` and `{{bearerToken}}` in environment."
+  },
+  "item": [
+    {
+      "name": "Auth - Register",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"first_name\": \"Jane\",\n  \"last_name\": \"Doe\",\n  \"email\": \"jane@example.com\",\n  \"password\": \"SuperSecret123\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/register",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth","register"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Auth - Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"jane@example.com\",\n  \"password\": \"SuperSecret123\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth","login"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Auth - Refresh Token",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "body": { "mode": "raw", "raw": "{\n  \"refresh_token\": \"{{refreshToken}}\"\n}" },
+        "url": { "raw": "{{baseUrl}}/auth/refresh", "host": ["{{baseUrl}}"], "path": ["auth","refresh"] }
+      }
+    },
+    {
+      "name": "Auth - Me (GET)",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{bearerToken}}" } ],
+        "url": { "raw": "{{baseUrl}}/auth/me", "host": ["{{baseUrl}}"], "path": ["auth","me"] }
+      }
+    },
+    {
+      "name": "Auth - Update Me (PUT)",
+      "request": {
+        "method": "PUT",
+        "header": [ { "key": "Authorization", "value": "Bearer {{bearerToken}}" }, { "key": "Content-Type", "value": "application/json" } ],
+        "body": { "mode": "raw", "raw": "{\n  \"first_name\": \"Janet\"\n}" },
+        "url": { "raw": "{{baseUrl}}/auth/me", "host": ["{{baseUrl}}"], "path": ["auth","me"] }
+      }
+    },
+    {
+      "name": "Users - List",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{bearerToken}}" } ],
+        "url": { "raw": "{{baseUrl}}/auth?page=1&per_page=10", "host": ["{{baseUrl}}"], "path": ["auth"], "query": [ { "key": "page", "value": "1" }, { "key": "per_page", "value": "10" } ] }
+      }
+    },
+    {
+      "name": "Users - Get",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{bearerToken}}" } ],
+        "url": { "raw": "{{baseUrl}}/auth/{{userId}}", "host": ["{{baseUrl}}"], "path": ["auth","{{userId}}"] }
+      }
+    },
+    {
+      "name": "Users - Update",
+      "request": {
+        "method": "PUT",
+        "header": [ { "key": "Authorization", "value": "Bearer {{bearerToken}}" }, { "key": "Content-Type", "value": "application/json" } ],
+        "body": { "mode": "raw", "raw": "{\n  \"first_name\": \"Updated\"\n}" },
+        "url": { "raw": "{{baseUrl}}/auth/{{userId}}", "host": ["{{baseUrl}}"], "path": ["auth","{{userId}}"] }
+      }
+    },
+    {
+      "name": "Users - Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [ { "key": "Authorization", "value": "Bearer {{bearerToken}}" } ],
+        "url": { "raw": "{{baseUrl}}/auth/{{userId}}", "host": ["{{baseUrl}}"], "path": ["auth","{{userId}}"] }
+      }
+    },
+    {
+      "name": "Tenants - Create",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Authorization", "value": "Bearer {{bearerToken}}" }, { "key": "Content-Type", "value": "application/json" } ],
+        "body": { "mode": "raw", "raw": "{\n  \"name\": \"Example School\",\n  \"domain\": \"example.edu\",\n  \"created_by\": \"{{userId}}\"\n}" },
+        "url": { "raw": "{{baseUrl}}/tenants", "host": ["{{baseUrl}}"], "path": ["tenants"] }
+      }
+    },
+    {
+      "name": "Tenants - Get Current (admin)",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{bearerToken}}" } ],
+        "url": { "raw": "{{baseUrl}}/tenants", "host": ["{{baseUrl}}"], "path": ["tenants"] }
+      }
+    },
+    {
+      "name": "Tenants - Get by ID",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{bearerToken}}" } ],
+        "url": { "raw": "{{baseUrl}}/tenants/{{tenantId}}", "host": ["{{baseUrl}}"], "path": ["tenants","{{tenantId}}"] }
+      }
+    },
+    {
+      "name": "Tenants - Update",
+      "request": {
+        "method": "PUT",
+        "header": [ { "key": "Authorization", "value": "Bearer {{bearerToken}}" }, { "key": "Content-Type", "value": "application/json" } ],
+        "body": { "mode": "raw", "raw": "{\n  \"name\": \"Updated School\",\n  \"updated_by\": \"{{userId}}\"\n}" },
+        "url": { "raw": "{{baseUrl}}/tenants/{{tenantId}}", "host": ["{{baseUrl}}"], "path": ["tenants","{{tenantId}}"] }
+      }
+    },
+    {
+      "name": "Tenants - Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [ { "key": "Authorization", "value": "Bearer {{bearerToken}}" } ],
+        "url": { "raw": "{{baseUrl}}/tenants/{{tenantId}}", "host": ["{{baseUrl}}"], "path": ["tenants","{{tenantId}}"] }
+      }
+    },
+    {
+      "name": "Tenants - Restore",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Authorization", "value": "Bearer {{bearerToken}}" }, { "key": "Content-Type", "value": "application/json" } ],
+        "body": { "mode": "raw", "raw": "{}" },
+        "url": { "raw": "{{baseUrl}}/tenants/{{tenantId}}/restore", "host": ["{{baseUrl}}"], "path": ["tenants","{{tenantId}","restore"] }
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8000/api/v1" },
+    { "key": "bearerToken", "value": "" },
+    { "key": "userId", "value": "" },
+    { "key": "tenantId", "value": "" },
+    { "key": "refreshToken", "value": "" }
+  ]
+}
