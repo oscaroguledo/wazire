@@ -1,17 +1,15 @@
 from __future__ import annotations
 
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Tuple, Any, Dict
 from uuid import UUID
+from datetime import datetime
 
-from sqlalchemy import select, func as sqlfunc, table, column
+from fastapi import HTTPException, status
+from sqlalchemy import select, or_, func as sqlfunc
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
-from models.account.tenant import Tenant as TenantModel
-from models.account.users import User as UserModel
-from models.academic.course import Course as CourseModel
-from models.academic.exam import Exam as ExamModel
-from schemas.account.tenant import TenantCreate, TenantUpdate
+from models.account.tenant import Tenant
+from schemas.account.tenant import TenantCreate, TenantUpdate,TenantDelete
 
 
 class TenantService:
@@ -19,161 +17,201 @@ class TenantService:
         self.db = db
         self.token_service = token_service
 
-    async def get(self, tenant_id: UUID, name: Optional[str] = None,domain: Optional[str] = None) -> Optional[TenantModel]:
-        stmt = select(TenantModel).options(
-            selectinload(TenantModel.admins),
-            selectinload(TenantModel.invoices),
-            selectinload(TenantModel.usage),
-            selectinload(TenantModel.payment_methods)
-        ).where(TenantModel.id == tenant_id)
+    async def get(
+        self,
+        tenant_id: UUID,
+        is_active: Optional[bool] = True,  
+        is_deleted: Optional[bool] = False, 
+    ) -> Optional[Tenant]:
+        """Fetch a single tenant by primary key."""
+
+        # ID first — hits primary key index immediately
+        stmt = select(Tenant).where(Tenant.id == tenant_id)
+
+        # Filter deleted — default excludes soft deleted records
+        if is_deleted is not None:
+            stmt = stmt.where(Tenant.is_deleted.is_(is_deleted))
+
+        # Filter active — only apply if explicitly passed
+        if is_active is not None:
+            stmt = stmt.where(Tenant.is_active.is_(is_active))
+
         res = await self.db.execute(stmt)
         return res.scalar_one_or_none()
 
-    async def list_for_admin(self, admin_user_id: UUID, limit: int = 50, offset: int = 0) -> Tuple[List[TenantModel], int]:
-        """Get tenants where the user is an admin using offset pagination.
-
-        Returns a tuple of (items, total_count).
+    async def list(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        is_active: Optional[bool] = True,
+        is_deleted: Optional[bool] = False,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> Tuple[List[Tenant], int]:
+        """List all tenants (superadmin use-case) with pagination.
+        
+        Returns (items, total_count) ordered by created_at desc, id desc.
         """
-        # Build a subquery selecting tenant_ids from the tenant_admins association table
-        tenant_admins = table("tenant_admins", column("tenant_id"), column("user_id"))
 
-        tenant_ids_stmt = select(tenant_admins.c.tenant_id).where(tenant_admins.c.user_id == str(admin_user_id))
+        # Build filters once, reuse for count and data query
+        filters = []
 
-        # Query tenants matching the tenant_ids
-        stmt = select(TenantModel).options(
-            selectinload(TenantModel.invoices),
-            selectinload(TenantModel.usage),
-            selectinload(TenantModel.payment_methods)
-        ).where(TenantModel.id.in_(tenant_ids_stmt)).order_by(TenantModel.created_at.desc(), TenantModel.id.desc()).offset(offset).limit(limit)
+        if is_deleted is not None:
+            filters.append(Tenant.is_deleted.is_(is_deleted))   # ← fixed: was `if not is_deleted`
+        if is_active is not None:
+            filters.append(Tenant.is_active.is_(is_active))     # ← fixed: was == not .is_()
+        if start_date is not None:
+            filters.append(Tenant.created_at >= start_date)
+        if end_date is not None:
+            filters.append(Tenant.created_at <= end_date)
 
-        res = await self.db.execute(stmt)
-        items = res.scalars().all()
-
-        # total count
-        count_stmt = select(sqlfunc.count()).select_from(TenantModel).where(TenantModel.id.in_(tenant_ids_stmt))
+        # Efficient count — no subquery
+        count_stmt = select(sqlfunc.count(Tenant.id)).where(*filters)
         total = int((await self.db.execute(count_stmt)).scalar_one())
 
-        return items, total
+        # Data query reuses same filters
+        stmt = (
+            select(Tenant)
+            .where(*filters)
+            .order_by(Tenant.created_at.desc(), Tenant.id.desc())
+            .offset(offset)
+            .limit(limit)
+        )
 
-    async def create(self, tenant_in: TenantCreate) -> TenantModel:
-        # Create tenant first
-        tenant = TenantModel(
-            name=tenant_in.name,
-            domain=tenant_in.domain,
+        items_res = await self.db.execute(stmt)
+        return list(items_res.scalars().all()), total
+
+    async def create(self, tenant_in: TenantCreate) -> Tenant:
+        """Create a new tenant and optionally link admin users.
+
+        Raises HTTP 400 if name or domain already exists.
+        Admin users are linked by updating their tenant_id FK to point at
+        the new tenant (there is no separate many-to-many table).
+        """
+        # Uniqueness checks
+        name   = tenant_in.name.strip().lower()
+        domain = tenant_in.domain.strip().lower() if tenant_in.domain else None
+
+        existing = (await self.db.execute(
+            select(Tenant.name, Tenant.domain)
+            .where(Tenant.is_deleted.is_(False))
+            .where(
+                or_(
+                    Tenant.name == name,
+                    Tenant.domain == domain if domain else False,
+                )
+            )
+        )).all()
+
+        for row in existing:
+            if row.name == name:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tenant name already exists")
+            if domain and row.domain == domain:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Domain already exists")
+        
+        # Create tenant
+        tenant = Tenant(
+            name=name,
+            domain=domain,
             logo_url=tenant_in.logo_url,
             is_active=True,
+            created_by=tenant_in.created_by,
+            updated_by=tenant_in.created_by,
         )
+
         self.db.add(tenant)
-        await self.db.flush()
-
-        # If initial admin user ids provided, link them via the association table
-        # and update their tenant_id foreign key
-        if getattr(tenant_in, 'admin_user_ids', None):
-            stmt = select(TenantModel).options(
-                selectinload(TenantModel.admins),
-                selectinload(TenantModel.invoices),
-                selectinload(TenantModel.usage),
-                selectinload(TenantModel.payment_methods)
-            ).where(TenantModel.id == tenant.id)
-            res = await self.db.execute(stmt)
-            tenant = res.scalar_one()
-
-            user_stmt = select(UserModel).where(UserModel.id.in_(tenant_in.admin_user_ids))
-            user_res = await self.db.execute(user_stmt)
-            users = user_res.scalars().all()
-            tenant.admins = users
-
-            # Also set tenant_id on each admin user so /auth/me returns it
-            for u in users:
-                u.tenant_id = tenant.id
-                self.db.add(u)
-
-        await self.db.commit()
+        await self.db.flush()           # catch DB errors before commit
         await self.db.refresh(tenant)
+        await self.db.commit()
+        return tenant
 
-        # Re-load with all relationships for Pydantic serialization
-        stmt = select(TenantModel).options(
-            selectinload(TenantModel.admins),
-            selectinload(TenantModel.invoices),
-            selectinload(TenantModel.usage),
-            selectinload(TenantModel.payment_methods)
-        ).where(TenantModel.id == tenant.id)
-        result = await self.db.execute(stmt)
-        return result.scalar_one()
+    async def update(
+        self,
+        tenant_update: TenantUpdate,
+    ) -> Tenant:
+        # 1. Fetch the existing record from the DB
+        tenant = await self.db.get(Tenant, tenant_update.id)
+        if not tenant:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail="Tenant not found"
+            )
+        
+        # 2. Extract update data 
+        # exclude_unset=True is the MVP here; it ignores fields not in the request payload.
+        # We also exclude 'id' so we don't accidentally try to overwrite the PK.
+        update_data = tenant_update.model_dump(exclude_unset=True, exclude={"id"})
 
-    async def update(self, tenant: TenantModel, tenant_in: TenantUpdate) -> TenantModel:
-        data = tenant_in.model_dump(exclude_unset=True)
-        for field, value in data.items():
+        # 3. Domain uniqueness check (Logical Guard)
+        new_domain = update_data.get("domain")
+        if new_domain and new_domain != tenant.domain:
+            # Check if another record (that isn't this one) already uses the domain
+            query = select(Tenant.id).where(
+                Tenant.domain == new_domain,
+                Tenant.id != tenant.id,
+                Tenant.is_deleted.is_(False),
+            )
+            domain_exists = (await self.db.execute(query)).scalar_one_or_none()
+            
+            if domain_exists:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST, 
+                    detail="Domain already exists"
+                )
+
+        # 4. Apply changes to the SQLAlchemy instance
+        for field, value in update_data.items():
             setattr(tenant, field, value)
+
+        # 5. Commit the transaction
+        # SQLAlchemy tracks 'tenant' because we fetched it via the same session,
+        # so we just need to commit and refresh.
+        try:
+            await self.db.commit()
+            await self.db.refresh(tenant)
+        except Exception as e:
+            await self.db.rollback()
+            # Log the error here if needed
+            raise e
+
+        return tenant
+
+    async def delete(self, tenant_delete: TenantDelete) -> None:
+        """Soft-delete the tenant (sets is_deleted, deleted_at, is_active=False)."""
+        tenant = await self.db.get(Tenant, tenant_delete.id)
+        if not tenant:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Tenant not found"
+            )
+        tenant.delete()  # model helper
+        if tenant_delete.updated_by:
+            tenant.updated_by = tenant_delete.updated_by
+        self.db.add(tenant)
+        await self.db.commit()
+
+    async def restore(self, tenant_delete: TenantDelete) -> Tenant:
+        """Restore a soft-deleted tenant."""
+        tenant = await self.db.get(Tenant, tenant_delete.id)
+        if not tenant:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Tenant not found"
+            )
+        tenant.restore()  # model helper
+        if tenant_delete.updated_by:
+            tenant.updated_by = tenant_delete.updated_by
         self.db.add(tenant)
         await self.db.commit()
         await self.db.refresh(tenant)
         return tenant
-
-    async def list(self, limit: int = 50, offset: int = 0) -> Tuple[List[TenantModel], int]:
-        """List tenants with offset pagination, returning items and total count."""
-        stmt = select(TenantModel).options(selectinload(TenantModel.admins)).order_by(TenantModel.created_at.desc(), TenantModel.id.desc()).offset(offset).limit(limit)
-        res = await self.db.execute(stmt)
-        items = res.scalars().all()
-
-        count_stmt = select(sqlfunc.count()).select_from(TenantModel)
-        total = int((await self.db.execute(count_stmt)).scalar_one())
-
-        return list(items), total
-
-    async def delete(self, tenant: TenantModel) -> None:
+    async def hard_delete(self, tenant_id: UUID) -> None:
+        """Permanently delete a tenant from the database."""
+        tenant = await self.db.get(Tenant, tenant_id, with_for_update=True)
+        if not tenant:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Tenant not found"
+            )
         await self.db.delete(tenant)
         await self.db.commit()
-
-    async def get_tenant_users(self, tenant_id: UUID, limit: int = 50, offset: int = 0) -> Tuple[List[Dict[str, Any]], int]:
-        """Get users in a tenant with their details and total count."""
-        stmt = select(UserModel).where(UserModel.tenant_id == tenant_id).order_by(UserModel.created_at.desc()).offset(offset).limit(limit)
-        res = await self.db.execute(stmt)
-        users = res.scalars().all()
-
-        count_stmt = select(sqlfunc.count()).select_from(UserModel).where(UserModel.tenant_id == tenant_id)
-        total = int((await self.db.execute(count_stmt)).scalar_one())
-
-        return [
-            {
-                "id": user.id,
-                "email": user.email,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "role": user.role,
-                "is_active": user.is_active,
-                "created_at": user.created_at
-            }
-            for user in users
-        ], total
-
-    async def get_tenant_stats(self, tenant_id: UUID) -> Dict[str, Any]:
-        """Get tenant statistics."""
-
-        # Count users by role
-        user_stmt = select(UserModel).where(UserModel.tenant_id == tenant_id)
-        user_res = await self.db.execute(user_stmt)
-        all_users = user_res.scalars().all()
-
-        total_users = len(all_users)
-        total_students = len([u for u in all_users if str(u.role).lower() in ('student', 'userrole.student')])
-        total_lecturers = len([u for u in all_users if str(u.role).lower() in ('lecturer', 'userrole.lecturer')])
-
-        # Count courses
-        course_count_stmt = select(sqlfunc.count()).select_from(CourseModel).where(CourseModel.tenant_id == tenant_id)
-        course_count_res = await self.db.execute(course_count_stmt)
-        total_courses = int(course_count_res.scalar_one())
-
-        # Count exams
-        exam_count_stmt = select(sqlfunc.count()).select_from(ExamModel).where(ExamModel.tenant_id == tenant_id)
-        exam_count_res = await self.db.execute(exam_count_stmt)
-        total_exams = int(exam_count_res.scalar_one())
-
-        return {
-            "tenant_id": str(tenant_id),
-            "total_users": total_users,
-            "total_students": total_students,
-            "total_lecturers": total_lecturers,
-            "total_courses": total_courses,
-            "total_exams": total_exams,
-        }
