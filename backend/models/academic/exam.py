@@ -11,7 +11,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.types.guid import GUID
 
 from core.database import Base
-from core.utils.uuid7 import uuid7
+from uuid_utils import uuid7
 
 class ExamStatus(str, Enum):
     NOT_STARTED = "not_started"
@@ -27,6 +27,7 @@ class Exam(Base):
     - duration: duration in minutes
     - course_id: FK to `academic.courses.id`
     - tenant_id: FK to `account.tenants.id`
+    - semester_id: FK to `billings.semesters.id`
     - created_by / updated_by: FK to `account.users.id` (user ids)
     - created_at / updated_at timestamps
     """
@@ -35,6 +36,8 @@ class Exam(Base):
     __table_args__ = (
         Index("ix_exams_course_id", "course_id"),
         Index("ix_exams_tenant_id", "tenant_id"),
+        Index("ix_exams_student_id", "student_id"),
+        Index("ix_exams_semester_id", "semester_id"),
         Index("ix_exams_status", "status"),
         Index("ix_exams_start_time", "start_time"),
         Index("ix_exams_created_by", "created_by"),
@@ -46,6 +49,8 @@ class Exam(Base):
         Index("ix_exams_tenant_start_time", "tenant_id", "start_time"),
         Index("ix_exams_course_status", "course_id", "status"),
         Index("ix_exams_course_start_time", "course_id", "start_time"),
+        Index("ix_exams_tenant_semester", "tenant_id", "semester_id"),
+        Index("ix_exams_course_semester", "course_id", "semester_id"),
         CheckConstraint("duration > 0", name="ck_exams_duration_positive"),
         CheckConstraint("max_attempts > 0", name="ck_exams_max_attempts_positive"),
         {"schema": "academic"},
@@ -54,28 +59,22 @@ class Exam(Base):
     id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid7, comment="Primary key: UUIDv7 time-ordered")
     title: Mapped[str] = mapped_column(String(200), nullable=False, comment="Exam title")
     description: Mapped[str] = mapped_column(String(2000), nullable=True, comment="Exam description")
+    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True, comment="Exam start time (timezone-aware)")
     duration: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, comment="Duration in hours (decimal)")
     total_marks: Mapped[int] = mapped_column(Integer, nullable=True, comment="Total marks for the exam")
     passing_marks: Mapped[int] = mapped_column(Integer, nullable=True, comment="Passing marks for the exam")
     status: Mapped[ExamStatus] = mapped_column(SQLEnum(ExamStatus, name="exam_status", create_type=True), nullable=True, default=ExamStatus.NOT_STARTED, comment="Exam status: not_started, in_progress, finished")
-    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True, comment="Exam start time (timezone-aware)")
     max_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=1, comment="Maximum attempts allowed (default 1)")
 
     course_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("academic.courses.id", ondelete="CASCADE"), nullable=True, comment="FK to course")
-    tenant_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.tenants.id", ondelete="CASCADE"), nullable=True, comment="FK to tenant/organization")
-
+    tenant_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.tenants.id", ondelete="CASCADE"), nullable=False, comment="FK to tenant/organization")
+    semester_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("billings.semesters.id", ondelete="SET NULL"), nullable=True, comment="FK to semester")
+    student_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.users.id", ondelete="CASCADE"), nullable=True, comment="FK to student")
+    
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    created_by: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="User who created")
-    updated_by: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="User who last updated")
-
-    # Relationships (selectin loading for async safety)
-    # Relationship to questions via association table `academic.question_exams`
-    questions: Mapped[list] = relationship("Question", secondary="academic.question_exams", back_populates="exams", lazy="selectin")
-    # Relationship to course
-    course: Mapped["Course"] = relationship("Course", back_populates="exams", lazy="selectin")
-    # Relationship to submissions
-    submissions: Mapped[list] = relationship("Submission", back_populates="exam", lazy="joined")
+    created_by: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="FK: user who created this record")
+    updated_by: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="FK: user who last updated this record")
 
 
     def __repr__(self) -> str:
@@ -87,32 +86,22 @@ class Exam(Base):
         duration_hours = int(self.duration) if self.duration else 0
         duration_minutes = int(round((self.duration - Decimal(duration_hours)) * Decimal(60))) if self.duration else 0
 
-        # Handle submissions that might be loaded as scalar or list
-        submission_count = 0
-        if self.submissions:
-            if isinstance(self.submissions, list):
-                submission_count = len(self.submissions)
-            else:
-                submission_count = 1  # Single submission loaded as scalar
-
         return {
             "id": str(self.id) if self.id else None,
             "title": self.title,
             "description": self.description,
+            "start_time": self.start_time.isoformat() if self.start_time else None,
             "duration_hours": duration_hours,
             "duration_minutes": duration_minutes,
             "total_marks": self.total_marks,
             "passing_marks": self.passing_marks,
             "status": self.status,
             "max_attempts": self.max_attempts,
-            "start_time": self.start_time.isoformat() if self.start_time else None,
-            "course": self.course.to_dict() if self.course else None,
-            "lecturer": self.course.lecturer.to_dict() if self.course and self.course.lecturer else None,
-            "tenant_id": str(self.tenant_id) if self.tenant_id else None,
+            "tenant_id": str(self.tenant_id),
+            "semester_id": str(self.semester_id) if self.semester_id else None,
+            "student_id": str(self.student_id) if self.student_id else None,
             "created_by": str(self.created_by) if self.created_by else None,
             "updated_by": str(self.updated_by) if self.updated_by else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
-            "question_count": len(self.questions) if self.questions and isinstance(self.questions, list) else 0,
-            "submission_count": submission_count,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None
         }

@@ -7,10 +7,10 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from core.utils.response import ResponseModel as _BaseResponseModel
+from core.dependencies.pagination import PaginationResponse
 
 
-class KeysetMeta(BaseModel):
-    next_cursor: Optional[str] = None
+KeysetMeta = PaginationResponse
 
 
 class AnswerBase(BaseModel):
@@ -53,7 +53,7 @@ class AnswerResponse(_BaseResponseModel):
 
 class AnswerListResponse(_BaseResponseModel):
     data: Optional[List[AnswerRead]] = None
-    meta: Optional[KeysetMeta] = None
+    meta: Optional[PaginationResponse] = None
 
 
 class UpsertPayload(BaseModel):

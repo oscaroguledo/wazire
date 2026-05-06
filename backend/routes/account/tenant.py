@@ -11,6 +11,7 @@ from core.database import get_db
 from core.utils.response import Response
 from core.utils.token import TokenService
 from core.dependencies.common import get_token_service, authenticated_dep, admin_only_dep
+from core.dependencies.pagination import get_pagination, PaginationParams, PaginationResponse
 from services.account.tenant import TenantService
 from schemas.account.tenant import TenantCreate, TenantUpdate, TenantRead
 
@@ -80,30 +81,23 @@ async def create_tenant(
 @router.get("/")
 async def list_tenants(
     request: Request,
-    page: int = 1,
-    per_page: int = 50,
-    cursor: Optional[str] = None,
+    pagination: PaginationParams = Depends(get_pagination),
     current_user: TenantRead = admin_only_dep,
     service: TenantService = Depends(get_tenant_service)
 ):
-    """List tenants where current user is an admin using keyset pagination."""
-    # Use keyset pagination
-    tenants, next_cursor = await service.list_for_admin(
+    """List tenants where current user is an admin using offset pagination."""
+    tenants, total = await service.list_for_admin(
         admin_user_id=current_user.id,
-        limit=per_page,
-        cursor=cursor
+        limit=pagination.limit,
+        offset=pagination.offset,
     )
-    
+
     return Response(
-        success=True, 
-        message="Tenants retrieved successfully", 
-        data=[t.to_dict() for t in tenants], 
-        pagination={
-            "next_cursor": next_cursor,
-            "has_next": next_cursor is not None,
-            "per_page": per_page
-        }, 
-        request=request
+        success=True,
+        message="Tenants retrieved successfully",
+        data=[t.to_dict() for t in tenants],
+        pagination=PaginationResponse.create(pagination.page, pagination.per_page, total).model_dump(),
+        request=request,
     )
 
 
@@ -223,8 +217,7 @@ async def delete_tenant(
 async def get_tenant_users(
     tenant_id: uuid.UUID,
     request: Request,
-    page: int = 1,
-    per_page: int = 50,
+    pagination: PaginationParams = Depends(get_pagination),
     current_user: TenantRead = admin_only_dep,
     service: TenantService = Depends(get_tenant_service)
 ):
@@ -238,15 +231,14 @@ async def get_tenant_users(
             status_code=status.HTTP_404_NOT_FOUND
         )
     
-    users = await service.get_tenant_users(tenant_id, limit=per_page, offset=(page - 1) * per_page)
-    total_users = len(users)  # This should be replaced with actual count query
-    
+    users, total_users = await service.get_tenant_users(tenant_id, limit=pagination.limit, offset=pagination.offset)
+
     return Response(
         success=True,
         message="Tenant users retrieved successfully",
         data=users,
-        pagination=(page, per_page, total_users, str(request.url)),
-        request=request
+        pagination=PaginationResponse.create(pagination.page, pagination.per_page, total_users).model_dump(),
+        request=request,
     )
 
 

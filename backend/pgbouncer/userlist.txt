@@ -1,0 +1,3 @@
+# When using auth_type = trust this file can be empty. For md5 auth use entries like:
+# "wazire" "md5<md5-hash>"
+

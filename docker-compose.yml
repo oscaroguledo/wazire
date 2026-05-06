@@ -25,6 +25,36 @@ services:
           cpus: '0.5'
           memory: 512M
 
+    pgbouncer:
+      image: edoburu/pgbouncer:1.17.0
+      restart: unless-stopped
+      container_name: wazire-pgbouncer
+      env_file:
+        - ./backend/.env
+      ports:
+        - "${PGBOUNCER_PORT:-6432}:6432"
+      volumes:
+        - ./backend/pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+        - ./backend/pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt:ro
+      depends_on:
+        postgres:
+          condition: service_healthy
+      healthcheck:
+        test: ["CMD-SHELL", "pg_isready -h postgres -p ${POSTGRES_PORT:-5432} -U ${POSTGRES_USER:-wazire} -d ${POSTGRES_DB:-wazire}"]
+        interval: 10s
+        timeout: 5s
+        retries: 5
+      networks:
+        - wazire-network
+      deploy:
+        resources:
+          limits:
+            cpus: '1.0'
+            memory: 256M
+          reservations:
+            cpus: '0.25'
+            memory: 64M
+
   redis:
     image: redis:7-alpine
     restart: unless-stopped
@@ -62,7 +92,7 @@ services:
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
-      postgres:
+      pgbouncer:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -87,7 +117,7 @@ services:
       - ./backend/.env
     command: celery -A celery_app.celery_app worker --loglevel=info --concurrency=${CELERY_WORKER_CONCURRENCY:-2}
     depends_on:
-      postgres:
+      pgbouncer:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -112,7 +142,7 @@ services:
       - ./backend/.env
     command: celery -A celery_app.celery_app beat --loglevel=info
     depends_on:
-      postgres:
+      pgbouncer:
         condition: service_healthy
       redis:
         condition: service_healthy

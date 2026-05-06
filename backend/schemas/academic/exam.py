@@ -10,10 +10,10 @@ from typing import List, Optional, Dict
 
 from core.utils.response import ResponseModel as _BaseResponseModel
 from core.utils.validation import ValidationMixin, validate_duration
+from core.dependencies.pagination import PaginationResponse
 
 
-class KeysetMeta(BaseModel):
-    next_cursor: Optional[str] = None
+KeysetMeta = PaginationResponse
 
 
 class ExamBase(ValidationMixin):
@@ -138,4 +138,4 @@ class ExamResponse(_BaseResponseModel):
 
 class ExamListResponse(_BaseResponseModel):
     data: Optional[List[ExamRead]] = None
-    meta: Optional[KeysetMeta] = None
+    meta: Optional[PaginationResponse] = None

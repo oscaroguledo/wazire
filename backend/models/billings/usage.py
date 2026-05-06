@@ -1,59 +1,57 @@
 from __future__ import annotations
 
 import uuid
-from enum import Enum
 from datetime import datetime
 
-from sqlalchemy import Index, func, CheckConstraint, Integer, DateTime, ForeignKey
-from sqlalchemy import Enum as SAEnum
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import Index, func, CheckConstraint, Integer, DateTime, ForeignKey, String
+from sqlalchemy.orm import Mapped, mapped_column
 from core.types.guid import GUID
 from core.database import Base
-from core.utils.uuid7 import uuid7
-
-
-class PlanType(str, Enum):
-    STARTER = "starter"
-    INTERMEDIATE = "intermediate"
-    ENTERPRISE = "enterprise"
+from uuid_utils import uuid7
 
 
 class CurrentUsage(Base):
+    """Current usage tracking for billing dashboard.
+    
+    Matches the UsageCard component in Billing.tsx
+    """
     __tablename__ = "current_usage"
     __table_args__ = (
-        Index("ix_current_usage_plan", "plan"),
         Index("ix_current_usage_tenant_id", "tenant_id"),
+        Index("ix_current_usage_semester_id", "semester_id"),
         Index("ix_current_usage_created_at", "created_at"),
         Index("ix_current_usage_updated_at", "updated_at"),
-        Index("ix_current_usage_tenant_plan", "tenant_id", "plan"),
-        CheckConstraint("student_count >= 0", name="check_student_count_non_negative"),
-        CheckConstraint("exams_graded >= 0", name="check_exams_graded_non_negative"),
         {"schema": "billings"},
     )
-    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid7, comment="Primary key: UUIDv7 time-ordered")
-    student_count: Mapped[int] = mapped_column(Integer, nullable=False, comment="Number of students")
-    exams_graded: Mapped[int] = mapped_column(Integer, nullable=False, comment="Number of exams graded")
-    plan: Mapped[PlanType] = mapped_column(SAEnum(PlanType), nullable=False, comment="Current plan type")
-    tenant_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.tenants.id"), nullable=False, comment="Tenant ID")
-    plan_updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, comment="When the plan was last updated")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False, comment="When the record was created")
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False, comment="When the record was last updated")
     
-    # Relationships (selectin loading for async safety)
-    tenant = relationship("Tenant", back_populates="usage", lazy="selectin")
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid7, comment="Primary key: UUIDv7 time-ordered")
+    tenant_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.tenants.id", ondelete="CASCADE"), nullable=False, comment="FK to tenant")
+    semester_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("billings.semesters.id", ondelete="SET NULL"), nullable=True, comment="FK to current active semester")
+
+    # Usage metrics (from Billing.tsx UsageCard)
+    student_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, comment="Total number of students")
+
+    # Plan info (single Standard plan at ₦2000/student)
+    current_plan: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("billings.billing_plans.id", ondelete="SET NULL"), nullable=True, comment="FK to billing plan")
+
+    # Audit fields
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), comment="Creation timestamp (timezone-aware)")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), comment="Last update timestamp (timezone-aware)")
+    created_by: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="FK: user who created this record")
+    updated_by: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="FK: user who last updated this record")
     
     def __repr__(self):
-        return f"<CurrentUsage(id={self.id}, student_count={self.student_count}, exams_graded={self.exams_graded}, plan={self.plan}, plan_updated_at={self.plan_updated_at})>"
+        return f"<CurrentUsage(id={self.id}, tenant_id={self.tenant_id}, student_count={self.student_count}, current_plan={self.current_plan})>"
     
     def to_dict(self):
         return {
-            "id": str(self.id),
+            "id": str(self.id) if self.id else None,
+            "tenant_id": str(self.tenant_id),
+            "semester_id": str(self.semester_id) if self.semester_id else None,
             "student_count": self.student_count,
-            "exams_graded": self.exams_graded,
-            "plan": self.plan.value,
-            "tenant": self.tenant.to_dict() if self.tenant else None,
-            "plan_updated_at": self.plan_updated_at.isoformat(),
-            "created_at": self.created_at.isoformat(),
-            "updated_at": self.updated_at.isoformat(),
+            "current_plan": str(self.current_plan) if self.current_plan else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "created_by": str(self.created_by) if self.created_by else None,
+            "updated_by": str(self.updated_by) if self.updated_by else None,
         }
-    

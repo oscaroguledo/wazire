@@ -5,8 +5,6 @@ import {
   Check,
   Zap,
   Building2,
-  GraduationCap,
-  Crown,
   Receipt,
   Download,
   Calendar,
@@ -42,67 +40,27 @@ interface Invoice {
   studentCount: number;
 }
 
-const pricingPlans: PricingPlan[] = [
-  {
-    id: 'starter',
-    name: 'Starter',
-    pricePerStudent: 0,
-    minStudents: 100,
-    description: 'Free 90-day trial for new institutions',
-    icon: GraduationCap,
-    color: 'from-green-500 to-green-600',
-    features: [
-      'Up to 500 students',
-      'Unlimited lecturers',
-      'Basic AI grading (500 credits)',
-      'Email support',
-      'Standard analytics',
-      'Mobile-friendly exams',
-      'No credit card required',
-      '90-day free trial',
-    ],
-  },
-  {
-    id: 'intermediate',
-    name: 'Intermediate',
-    pricePerStudent: 1000,
-    minStudents: 500,
-    description: 'Perfect for growing institutions',
-    icon: Building2,
-    color: 'from-blue-500 to-blue-600',
-    highlighted: true,
-    features: [
-      'Up to 5,000 students',
-      'Unlimited lecturers',
-      'Enhanced AI grading (10,000 credits/semester)',
-      'Priority support',
-      'Advanced analytics & reports',
-      'Paper exam scanning',
-      'Custom branding',
-      'API access',
-    ],
-  },
-  {
-    id: 'enterprise',
-    name: 'Enterprise',
-    pricePerStudent: 2500,
-    minStudents: 1000,
-    description: 'For large institutions with complex needs',
-    icon: Crown,
-    color: 'from-purple-500 to-purple-600',
-    features: [
-      'Unlimited students',
-      'Unlimited everything',
-      'Premium AI grading (unlimited)',
-      '24/7 dedicated support',
-      'Full analytics suite',
-      'On-premise deployment option',
-      'Custom integrations',
-      'SLA guarantee',
-      'Dedicated account manager',
-    ],
-  },
-];
+const pricingPlan: PricingPlan = {
+  id: 'standard',
+  name: 'Standard',
+  pricePerStudent: 2000,
+  minStudents: 50,
+  description: 'Simple pricing for all institutions',
+  icon: Building2,
+  color: 'from-blue-500 to-blue-600',
+  highlighted: true,
+  features: [
+    'Unlimited students',
+    'Unlimited lecturers',
+    'Unlimited AI grading',
+    'Priority support',
+    'Analytics & reports',
+    'Paper exam scanning',
+    'Custom branding',
+    'API access',
+    'Mobile-friendly exams',
+  ],
+};
 
 const mockInvoices: Invoice[] = [
   {
@@ -144,65 +102,69 @@ function PlanCard({ plan, isCurrent }: { plan: PricingPlan; isCurrent: boolean }
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      className={`surface-card p-6 relative overflow-hidden ${
-        plan.highlighted ? 'ring-2 ring-[var(--color-primary-500)]' : ''
-      }`}
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.4 }}
+      className="surface-card p-8 relative overflow-hidden ring-2 ring-[var(--color-primary-500)] max-w-2xl mx-auto"
     >
-      {plan.highlighted && (
-        <div className="absolute top-0 right-0 bg-[var(--color-primary-600)] text-white text-xs font-semibold px-3 py-1 rounded-bl-lg">
-          Most Popular
-        </div>
-      )}
-
-      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${plan.color} flex items-center justify-center mb-4`}>
-        <Icon as={IconComponent} size={24} className="text-white" />
+      {/* Background decoration */}
+      <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-[var(--color-primary-100)] to-transparent rounded-full -translate-y-1/2 translate-x-1/2 opacity-50" />
+      
+      {/* Badge */}
+      <div className="absolute top-4 right-4 bg-[var(--color-primary-600)] text-white text-sm font-semibold px-4 py-1.5 rounded-full">
+        All Features Included
       </div>
 
-      <h3 className="text-xl font-bold text-[var(--color-text-primary)]">{plan.name}</h3>
-      <p className="text-sm text-[var(--color-text-secondary)] mt-1">{plan.description}</p>
-
-      <div className="mt-4 mb-6">
-        {plan.pricePerStudent === 0 ? (
-          <div className="flex items-baseline gap-1">
-            <span className="text-3xl font-bold text-[var(--color-text-primary)]">
-              FREE
-            </span>
-            <span className="text-[var(--color-text-secondary)]">for 90 days</span>
+      <div className="relative">
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-6">
+          <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${plan.color} flex items-center justify-center shadow-lg`}>
+            <Icon as={IconComponent} size={32} className="text-white" />
           </div>
-        ) : (
-          <div className="flex items-baseline gap-1">
-            <span className="text-3xl font-bold text-[var(--color-text-primary)]">
+          <div>
+            <h3 className="text-2xl font-bold text-[var(--color-text-primary)]">{plan.name}</h3>
+            <p className="text-[var(--color-text-secondary)]">{plan.description}</p>
+          </div>
+        </div>
+
+        {/* Price Section */}
+        <div className="bg-[var(--color-bg-secondary)] rounded-xl p-6 mb-6">
+          <div className="flex items-baseline gap-2 mb-2">
+            <span className="text-5xl font-bold text-[var(--color-primary-600)]">
               ₦{plan.pricePerStudent.toLocaleString()}
             </span>
-            <span className="text-[var(--color-text-secondary)]">/student/semester</span>
+            <span className="text-lg text-[var(--color-text-secondary)]">/student/semester</span>
           </div>
-        )}
-        <p className="text-sm text-[var(--color-text-muted)] mt-1">
-          Minimum {plan.minStudents.toLocaleString()} students
+          <p className="text-sm text-[var(--color-text-muted)]">
+            Minimum {plan.minStudents.toLocaleString()} students • Starting at ₦{plan.pricePerStudent.toLocaleString()}/per student
+          </p>
+        </div>
+
+        {/* Features Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+          {plan.features.map((feature, idx) => (
+            <div key={idx} className="flex items-center gap-3">
+              <div className="w-6 h-6 rounded-full bg-[var(--color-success-100)] flex items-center justify-center flex-shrink-0">
+                <Icon as={Check} size={14} className="text-[var(--color-success-600)]" />
+              </div>
+              <span className="text-[var(--color-text-secondary)]">{feature}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* CTA Button */}
+        <Button
+          variant="primary"
+          className="w-full py-4 text-lg font-semibold"
+          disabled={isCurrent}
+        >
+          {isCurrent ? '✓ Currently Active' : 'Get Started'}
+        </Button>
+        
+        <p className="text-center text-sm text-[var(--color-text-muted)] mt-4">
+          No hidden fees. Cancel anytime.
         </p>
       </div>
-
-      <div className="space-y-3 mb-6">
-        {plan.features.map((feature, idx) => (
-          <div key={idx} className="flex items-start gap-3">
-            <div className="w-5 h-5 rounded-full bg-[var(--color-success-100)] flex items-center justify-center flex-shrink-0 mt-0.5">
-              <Icon as={Check} size={12} className="text-[var(--color-success-600)]" />
-            </div>
-            <span className="text-sm text-[var(--color-text-secondary)]">{feature}</span>
-          </div>
-        ))}
-      </div>
-
-      <Button
-        variant={isCurrent ? 'secondary' : plan.highlighted ? 'primary' : 'secondary'}
-        className="w-full"
-        disabled={isCurrent}
-      >
-        {isCurrent ? 'Current Plan' : 'Upgrade'}
-      </Button>
     </motion.div>
   );
 }
@@ -214,7 +176,7 @@ function UsageCard() {
   const usageStats = {
     totalStudents: 2500,
     examsGraded: 1247,
-    currentPlan: 'Intermediate',
+    currentPlan: 'Standard',
     nextBillingDate: '2025-06-01',
   };
 
@@ -476,21 +438,18 @@ export default function BillingPage() {
                   Simple, Transparent Pricing
                 </h3>
                 <p className="text-sm text-[var(--color-primary-700)]">
-                  Start free for 90 days. Then upgrade to Intermediate (₦1,000/student) 
-                  or Enterprise (₦2,500/student) based on your needs.
+                  One simple plan at ₦2,000 per student per semester. 
+                  All features included, no hidden fees.
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            {pricingPlans.map((plan) => (
-              <PlanCard
-                key={plan.id}
-                plan={plan}
-                isCurrent={plan.name === 'Intermediate'}
-              />
-            ))}
+          <div className="mb-8">
+            <PlanCard
+              plan={pricingPlan}
+              isCurrent={true}
+            />
           </div>
 
           <motion.div
@@ -505,20 +464,20 @@ export default function BillingPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[
                 {
-                  q: 'How does the 90-day free trial work?',
-                  a: 'Start with full Starter features for 90 days. No credit card required. Upgrade anytime.',
+                  q: 'How does the pricing work?',
+                  a: 'Simple flat rate of ₦2,000 per student per semester. All features included, no hidden fees.',
                 },
                 {
-                  q: 'What happens after the trial ends?',
-                  a: 'Choose Intermediate (₦1,000/student) or Enterprise (₦2,500/student). We\'ll help you migrate.',
+                  q: 'Is there a minimum number of students?',
+                  a: 'Yes, minimum 100 students per institution to get started.',
                 },
                 {
-                  q: 'What\'s the difference between Intermediate and Enterprise?',
-                  a: 'Enterprise includes unlimited students, unlimited AI grading, on-premise option, and 24/7 support.',
+                  q: 'What payment methods do you accept?',
+                  a: 'Bank transfer, debit/credit cards, and invoice-based billing for larger institutions.',
                 },
                 {
-                  q: 'Can we switch plans mid-semester?',
-                  a: 'Yes, you can upgrade anytime. Downgrades take effect next semester.',
+                  q: 'Can I cancel anytime?',
+                  a: 'Yes, you can cancel at any time. No long-term contracts required.',
                 },
               ].map((faq, idx) => (
                 <div key={idx} className="space-y-1">

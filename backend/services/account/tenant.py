@@ -19,7 +19,7 @@ class TenantService:
         self.db = db
         self.token_service = token_service
 
-    async def get(self, tenant_id: UUID) -> Optional[TenantModel]:
+    async def get(self, tenant_id: UUID, name: Optional[str] = None,domain: Optional[str] = None) -> Optional[TenantModel]:
         stmt = select(TenantModel).options(
             selectinload(TenantModel.admins),
             selectinload(TenantModel.invoices),
@@ -29,76 +29,32 @@ class TenantService:
         res = await self.db.execute(stmt)
         return res.scalar_one_or_none()
 
-    async def get_by_name(self, name: str) -> Optional[TenantModel]:
+    async def list_for_admin(self, admin_user_id: UUID, limit: int = 50, offset: int = 0) -> Tuple[List[TenantModel], int]:
+        """Get tenants where the user is an admin using offset pagination.
+
+        Returns a tuple of (items, total_count).
+        """
+        # Build a subquery selecting tenant_ids from the tenant_admins association table
+        from sqlalchemy import table, column
+        tenant_admins = table("tenant_admins", column("tenant_id"), column("user_id"))
+
+        tenant_ids_stmt = select(tenant_admins.c.tenant_id).where(tenant_admins.c.user_id == str(admin_user_id))
+
+        # Query tenants matching the tenant_ids
         stmt = select(TenantModel).options(
-            selectinload(TenantModel.admins),
             selectinload(TenantModel.invoices),
             selectinload(TenantModel.usage),
             selectinload(TenantModel.payment_methods)
-        ).where(TenantModel.name == name)
+        ).where(TenantModel.id.in_(tenant_ids_stmt)).order_by(TenantModel.created_at.desc(), TenantModel.id.desc()).offset(offset).limit(limit)
+
         res = await self.db.execute(stmt)
-        return res.scalar_one_or_none()
+        items = res.scalars().all()
 
-    async def get_by_domain(self, domain: str) -> Optional[TenantModel]:
-        stmt = select(TenantModel).options(
-            selectinload(TenantModel.admins),
-            selectinload(TenantModel.invoices),
-            selectinload(TenantModel.usage),
-            selectinload(TenantModel.payment_methods)
-        ).where(TenantModel.domain == domain)
-        res = await self.db.execute(stmt)
-        return res.scalar_one_or_none()
+        # total count
+        count_stmt = select(sqlfunc.count()).select_from(TenantModel).where(TenantModel.id.in_(tenant_ids_stmt))
+        total = int((await self.db.execute(count_stmt)).scalar_one())
 
-    async def list_for_admin(self, admin_user_id: UUID, limit: int = 50, cursor: Optional[str] = None) -> Tuple[List[TenantModel], Optional[str]]:
-        """Get all tenants where the user is an admin using keyset pagination."""
-        import base64
-        from datetime import datetime as _dt
-        
-        # Get all tenants where user is admin
-        all_tenants_stmt = select(TenantModel).options(
-            selectinload(TenantModel.admins),
-            selectinload(TenantModel.invoices),
-            selectinload(TenantModel.usage),
-            selectinload(TenantModel.payment_methods)
-        )
-        all_tenants_res = await self.db.execute(all_tenants_stmt)
-        all_tenants = all_tenants_res.scalars().all()
-        
-        # Filter by admin user
-        user_tenants = []
-        for tenant in all_tenants:
-            admin_ids = [str(admin.id) for admin in tenant.admins]
-            if str(admin_user_id) in admin_ids:
-                user_tenants.append(tenant)
-        
-        # Apply keyset pagination
-        if cursor:
-            try:
-                raw = base64.urlsafe_b64decode(cursor.encode()).decode()
-                ts, idstr = raw.split("|", 1)
-                created_before, id_before = _dt.fromisoformat(ts), UUID(idstr)
-            except Exception:
-                raise ValueError("Invalid cursor")
-            
-            # Filter the already filtered list
-            user_tenants = [
-                t for t in user_tenants 
-                if (t.created_at < created_before) or 
-                   (t.created_at == created_before and t.id < id_before)
-            ]
-        
-        # Sort by created_at desc, id desc
-        user_tenants.sort(key=lambda t: (t.created_at, t.id), reverse=True)
-        
-        # Apply limit and generate next cursor
-        next_cursor = None
-        if len(user_tenants) > limit:
-            last = user_tenants[limit]
-            user_tenants = user_tenants[:limit]
-            raw_next = f"{last.created_at.isoformat()}|{str(last.id)}"
-            next_cursor = base64.urlsafe_b64encode(raw_next.encode()).decode()
-
-        return user_tenants, next_cursor
+        return items, total
 
     async def create(self, tenant_in: TenantCreate) -> TenantModel:
         # Create tenant first
@@ -155,50 +111,30 @@ class TenantService:
         await self.db.refresh(tenant)
         return tenant
 
-    async def list(self, limit: int = 50, offset: int = 0, cursor: Optional[str] = None) -> Tuple[List[TenantModel], Optional[str]]:
-        import base64
-        from datetime import datetime as _dt
-        if cursor:
-            try:
-                raw = base64.urlsafe_b64decode(cursor.encode()).decode()
-                ts, idstr = raw.split("|", 1)
-                created_before, id_before = _dt.fromisoformat(ts), UUID(idstr)
-            except Exception:
-                raise ValueError("Invalid cursor")
-            stmt = select(TenantModel).options(
-                selectinload(TenantModel.admins)
-            ).where(
-                (TenantModel.created_at < created_before)
-                | ((TenantModel.created_at == created_before) & (TenantModel.id < id_before))
-            ).order_by(TenantModel.created_at.desc(), TenantModel.id.desc()).limit(limit + 1)
-        else:
-            stmt = select(TenantModel).options(
-                selectinload(TenantModel.admins)
-            ).order_by(
-                TenantModel.created_at.desc(), TenantModel.id.desc()
-            ).offset(offset).limit(limit + 1)
+    async def list(self, limit: int = 50, offset: int = 0) -> Tuple[List[TenantModel], int]:
+        """List tenants with offset pagination, returning items and total count."""
+        stmt = select(TenantModel).options(selectinload(TenantModel.admins)).order_by(TenantModel.created_at.desc(), TenantModel.id.desc()).offset(offset).limit(limit)
+        res = await self.db.execute(stmt)
+        items = res.scalars().all()
 
-        items = (await self.db.execute(stmt)).scalars().all()
-        next_cursor = None
-        if len(items) > limit:
-            last = items[limit]
-            items = items[:limit]
-            raw_next = f"{last.created_at.isoformat()}|{str(last.id)}"
-            next_cursor = base64.urlsafe_b64encode(raw_next.encode()).decode()
+        count_stmt = select(sqlfunc.count()).select_from(TenantModel)
+        total = int((await self.db.execute(count_stmt)).scalar_one())
 
-        return list(items), next_cursor
+        return list(items), total
 
     async def delete(self, tenant: TenantModel) -> None:
         await self.db.delete(tenant)
         await self.db.commit()
 
-    async def get_tenant_users(self, tenant_id: UUID, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
-        """Get users in a tenant with their details."""
-        
-        stmt = select(UserModel).where(UserModel.tenant_id == tenant_id).offset(offset).limit(limit)
+    async def get_tenant_users(self, tenant_id: UUID, limit: int = 50, offset: int = 0) -> Tuple[List[Dict[str, Any]], int]:
+        """Get users in a tenant with their details and total count."""
+        stmt = select(UserModel).where(UserModel.tenant_id == tenant_id).order_by(UserModel.created_at.desc()).offset(offset).limit(limit)
         res = await self.db.execute(stmt)
         users = res.scalars().all()
-        
+
+        count_stmt = select(sqlfunc.count()).select_from(UserModel).where(UserModel.tenant_id == tenant_id)
+        total = int((await self.db.execute(count_stmt)).scalar_one())
+
         return [
             {
                 "id": user.id,
@@ -210,7 +146,7 @@ class TenantService:
                 "created_at": user.created_at
             }
             for user in users
-        ]
+        ], total
 
     async def get_tenant_stats(self, tenant_id: UUID) -> Dict[str, Any]:
         """Get tenant statistics."""
