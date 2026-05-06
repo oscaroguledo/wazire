@@ -20,6 +20,9 @@ from models.academic.question import Question as QuestionModel
 from models.academic.exam import Exam as ExamModel
 from models.academic.course import Course
 from models.account.users import User as UserModel
+from models.account.users import UserRole
+from models.academic.question import QuestionType
+from models.academic.submission import SubmissionStatus
 from schemas.academic.submission import (
     SubmissionCreate,
     SubmissionRead,
@@ -38,11 +41,11 @@ async def _enrich_submission(s, db) -> dict:
     data = s.to_dict()
     # Compute status based on graded_at and latest_score
     if s.graded_at and s.latest_score is not None:
-        data['status'] = 'graded'
+        data['status'] = SubmissionStatus.GRADED.value
     elif s.attempts_count > 0:
-        data['status'] = 'submitted'
+        data['status'] = SubmissionStatus.SUBMITTED.value
     else:
-        data['status'] = 'pending'
+        data['status'] = SubmissionStatus.PENDING.value
     # Fetch student name
     student = (await db.execute(select(UserModel).where(UserModel.id == s.student_id))).scalar_one_or_none()
     if student:
@@ -67,7 +70,7 @@ class ScanSubmit(BaseModel):
 
 
 def _tenant(user: UserRead) -> Optional[uuid.UUID]:
-    return None if user.role in ("admin", "superadmin") else user.tenant_id
+    return None if user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else user.tenant_id
 
 
 # ---------------------------------------------------------------------------
@@ -83,7 +86,7 @@ async def submit_exam(
 ):
     service = SubmissionService(db)
     """Submit an exam attempt. Returns immediately; grading runs in background."""
-    if not current_user.tenant_id and current_user.role not in ("admin", "superadmin"):
+    if not current_user.tenant_id and current_user.role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
         return Response(success=False, error="No tenant assigned to your account", request=request, status_code=status.HTTP_403_FORBIDDEN)
 
     try:
@@ -141,7 +144,7 @@ async def start_submission(
 ):
     service = SubmissionService(db)
     """Create a Submission record (no attempt) when the student clicks Start Exam."""
-    if not current_user.tenant_id and current_user.role not in ("admin", "superadmin"):
+    if not current_user.tenant_id and current_user.role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
         return Response(success=False, error="No tenant assigned to your account", request=request, status_code=status.HTTP_403_FORBIDDEN)
 
     try:
@@ -383,7 +386,7 @@ async def scan_answer_sheet(
 
     # 2. Parse answer sheet pages (fast — just vision extraction, no DB writes)
     question_index = [
-        {"number": q.number, "qtype": q.qtype, "options": q.get_options() if q.qtype == "multiple_choice" else []}
+        {"number": q.number, "qtype": q.qtype, "options": q.get_options() if q.qtype == QuestionType.MULTIPLE_CHOICE else []}
         for q in questions
     ]
     number_to_id = {q.number: str(q.id) for q in questions}

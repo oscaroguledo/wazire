@@ -40,7 +40,7 @@ async def list_enrollment(
 ):
     try:
         service = EnrollmentService(db)
-        tenant_id = None if current_user.role in ("admin", "superadmin") else current_user.tenant_id
+        tenant_id = None if current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else current_user.tenant_id
         params = EnrollmentListParams(page=page, per_page=per_page, search=search, student_id=student_id, course_id=course_id, lecturer_id=lecturer_id, status=enrollment_status, semester=semester)
         items, total = await service.list_enrollments(params, tenant_id=tenant_id)
         return Response(success=True, data=[i.to_dict() for i in items], page=page, per_page=per_page, total=total, request=request)
@@ -58,7 +58,7 @@ async def check_enrollment(
     current_user: User = Depends(create_auth_dependency(get_token_service())),
 ):
     service = EnrollmentService(db)
-    tenant_id = None if current_user.role in ("admin", "superadmin") else current_user.tenant_id
+    tenant_id = None if current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else current_user.tenant_id
     if current_user.role == UserRole.STUDENT and str(current_user.id) != str(student_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Can only check your own enrollment status")
     try:
@@ -80,7 +80,7 @@ async def get_student_enrollments(
     current_user: User = Depends(create_auth_dependency(get_token_service())),
 ):
     service = EnrollmentService(db)
-    tenant_id = None if current_user.role in ("admin", "superadmin") else current_user.tenant_id
+    tenant_id = None if current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else current_user.tenant_id
     if current_user.role == UserRole.STUDENT and str(current_user.id) != str(student_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Can only access your own enrollments")
     params = EnrollmentListParams(page=page, per_page=per_page, search=search, student_id=str(student_id), status=enrollment_status)
@@ -105,7 +105,7 @@ async def get_course_enrollments(
     current_user: User = Depends(create_auth_dependency(get_token_service())),
 ):
     service = EnrollmentService(db)
-    tenant_id = None if current_user.role in ("admin", "superadmin") else current_user.tenant_id
+    tenant_id = None if current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else current_user.tenant_id
     params = EnrollmentListParams(page=page, per_page=per_page, search=search, course_id=str(course_id), status=enrollment_status, semester=semester, year=year)
     try:
         items, total = await service.list_enrollments(params, tenant_id=tenant_id)
@@ -126,7 +126,7 @@ async def get_lecturer_enrollments(
     current_user: User = Depends(create_auth_dependency(get_token_service())),
 ):
     service = EnrollmentService(db)
-    tenant_id = None if current_user.role in ("admin", "superadmin") else current_user.tenant_id
+    tenant_id = None if current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else current_user.tenant_id
     if current_user.role == UserRole.LECTURER and current_user.id != lecturer_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Can only access your own course enrollments")
     params = EnrollmentListParams(page=page, per_page=per_page, search=search, lecturer_id=lecturer_id, status=enrollment_status)
@@ -145,7 +145,7 @@ async def get_enrollment(
     current_user: User = Depends(create_auth_dependency(get_token_service())),
 ):
     service = EnrollmentService(db)
-    tenant_id = None if current_user.role in ("admin", "superadmin") else current_user.tenant_id
+    tenant_id = None if current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else current_user.tenant_id
     try:
         enrollment = await service.get_enrollment(enrollment_id, tenant_id=tenant_id)
         if current_user.role == UserRole.STUDENT and str(enrollment.student_id) != str(current_user.id):

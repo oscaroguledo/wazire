@@ -13,6 +13,7 @@ from services.academic.course import CourseService
 from tasks.submission import refresh_dashboard_task
 from schemas.academic.course import CourseCreate, CourseUpdate
 from schemas.account.users import UserRead
+from models.account.users import UserRole
 
 router = APIRouter(prefix="/courses", tags=["courses"])
 
@@ -33,11 +34,11 @@ async def create_course(
     course_data = course_in.model_copy()
 
     # Admin can override tenant_id; lecturer is always assigned to their own tenant
-    if course_data.tenant_id and current_user.role in ("admin", "superadmin"):
+    if course_data.tenant_id and current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN):
         tenant_id = course_data.tenant_id
 
     # Lecturers are automatically assigned as the lecturer of the course they create
-    if current_user.role == "lecturer":
+    if current_user.role == UserRole.LECTURER:
         course_data.lecturer_id = current_user.id
 
     if not course_data.name or not course_data.name.strip():
@@ -71,7 +72,7 @@ async def list_courses(
 
     # Lecturers always see only their own courses — ignore any passed lecturer_id
     effective_lecturer_id = lecturer_id
-    if current_user.role == "lecturer":
+    if current_user.role == UserRole.LECTURER:
         effective_lecturer_id = current_user.id
 
     items, total_count = await service.list(

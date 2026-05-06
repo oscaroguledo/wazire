@@ -19,7 +19,8 @@ from schemas.academic.question import (
     QuestionCreate,
     QuestionUpdate,
 )
-from models.academic.question import Industry
+from models.academic.question import Industry, QuestionType
+from models.account.users import UserRole
 from schemas.account.users import UserRead
 
 
@@ -43,7 +44,7 @@ async def create_question(
 ):
     service = QuestionService(db)
     # Questions may optionally include a tenant_id; non-admins cannot set a tenant different from their own
-    if current_user.role != "admin":
+    if current_user.role != UserRole.ADMIN:
         # enforce non-admins cannot set tenant_id
         if getattr(question_in, "tenant_id", None):
             # ignore provided tenant_id and use user's tenant if present
@@ -56,7 +57,7 @@ async def create_question(
     try:
         q = await service.create(question_in, tenant_id=tenant_id)
         # If MCQ with no answer provided, detect it in the background
-        if q.qtype == "multiple_choice" and not q.answer_id:
+        if q.qtype == QuestionType.MULTIPLE_CHOICE and not q.answer_id:
             # Enqueue MCQ answer detection to Celery worker
             detect_answer_task.delay(str(q.id))
         return Response(success=True, message="Question created", data=q.to_dict(), request=request, status_code=status.HTTP_201_CREATED)
@@ -179,7 +180,7 @@ async def upload_exam_paper(
     if not body.pages:
         return Response(success=False, error="No pages provided", request=request, status_code=status.HTTP_400_BAD_REQUEST)
 
-    tenant_id = None if current_user.role == "admin" else str(current_user.tenant_id)
+    tenant_id = None if current_user.role == UserRole.ADMIN else str(current_user.tenant_id)
 
     # Enqueue exam parsing and question-creation to Celery worker
     parse_and_create_task.delay(body.pages, body.industry.value, str(body.exam_id), body.mark_per_question, tenant_id)
