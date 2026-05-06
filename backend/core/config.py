@@ -42,6 +42,14 @@ class Settings(BaseModel):
     CELERY_EXAM_STATUS_UPDATE_INTERVAL: int = 60
     CELERY_EMAIL_SEND_INTERVAL: int = 60
 
+    # Kafka settings
+    KAFKA_BOOTSTRAP_SERVERS: Optional[str] = None
+    KAFKA_TOPIC_PREFIX: Optional[str] = None
+    KAFKA_USERNAME: Optional[str] = None
+    KAFKA_PASSWORD: Optional[str] = None
+    KAFKA_SECURITY_PROTOCOL: Optional[str] = "PLAINTEXT"
+    KAFKA_SASL_MECHANISM: Optional[str] = None
+
     def cors_origins_list(self) -> List[str]:
         if isinstance(self.CORS_ORIGINS, str):
             return [s.strip() for s in self.CORS_ORIGINS.split(",") if s.strip()]
@@ -52,6 +60,14 @@ class Settings(BaseModel):
         if isinstance(self.REQUEST_ID_HEADERS, str):
             return [s.strip() for s in self.REQUEST_ID_HEADERS.split(",") if s.strip()]
         return list(self.REQUEST_ID_HEADERS)
+
+    def kafka_bootstrap_list(self) -> List[str]:
+        """Return `KAFKA_BOOTSTRAP_SERVERS` as a list of brokers."""
+        if not self.KAFKA_BOOTSTRAP_SERVERS:
+            return []
+        if isinstance(self.KAFKA_BOOTSTRAP_SERVERS, str):
+            return [s.strip() for s in self.KAFKA_BOOTSTRAP_SERVERS.split(",") if s.strip()]
+        return list(self.KAFKA_BOOTSTRAP_SERVERS)
     
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> Optional[str]:
@@ -170,6 +186,12 @@ def get_settings(force_reload: bool = False) -> Settings:
             USE_INTERNAL_SCHEDULER=os.getenv("USE_INTERNAL_SCHEDULER", str(_defaults.USE_INTERNAL_SCHEDULER)).lower() in ("1", "true", "yes"),
             CELERY_EXAM_STATUS_UPDATE_INTERVAL=int(os.getenv("CELERY_EXAM_STATUS_UPDATE_INTERVAL", str(_defaults.CELERY_EXAM_STATUS_UPDATE_INTERVAL))),
             CELERY_EMAIL_SEND_INTERVAL=int(os.getenv("CELERY_EMAIL_SEND_INTERVAL", str(_defaults.CELERY_EMAIL_SEND_INTERVAL))),
+            KAFKA_BOOTSTRAP_SERVERS=os.getenv("KAFKA_BOOTSTRAP_SERVERS", _defaults.KAFKA_BOOTSTRAP_SERVERS),
+            KAFKA_TOPIC_PREFIX=os.getenv("KAFKA_TOPIC_PREFIX", _defaults.KAFKA_TOPIC_PREFIX),
+            KAFKA_USERNAME=os.getenv("KAFKA_USERNAME", _defaults.KAFKA_USERNAME),
+            KAFKA_PASSWORD=os.getenv("KAFKA_PASSWORD", _defaults.KAFKA_PASSWORD),
+            KAFKA_SECURITY_PROTOCOL=os.getenv("KAFKA_SECURITY_PROTOCOL", _defaults.KAFKA_SECURITY_PROTOCOL),
+            KAFKA_SASL_MECHANISM=os.getenv("KAFKA_SASL_MECHANISM", _defaults.KAFKA_SASL_MECHANISM),
         )
         
         # Validate configuration
