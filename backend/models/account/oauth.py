@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import String, Index, UniqueConstraint, func, ForeignKey
+from sqlalchemy import String, Index, UniqueConstraint, func, ForeignKey, DateTime
 from sqlalchemy.orm import Mapped, mapped_column
 
 from core.types.guid import GUID
@@ -40,8 +40,8 @@ class OAuth(Base):
     provider: Mapped[str] = mapped_column(String(50), nullable=False, comment="OAuth provider name, e.g. 'google', 'facebook'")
     provider_user_id: Mapped[str] = mapped_column(String(255), nullable=False, comment="User ID from the OAuth provider")
 
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     def __repr__(self) -> str:
         return f"<OAuth(id={self.id}, user_id={self.user_id}, provider={self.provider})>"

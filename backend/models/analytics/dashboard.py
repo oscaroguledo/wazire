@@ -30,8 +30,8 @@ class LecturerDashboard(Base):
     pending_submissions: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     graded_submissions: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     active_courses: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now(), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=func.now(), onupdate=func.now())
     
     # Relationships (noload to prevent loading - we don't need lecturer in dashboard response)
     lecturer = relationship("User", back_populates="lecturer_dashboard", lazy="noload")
@@ -72,8 +72,8 @@ class AdminDashboard(Base):
     total_submissions: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     total_graded_submissions: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     total_pending_submissions: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now(), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=func.now(), onupdate=func.now())
     
     # Relationships (noload to prevent loading - we don't need admin in dashboard response)
     admin = relationship("User", back_populates="admin_dashboard", lazy="noload")
@@ -115,8 +115,8 @@ class StudentDashboard(Base):
     total_pending_submissions: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     missed_exams: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     upcoming_exams: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now(), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=func.now(), onupdate=func.now())
 
     # Relationships (noload to prevent loading - we don't need student in dashboard response)
     student = relationship("User", back_populates="student_dashboard", lazy="noload")

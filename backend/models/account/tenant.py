@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import String, Boolean, Index, func, ForeignKey, Table, Column
+from sqlalchemy import String, Boolean, Index, func, ForeignKey, Table, Column, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from core.types.guid import GUID
@@ -52,8 +52,8 @@ class Tenant(Base):
 	# Association table defined below
 	is_active: Mapped[bool] = mapped_column(default=True, comment="Tenant enabled flag")
 
-	created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-	updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+	created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+	updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 	# Relationships (selectin loading for async safety)
 	admins = relationship("User", secondary=tenant_admins, back_populates="admin_tenants", lazy="selectin")
