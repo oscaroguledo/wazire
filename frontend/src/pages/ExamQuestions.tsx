@@ -135,39 +135,8 @@ export default function ExamQuestions() {
   const loading = examLoading || questionsLoading
   const error = examError?.message || questionsError?.message || null
 
-  // WebSocket message handler for real-time updates
-  const handleWebSocketMessage = useCallback((msg: any) => {
-    if (msg.exam_id !== examId) return; // Only handle messages for this exam
-    
-    switch (msg.type) {
-      case 'extraction_started':
-        setIsProcessing(true)
-        setProcessingProgress({ current: 0, total: msg.data?.total_questions || 0 })
-        setSuccessMessage(`Processing ${msg.data?.total_questions} questions...`)
-        break
-      case 'question_created':
-        // Refresh to show new questions
-        refetchQuestions()
-        const progress = msg.data?.progress
-        if (progress) {
-          setProcessingProgress(progress)
-          setSuccessMessage(`Created question ${progress.current}/${progress.total}`)
-        }
-        break
-      case 'extraction_complete':
-        refetchQuestions()
-        setIsProcessing(false)
-        setProcessingProgress(null)
-        const data = msg.data
-        if (data?.errors > 0) {
-          setSuccessMessage(`Complete! ${data.created} created, ${data.errors} errors`)
-        } else {
-          setSuccessMessage(`All ${data?.created} questions created successfully!`)
-        }
-        setTimeout(() => setSuccessMessage(null), 5000)
-        break
-    }
-  }, [examId, refetchQuestions])
+  // Background processing will extract questions on the server.
+  // The UI will refresh shortly after upload to show created questions.
 
 
   // Client-side pagination for filtered questions
@@ -293,9 +262,12 @@ export default function ExamQuestions() {
         mark_per_question: 1
       })
       
-      setSuccessMessage('Document uploaded successfully! Questions will be extracted.')
-      // Keep processing indicator active - WebSocket will update progress
-      // setIsProcessing(false) // Don't clear yet - wait for extraction_complete
+      setSuccessMessage('Document uploaded successfully! Questions will be extracted in background.')
+      // Stop local processing indicator; server will process in background.
+      setIsProcessing(false)
+      setProcessingProgress(null)
+      // Refresh questions shortly after upload to pick up created items.
+      setTimeout(() => refetchQuestions(), 2000)
       setFormLoading(false)
     } catch (error: unknown) {
       if (error instanceof Error) {

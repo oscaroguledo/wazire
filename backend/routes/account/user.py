@@ -100,12 +100,12 @@ async def list_users(
     page: int = Query(1, ge=1),
     per_page: int = Query(10, ge=1, le=100),
     is_active: Optional[bool] = None,
+    tenant_id: Optional[uuid.UUID] = Query(None),
     current_user: UserRead = Depends(require_lecturer_or_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
     token_service: TokenService = Depends(get_token_service),
 ):
     try:
-        tenant_id = None if current_user.role in ("admin", "superadmin") else current_user.tenant_id
         encryption = EncryptionService()
         service = UserService(db, encryption=encryption, token_service=token_service)
         users, total = await service.list(

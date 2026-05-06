@@ -11,7 +11,13 @@ from core.utils.response import Response, offset
 from core.utils.token import TokenService
 from core.middleware.auth import get_token_service, require_admin
 from services.account.tenant import TenantService
-from schemas.account.tenant import TenantCreate, TenantUpdate, TenantRead
+from services.account.user import UserService
+from schemas.account.tenant import TenantCreate, TenantUpdate, TenantRead, TenantDelete
+from schemas.account.users import UserRead
+from models.account.users import User
+from models.academic.course import Course
+from models.academic.exam import Exam
+from sqlalchemy import select, func as sqlfunc
 
 router = APIRouter(prefix="/tenants", tags=["tenants"])
 
@@ -23,7 +29,7 @@ router = APIRouter(prefix="/tenants", tags=["tenants"])
 async def create_tenant(
     tenant_in: TenantCreate,
     request: Request,
-    current_user: TenantRead = Depends(require_admin(get_token_service())),
+    current_user: UserRead = Depends(require_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
     token_service: TokenService = Depends(get_token_service),
 ):
@@ -39,7 +45,7 @@ async def create_tenant(
     # Always link the creating admin; service handles uniqueness checks
     service = TenantService(db, token_service=token_service)
     tenant_in.admin_user_ids = [current_user.id]
-    tenant = await service.create(tenant_in, created_by=current_user.id)
+    tenant = await service.create(tenant_in)
     return Response(
         success=True,
         message="Tenant created successfully",
@@ -52,7 +58,7 @@ async def create_tenant(
 @router.get("/")
 async def list_tenants(
     request: Request,
-    current_user: TenantRead = Depends(require_admin(get_token_service())),
+    current_user: UserRead = Depends(require_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
     token_service: TokenService = Depends(get_token_service),
 ):
@@ -78,7 +84,7 @@ async def list_tenants(
 async def get_tenant(
     tenant_id: uuid.UUID,
     request: Request,
-    current_user: TenantRead = Depends(require_admin(get_token_service())),
+    current_user: UserRead = Depends(require_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
     token_service: TokenService = Depends(get_token_service),
 ):
@@ -105,7 +111,7 @@ async def update_tenant(
     tenant_id: uuid.UUID,
     tenant_in: TenantUpdate,
     request: Request,
-    current_user: TenantRead = Depends(require_admin(get_token_service())),
+    current_user: UserRead = Depends(require_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
     token_service: TokenService = Depends(get_token_service),
 ):
@@ -119,7 +125,8 @@ async def update_tenant(
             request=request,
             status_code=status.HTTP_404_NOT_FOUND,
         )
-    updated = await service.update(tenant, tenant_in, updated_by=current_user.id)
+    tenant_in.id = tenant_id
+    updated = await service.update(tenant_in)
     return Response(
         success=True,
         message="Tenant updated successfully",
@@ -132,7 +139,7 @@ async def update_tenant(
 async def delete_tenant(
     tenant_id: uuid.UUID,
     request: Request,
-    current_user: TenantRead = Depends(require_admin(get_token_service())),
+    current_user: UserRead = Depends(require_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
     token_service: TokenService = Depends(get_token_service),
 ):
@@ -147,22 +154,24 @@ async def delete_tenant(
             status_code=status.HTTP_404_NOT_FOUND,
         )
 
-    stats = await service.get_tenant_stats(tenant_id)
-    if stats.get("total_users", 0) > 0:
+    total_users = int((await db.execute(select(sqlfunc.count(User.id)).where(User.tenant_id == tenant_id))).scalar_one())
+    total_courses = int((await db.execute(select(sqlfunc.count(Course.id)).where(Course.tenant_id == tenant_id))).scalar_one())
+    total_exams = int((await db.execute(select(sqlfunc.count(Exam.id)).where(Exam.tenant_id == tenant_id))).scalar_one())
+    if total_users > 0:
         return Response(
             success=False,
             error="Cannot delete tenant with associated users. Please delete or reassign all users first.",
             request=request,
             status_code=status.HTTP_400_BAD_REQUEST,
         )
-    if stats.get("total_courses", 0) > 0:
+    if total_courses > 0:
         return Response(
             success=False,
             error="Cannot delete tenant with associated courses. Please delete all courses first.",
             request=request,
             status_code=status.HTTP_400_BAD_REQUEST,
         )
-    if stats.get("total_exams", 0) > 0:
+    if total_exams > 0:
         return Response(
             success=False,
             error="Cannot delete tenant with associated exams. Please delete all exams first.",
@@ -170,7 +179,8 @@ async def delete_tenant(
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 
-    await service.delete(tenant, deleted_by=current_user.id)
+    tenant_delete = TenantDelete(id=tenant_id, updated_by=current_user.id)
+    await service.delete(tenant_delete)
     return Response(
         success=True,
         message="Tenant deleted successfully",
@@ -182,13 +192,13 @@ async def delete_tenant(
 async def restore_tenant(
     tenant_id: uuid.UUID,
     request: Request,
-    current_user: TenantRead = Depends(require_admin(get_token_service())),
+    current_user: UserRead = Depends(require_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
     token_service: TokenService = Depends(get_token_service),
 ):
     """Restore a soft-deleted tenant (admin only)."""
     service = TenantService(db, token_service=token_service)
-    tenant = await service.get(tenant_id, include_deleted=True)
+    tenant = await service.get(tenant_id, is_deleted=True)
     if not tenant:
         return Response(
             success=False,
@@ -203,51 +213,11 @@ async def restore_tenant(
             request=request,
             status_code=status.HTTP_400_BAD_REQUEST,
         )
-    restored = await service.restore(tenant, restored_by=current_user.id)
+    tenant_delete = TenantDelete(id=tenant_id, updated_by=current_user.id)
+    restored = await service.restore(tenant_delete)
     return Response(
         success=True,
         message="Tenant restored successfully",
         data=restored.to_dict(),
-        request=request,
-    )
-
-
-@router.get("/{tenant_id}/users")
-async def get_tenant_users(
-    tenant_id: uuid.UUID,
-    request: Request,
-    page: int = Query(1, ge=1),
-    per_page: int = Query(10, ge=1, le=100),
-    current_user: TenantRead = Depends(require_admin(get_token_service())),
-    db: AsyncSession = Depends(get_db),
-    token_service: TokenService = Depends(get_token_service),
-):
-    """Get users in a tenant (admin only)."""
-    service = TenantService(db, token_service=token_service)
-    tenant = await service.get(tenant_id)
-    if not tenant:
-        return Response(success=False, error="Tenant not found", request=request, status_code=status.HTTP_404_NOT_FOUND)
-    users, total = await service.get_tenant_users(tenant_id, limit=per_page, offset=offset(page, per_page))
-    return Response(success=True, message="Tenant users retrieved successfully", data=users, page=page, per_page=per_page, total=total, request=request)
-
-
-@router.get("/{tenant_id}/stats")
-async def get_tenant_stats(
-    tenant_id: uuid.UUID,
-    request: Request,
-    current_user: TenantRead = Depends(require_admin(get_token_service())),
-    db: AsyncSession = Depends(get_db),
-    token_service: TokenService = Depends(get_token_service),
-):
-    """Get tenant statistics (admin only)."""
-    service = TenantService(db, token_service=token_service)
-    if current_user.role == "admin" and current_user.tenant_id != tenant_id:
-        raise ForbiddenError("Access denied: You can only access statistics for your own tenant")
-
-    stats = await service.get_tenant_stats(tenant_id)
-    return Response(
-        success=True,
-        message="Tenant statistics retrieved successfully",
-        data=stats,
         request=request,
     )

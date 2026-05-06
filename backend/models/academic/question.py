@@ -7,8 +7,7 @@ from typing import Optional, List
 
 from sqlalchemy import ForeignKey, String, Integer, Index, func, CheckConstraint, JSON, Numeric, Enum as SAEnum, inspect, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from core.types.guid import GUID
+from sqlalchemy.dialects.postgresql import UUID
 
 from core.database import Base
 from uuid_utils import uuid7
@@ -21,8 +20,8 @@ class QuestionExams(Base):
         {"schema": "academic"},
     )
 
-    question_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("academic.questions.id", ondelete="CASCADE"), primary_key=True, comment="FK to question")
-    exam_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("academic.exams.id", ondelete="CASCADE"), primary_key=True, comment="FK to exam")
+    question_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("academic.questions.id", ondelete="CASCADE"), primary_key=True, comment="FK to question")
+    exam_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("academic.exams.id", ondelete="CASCADE"), primary_key=True, comment="FK to exam")
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -86,14 +85,14 @@ class Question(Base):
         Index("ix_questions_tenant_semester", "tenant_id", "semester_id"),
         {"schema": "academic"},
     )
-    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid7, comment="Primary key: UUIDv7 time-ordered")
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7, comment="Primary key: UUIDv7 time-ordered")
     number: Mapped[str] = mapped_column(String(20), nullable=False, comment="Question number within the exam")
     text: Mapped[str] = mapped_column(String(2000), nullable=False, comment="Question text")
     images: Mapped[list] = mapped_column(JSON, nullable=True, comment="Optional array of image URLs for the question")
-    parent_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("academic.questions.id", ondelete="CASCADE"), nullable=True, comment="Optional FK to parent question for sub-questions")
-    tenant_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.tenants.id", ondelete="CASCADE"), nullable=False, comment="FK to tenant/organization")
-    semester_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("billings.semesters.id", ondelete="SET NULL"), nullable=True, comment="FK to semester")
-    answer_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("academic.answers.id", ondelete="SET NULL"), nullable=True, comment="Optional FK to an Answer shared across questions")
+    parent_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("academic.questions.id", ondelete="CASCADE"), nullable=True, comment="Optional FK to parent question for sub-questions")
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.tenants.id", ondelete="CASCADE"), nullable=False, comment="FK to tenant/organization")
+    semester_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("billings.semesters.id", ondelete="SET NULL"), nullable=True, comment="FK to semester")
+    answer_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("academic.answers.id", ondelete="SET NULL"), nullable=True, comment="Optional FK to an Answer shared across questions")
     rules: Mapped[str] = mapped_column(String(2000), nullable=True, comment="Optional grading rules or metadata in JSON format")
     mark: Mapped[Optional[Decimal]] = mapped_column(Decimal(10, 2), nullable=True, comment="Mark for the question")
     industry: Mapped[Industry] = mapped_column(SAEnum(Industry, name="industry_enum"), nullable=False, comment="Industry/subject area of the question")
@@ -102,8 +101,8 @@ class Question(Base):
     
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    created_by: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="Optional FK to user who created the question")
-    updated_by: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="Optional FK to user who last updated the question")
+    created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="Optional FK to user who created the question")
+    updated_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="Optional FK to user who last updated the question")
     
     def __repr__(self) -> str:
         return f"<Question(id={self.id}, number={self.number}, type={self.qtype}, tenant_id={self.tenant_id})>"
@@ -173,7 +172,7 @@ class Answer(Base):
         {"schema": "academic"},
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid7, comment="Primary key: UUIDv7 time-ordered")
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7, comment="Primary key: UUIDv7 time-ordered")
     # For MCQ questions: stores the correct option letter (a-z)
     value: Mapped[AnswerEnum] = mapped_column(SAEnum(AnswerEnum, name="answer_enum"), nullable=True, comment="MCQ answer: option letter a-z")
     # For fill-in-the-blanks questions: stores the correct text answer
@@ -183,8 +182,8 @@ class Answer(Base):
     
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    created_by: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="Optional FK to user who created the answer")
-    updated_by: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="Optional FK to user who last updated the answer")
+    created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="Optional FK to user who created the answer")
+    updated_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="Optional FK to user who last updated the answer")
     
     def __repr__(self) -> str:
         return f"<Answer(id={self.id}, value={self.value}, text_value={self.text_value})>"

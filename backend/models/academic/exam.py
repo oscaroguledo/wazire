@@ -7,8 +7,7 @@ from enum import Enum
 
 from sqlalchemy import ForeignKey, Enum as SQLEnum, String, Integer, Numeric, Index, func, CheckConstraint, DateTime, inspect
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from core.types.guid import GUID
+from sqlalchemy.dialects.postgresql import UUID
 
 from core.database import Base
 from uuid_utils import uuid7
@@ -56,7 +55,7 @@ class Exam(Base):
         {"schema": "academic"},
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid7, comment="Primary key: UUIDv7 time-ordered")
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7, comment="Primary key: UUIDv7 time-ordered")
     title: Mapped[str] = mapped_column(String(200), nullable=False, comment="Exam title")
     description: Mapped[str] = mapped_column(String(2000), nullable=True, comment="Exam description")
     start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True, comment="Exam start time (timezone-aware)")
@@ -66,15 +65,15 @@ class Exam(Base):
     status: Mapped[ExamStatus] = mapped_column(SQLEnum(ExamStatus, name="exam_status", create_type=True), nullable=True, default=ExamStatus.NOT_STARTED, comment="Exam status: not_started, in_progress, finished")
     max_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=1, comment="Maximum attempts allowed (default 1)")
 
-    course_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("academic.courses.id", ondelete="CASCADE"), nullable=True, comment="FK to course")
-    tenant_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.tenants.id", ondelete="CASCADE"), nullable=False, comment="FK to tenant/organization")
-    semester_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("billings.semesters.id", ondelete="SET NULL"), nullable=True, comment="FK to semester")
-    student_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.users.id", ondelete="CASCADE"), nullable=True, comment="FK to student")
+    course_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("academic.courses.id", ondelete="CASCADE"), nullable=True, comment="FK to course")
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.tenants.id", ondelete="CASCADE"), nullable=False, comment="FK to tenant/organization")
+    semester_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("billings.semesters.id", ondelete="SET NULL"), nullable=True, comment="FK to semester")
+    student_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.users.id", ondelete="CASCADE"), nullable=True, comment="FK to student")
     
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    created_by: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="FK: user who created this record")
-    updated_by: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="FK: user who last updated this record")
+    created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="FK: user who created this record")
+    updated_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="FK: user who last updated this record")
 
 
     def __repr__(self) -> str:

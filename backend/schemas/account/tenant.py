@@ -30,6 +30,7 @@ class TenantCreate(BaseModel):
     name: str
     domain: Optional[str] = None
     logo_url: Optional[str] = None
+    admin_user_ids: Optional[list[UUID]] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     created_by: UUID

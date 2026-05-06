@@ -5,7 +5,7 @@ from datetime import datetime
 from enum import Enum
 from sqlalchemy import Index, func, DateTime, ForeignKey, JSON, Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column
-from core.types.guid import GUID
+from sqlalchemy.dialects.postgresql import UUID
 from core.database import Base
 from uuid_utils import uuid7
 
@@ -35,8 +35,8 @@ class PaymentMethod(Base):
         {"schema": "billings"},
     )
     
-    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid7, comment="Primary key: UUIDv7 time-ordered")
-    tenant_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.tenants.id", ondelete="CASCADE"), nullable=False, comment="FK to tenant")
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7, comment="Primary key: UUIDv7 time-ordered")
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.tenants.id", ondelete="CASCADE"), nullable=False, comment="FK to tenant")
     
     # Payment method details
     type: Mapped[PaymentMethodType] = mapped_column(SAEnum(PaymentMethodType, name="payment_method_type_enum", create_type=True), nullable=False, comment="Payment method type")
@@ -46,8 +46,8 @@ class PaymentMethod(Base):
     # Audit fields
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), comment="Creation timestamp (timezone-aware)")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), comment="Last update timestamp (timezone-aware)")
-    created_by: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="FK: user who created this record")
-    updated_by: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="FK: user who last updated this record")
+    created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="FK: user who created this record")
+    updated_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="FK: user who last updated this record")
     
     def __repr__(self):
         return f"<PaymentMethod(id={self.id}, tenant_id={self.tenant_id}, type={self.type.value}, is_default={self.is_default})>"

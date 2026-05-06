@@ -172,9 +172,9 @@ async def upload_exam_paper(
     service = QuestionService(db)
     """Parse a typed/scanned exam paper and bulk-create questions in the background.
 
-    Returns immediately with 202. Questions are created asynchronously.
-    The client receives a WebSocket push when done:
-      { "job_id": "<exam_id>", "status": "done", "created": N, "errors": [...] }
+        Returns immediately with 202. Questions are created asynchronously.
+        Notifications via WebSockets have been removed; clients should poll or refresh
+        to observe created questions (e.g., call GET /questions?exam_id=<exam_id>).
     """
     if not body.pages:
         return Response(success=False, error="No pages provided", request=request, status_code=status.HTTP_400_BAD_REQUEST)

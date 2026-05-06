@@ -9,7 +9,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-from core.types.guid import GUID
+# Migration: use Postgres native UUID (sa.dialects.postgresql.UUID)
 
 # IMPORTANT: Do not import models directly in migration files.
 # The env.py file handles all model imports and database URL conversion.
@@ -31,7 +31,7 @@ def upgrade() -> None:
     op.execute('CREATE SCHEMA IF NOT EXISTS billings')
     
     op.create_table('answers',
-    sa.Column('id', GUID(length=16), nullable=False, comment='Primary key: UUIDv7 time-ordered'),
+    sa.Column('id', sa.dialects.postgresql.UUID(), nullable=False, comment='Primary key: UUIDv7 time-ordered'),
     sa.Column('value', sa.Enum('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', name='answer_enum'), nullable=True, comment='MCQ answer: option letter a-z'),
     sa.Column('text_value', sa.String(length=500), nullable=True, comment='FITB answer: correct text answer (case-insensitive match)'),
     sa.Column('acceptable_variations', sa.JSON(), nullable=True, comment='FITB: acceptable answer variations, e.g., ["Photosynthesis", "photosynthesis"]'),
@@ -44,7 +44,7 @@ def upgrade() -> None:
     op.create_index('ix_answers_created_at', 'answers', ['created_at'], unique=False, schema='academic')
     op.create_index('ix_answers_id', 'answers', ['id'], unique=False, schema='academic')
     op.create_table('tenants',
-    sa.Column('id', GUID(length=16), nullable=False, comment='Primary key: UUIDv7 time-ordered'),
+    sa.Column('id', sa.dialects.postgresql.UUID(), nullable=False, comment='Primary key: UUIDv7 time-ordered'),
     sa.Column('name', sa.String(length=200), nullable=False, comment='Tenant display name'),
     sa.Column('domain', sa.String(length=255), nullable=True, comment='Canonical domain, e.g. example.edu'),
     sa.Column('logo_url', sa.String(length=255), nullable=True, comment='Optional logo URL'),
@@ -60,7 +60,7 @@ def upgrade() -> None:
     op.create_index('ix_tenants_name', 'tenants', ['name'], unique=False, schema='account')
     op.create_index('ix_tenants_updated_at', 'tenants', ['updated_at'], unique=False, schema='account')
     op.create_table('users',
-    sa.Column('id', GUID(length=16), nullable=False, comment='Primary key: UUIDv7 time-ordered'),
+    sa.Column('id', sa.dialects.postgresql.UUID(), nullable=False, comment='Primary key: UUIDv7 time-ordered'),
     sa.Column('first_name', sa.String(length=100), nullable=False, comment='Given name'),
     sa.Column('middle_name', sa.String(length=100), nullable=True, comment='Middle name, optional'),
     sa.Column('last_name', sa.String(length=100), nullable=False, comment='Family name'),
@@ -68,7 +68,7 @@ def upgrade() -> None:
     sa.Column('password', sa.String(length=255), nullable=False, comment='Hashed password'),
     sa.Column('role', sa.Enum('student', 'lecturer', 'admin', 'superadmin', name='user_role'), nullable=False, comment='User role enum'),
     sa.Column('is_active', sa.Boolean(), nullable=False, comment='Account active flag'),
-    sa.Column('tenant_id', GUID(length=16), nullable=True, comment='FK: tenant id for multi-tenancy'),
+    sa.Column('tenant_id', sa.dialects.postgresql.UUID(), nullable=True, comment='FK: tenant id for multi-tenancy'),
     sa.Column('institution_id', sa.String(length=100), nullable=True, comment='Institution ID e.g., Student matric/registration number'),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
@@ -88,12 +88,12 @@ def upgrade() -> None:
     op.create_index('ix_users_tenant_role', 'users', ['tenant_id', 'role'], unique=False, schema='account')
     op.create_index('ix_users_updated_at', 'users', ['updated_at'], unique=False, schema='account')
     op.create_table('courses',
-    sa.Column('id', GUID(length=16), nullable=False, comment='Primary key: UUIDv7 time-ordered'),
+    sa.Column('id', sa.dialects.postgresql.UUID(), nullable=False, comment='Primary key: UUIDv7 time-ordered'),
     sa.Column('name', sa.String(length=100), nullable=False, comment='Course name'),
     sa.Column('description', sa.String(length=255), nullable=True, comment='Optional course description'),
     sa.Column('course_code', sa.String(length=20), nullable=False, comment='Short course code'),
-    sa.Column('lecturer_id', GUID(length=16), nullable=True, comment='FK to users (lecturer)'),
-    sa.Column('tenant_id', GUID(length=16), nullable=True, comment='FK to tenants (organization)'),
+    sa.Column('lecturer_id', sa.dialects.postgresql.UUID(), nullable=True, comment='FK to users (lecturer)'),
+    sa.Column('tenant_id', sa.dialects.postgresql.UUID(), nullable=True, comment='FK to tenants (organization)'),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False, comment='Creation timestamp (timezone-aware)'),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False, comment='Last update timestamp (timezone-aware)'),
     sa.ForeignKeyConstraint(['lecturer_id'], ['account.users.id'], ondelete='SET NULL'),
@@ -111,12 +111,12 @@ def upgrade() -> None:
     op.create_index('ix_courses_tenant_id', 'courses', ['tenant_id'], unique=False, schema='academic')
     op.create_index('ix_courses_updated_at', 'courses', ['updated_at'], unique=False, schema='academic')
     op.create_table('questions',
-    sa.Column('id', GUID(length=16), nullable=False, comment='Primary key: UUIDv7 time-ordered'),
+    sa.Column('id', sa.dialects.postgresql.UUID(), nullable=False, comment='Primary key: UUIDv7 time-ordered'),
     sa.Column('number', sa.String(length=20), nullable=False, comment='Question number within the exam'),
     sa.Column('text', sa.String(length=2000), nullable=False, comment='Question text'),
     sa.Column('images', sa.JSON(), nullable=True, comment='Optional array of image URLs for the question'),
-    sa.Column('parent_id', GUID(length=16), nullable=True, comment='Optional FK to parent question for sub-questions'),
-    sa.Column('tenant_id', GUID(length=16), nullable=True, comment='Optional FK to tenant/organization'),
+    sa.Column('parent_id', sa.dialects.postgresql.UUID(), nullable=True, comment='Optional FK to parent question for sub-questions'),
+    sa.Column('tenant_id', sa.dialects.postgresql.UUID(), nullable=True, comment='Optional FK to tenant/organization'),
     sa.Column('rules', sa.String(length=2000), nullable=True, comment='Optional grading rules or metadata in JSON format'),
     sa.Column('mark', sa.Numeric(precision=10, scale=2), nullable=True, comment='Mark for the question'),
     sa.Column('industry', sa.Enum('MEDICAL_AND_HEALTH_SCIENCES', 'NATURAL_SCIENCES', 'MATHEMATICS_AND_STATISTICS', 'ENGINEERING_AND_TECHNOLOGY', 'COMPUTING_AND_INFORMATION_TECHNOLOGY', 'BUSINESS_AND_MANAGEMENT', 'ECONOMICS_AND_FINANCE', 'LAW_AND_GOVERNANCE', 'SOCIAL_SCIENCES', 'HUMANITIES', 'ARTS_AND_DESIGN', 'MEDIA_AND_COMMUNICATION', 'EDUCATION', 'SPORTS_AND_PHYSICAL_EDUCATION', 'AGRICULTURE_AND_FOOD_SCIENCE', 'ENVIRONMENT_AND_SUSTAINABILITY', 'VOCATIONAL_AND_APPLIED', 'GENERAL', name='industry_enum'), nullable=False, comment='Industry/subject area of the question'),
@@ -124,7 +124,7 @@ def upgrade() -> None:
     sa.Column('options', sa.JSON(), nullable=True, comment='Options JSON list, e.g. [{"label":"a","text":"Option A"}]'),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('answer_id', GUID(length=16), nullable=True, comment='Optional FK to an Answer shared across questions'),
+    sa.Column('answer_id', sa.dialects.postgresql.UUID(), nullable=True, comment='Optional FK to an Answer shared across questions'),
     sa.CheckConstraint("qtype IN ('multiple_choice','theory','fill_in_blanks')", name='ck_questions_qtype'),
     sa.ForeignKeyConstraint(['answer_id'], ['academic.answers.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['parent_id'], ['academic.questions.id'], ondelete='CASCADE'),
@@ -144,8 +144,8 @@ def upgrade() -> None:
     op.create_index('ix_questions_tenant_qtype', 'questions', ['tenant_id', 'qtype'], unique=False, schema='academic')
     op.create_index('ix_questions_updated_at', 'questions', ['updated_at'], unique=False, schema='academic')
     op.create_table('oauth',
-    sa.Column('id', GUID(length=16), nullable=False, comment='Primary key: UUIDv7'),
-    sa.Column('user_id', GUID(length=16), nullable=False, comment='FK to users'),
+    sa.Column('id', sa.dialects.postgresql.UUID(), nullable=False, comment='Primary key: UUIDv7'),
+    sa.Column('user_id', sa.dialects.postgresql.UUID(), nullable=False, comment='FK to users'),
     sa.Column('provider', sa.String(length=50), nullable=False, comment="OAuth provider name, e.g. 'google', 'facebook'"),
     sa.Column('provider_user_id', sa.String(length=255), nullable=False, comment='User ID from the OAuth provider'),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
@@ -157,16 +157,16 @@ def upgrade() -> None:
     )
     op.create_index('ix_oauth_user_id_provider', 'oauth', ['user_id', 'provider'], unique=False, schema='account')
     op.create_table('tenant_admins',
-    sa.Column('tenant_id', GUID(length=16), nullable=False),
-    sa.Column('user_id', GUID(length=16), nullable=False),
+    sa.Column('tenant_id', sa.dialects.postgresql.UUID(), nullable=False),
+    sa.Column('user_id', sa.dialects.postgresql.UUID(), nullable=False),
     sa.ForeignKeyConstraint(['tenant_id'], ['account.tenants.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['user_id'], ['account.users.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('tenant_id', 'user_id'),
     schema='account'
     )
     op.create_table('admin_dashboard',
-    sa.Column('id', GUID(length=16), nullable=False),
-    sa.Column('admin_id', GUID(length=16), nullable=False),
+    sa.Column('id', sa.dialects.postgresql.UUID(), nullable=False),
+    sa.Column('admin_id', sa.dialects.postgresql.UUID(), nullable=False),
     sa.Column('total_users', sa.Integer(), nullable=False),
     sa.Column('total_lecturers', sa.Integer(), nullable=False),
     sa.Column('total_students', sa.Integer(), nullable=False),
@@ -185,8 +185,8 @@ def upgrade() -> None:
     op.create_index('ix_admin_dashboard_created_at', 'admin_dashboard', ['created_at'], unique=False, schema='analytics')
     op.create_index('ix_admin_dashboard_updated_at', 'admin_dashboard', ['updated_at'], unique=False, schema='analytics')
     op.create_table('lecturer_dashboard',
-    sa.Column('id', GUID(length=16), nullable=False),
-    sa.Column('lecturer_id', GUID(length=16), nullable=False),
+    sa.Column('id', sa.dialects.postgresql.UUID(), nullable=False),
+    sa.Column('lecturer_id', sa.dialects.postgresql.UUID(), nullable=False),
     sa.Column('total_courses', sa.Integer(), nullable=False),
     sa.Column('total_exams', sa.Integer(), nullable=False),
     sa.Column('total_students', sa.Integer(), nullable=False),
@@ -203,8 +203,8 @@ def upgrade() -> None:
     op.create_index('ix_lecturer_dashboard_created_at', 'lecturer_dashboard', ['created_at'], unique=False, schema='analytics')
     op.create_index('ix_lecturer_dashboard_updated_at', 'lecturer_dashboard', ['updated_at'], unique=False, schema='analytics')
     op.create_table('student_dashboard',
-    sa.Column('id', GUID(length=16), nullable=False),
-    sa.Column('student_id', GUID(length=16), nullable=False),
+    sa.Column('id', sa.dialects.postgresql.UUID(), nullable=False),
+    sa.Column('student_id', sa.dialects.postgresql.UUID(), nullable=False),
     sa.Column('total_courses', sa.Integer(), nullable=False),
     sa.Column('total_exams', sa.Integer(), nullable=False),
     sa.Column('total_submissions', sa.Integer(), nullable=False),
@@ -222,11 +222,11 @@ def upgrade() -> None:
     op.create_index('ix_student_dashboard_created_at', 'student_dashboard', ['created_at'], unique=False, schema='analytics')
     op.create_index('ix_student_dashboard_updated_at', 'student_dashboard', ['updated_at'], unique=False, schema='analytics')
     op.create_table('current_usage',
-    sa.Column('id', GUID(length=16), nullable=False, comment='Primary key: UUIDv7 time-ordered'),
+    sa.Column('id', sa.dialects.postgresql.UUID(), nullable=False, comment='Primary key: UUIDv7 time-ordered'),
     sa.Column('student_count', sa.Integer(), nullable=False, comment='Number of students'),
     sa.Column('exams_graded', sa.Integer(), nullable=False, comment='Number of exams graded'),
     sa.Column('plan', sa.Enum('STARTER', 'INTERMEDIATE', 'ENTERPRISE', name='plantype'), nullable=False, comment='Current plan type'),
-    sa.Column('tenant_id', GUID(length=16), nullable=False, comment='Tenant ID'),
+    sa.Column('tenant_id', sa.dialects.postgresql.UUID(), nullable=False, comment='Tenant ID'),
     sa.Column('plan_updated_at', sa.DateTime(timezone=True), nullable=False, comment='When the plan was last updated'),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False, comment='When the record was created'),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False, comment='When the record was last updated'),
@@ -242,11 +242,11 @@ def upgrade() -> None:
     op.create_index('ix_current_usage_tenant_plan', 'current_usage', ['tenant_id', 'plan'], unique=False, schema='billings')
     op.create_index('ix_current_usage_updated_at', 'current_usage', ['updated_at'], unique=False, schema='billings')
     op.create_table('invoices',
-    sa.Column('id', GUID(length=16), nullable=False, comment='Primary key: UUIDv7 time-ordered'),
+    sa.Column('id', sa.dialects.postgresql.UUID(), nullable=False, comment='Primary key: UUIDv7 time-ordered'),
     sa.Column('student_count', sa.Integer(), nullable=False, comment='Number of students'),
     sa.Column('amount_per_student', sa.Integer(), nullable=False, comment='Amount per student'),
     sa.Column('total_amount', sa.Integer(), nullable=False, comment='Total amount'),
-    sa.Column('tenant_id', GUID(length=16), nullable=False, comment='Tenant ID'),
+    sa.Column('tenant_id', sa.dialects.postgresql.UUID(), nullable=False, comment='Tenant ID'),
     sa.Column('status', sa.Enum('PENDING', 'PAID', 'FAILED', 'REFUNDED', name='invoicestatus'), nullable=False, comment='Invoice status'),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False, comment='When the record was created'),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False, comment='When the record was last updated'),
@@ -263,9 +263,9 @@ def upgrade() -> None:
     op.create_index('ix_invoice_tenant_status', 'invoices', ['tenant_id', 'status'], unique=False, schema='billings')
     op.create_index('ix_invoice_updated_at', 'invoices', ['updated_at'], unique=False, schema='billings')
     op.create_table('payment_methods',
-    sa.Column('id', GUID(length=16), nullable=False, comment='Primary key: UUIDv7 time-ordered'),
+    sa.Column('id', sa.dialects.postgresql.UUID(), nullable=False, comment='Primary key: UUIDv7 time-ordered'),
     sa.Column('type', sa.Enum('CREDIT_CARD', 'PAYPAL', 'BANK_TRANSFER', 'OTHER', name='paymentmethodtype'), nullable=False, comment='Payment method type'),
-    sa.Column('tenant_id', GUID(length=16), nullable=False, comment='Tenant ID'),
+    sa.Column('tenant_id', sa.dialects.postgresql.UUID(), nullable=False, comment='Tenant ID'),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False, comment='When the record was created'),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False, comment='When the record was last updated'),
     sa.ForeignKeyConstraint(['tenant_id'], ['account.tenants.id'], ),
@@ -278,9 +278,9 @@ def upgrade() -> None:
     op.create_index('ix_payment_methods_type', 'payment_methods', ['type'], unique=False, schema='billings')
     op.create_index('ix_payment_methods_updated_at', 'payment_methods', ['updated_at'], unique=False, schema='billings')
     op.create_table('enrollments',
-    sa.Column('id', GUID(length=16), nullable=False, comment='Primary key: UUIDv7 time-ordered'),
-    sa.Column('student_id', GUID(length=16), nullable=False, comment='FK: Student user ID'),
-    sa.Column('course_id', GUID(length=16), nullable=False, comment='FK: Course ID'),
+    sa.Column('id', sa.dialects.postgresql.UUID(), nullable=False, comment='Primary key: UUIDv7 time-ordered'),
+    sa.Column('student_id', sa.dialects.postgresql.UUID(), nullable=False, comment='FK: Student user ID'),
+    sa.Column('course_id', sa.dialects.postgresql.UUID(), nullable=False, comment='FK: Course ID'),
     sa.Column('semester', sa.Enum('FALL', 'SPRING', 'SUMMER', 'WINTER', 'INTERIM', 'FIRST', 'SECOND', 'THIRD', 'FOURTH', 'FIFTH', 'SIXTH', 'SEVENTH', 'EIGHTH', name='semester_enum'), nullable=False, comment='Academic semester'),
     sa.Column('status', sa.Enum('ACTIVE', 'COMPLETED', 'DROPPED', 'PENDING', name='enrollment_status'), nullable=False, comment='Current enrollment status'),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False, comment='Creation timestamp (timezone-aware)'),
@@ -302,7 +302,7 @@ def upgrade() -> None:
     op.create_index('ix_enrollment_tenant_semester_status', 'enrollments', ['student_id', 'semester', 'status'], unique=False, schema='academic')
     op.create_index('ix_enrollment_updated_at', 'enrollments', ['updated_at'], unique=False, schema='academic')
     op.create_table('exams',
-    sa.Column('id', GUID(length=16), nullable=False, comment='Primary key: UUIDv7 time-ordered'),
+    sa.Column('id', sa.dialects.postgresql.UUID(), nullable=False, comment='Primary key: UUIDv7 time-ordered'),
     sa.Column('title', sa.String(length=200), nullable=False, comment='Exam title'),
     sa.Column('description', sa.String(length=2000), nullable=True, comment='Exam description'),
     sa.Column('duration', sa.Numeric(precision=5, scale=2), nullable=False, comment='Duration in hours (decimal)'),
@@ -311,12 +311,12 @@ def upgrade() -> None:
     sa.Column('status', sa.Enum('NOT_STARTED', 'IN_PROGRESS', 'FINISHED', name='exam_status'), nullable=True, comment='Exam status: not_started, in_progress, finished'),
     sa.Column('start_time', sa.DateTime(timezone=True), nullable=True, comment='Exam start time (timezone-aware)'),
     sa.Column('max_attempts', sa.Integer(), nullable=False, comment='Maximum attempts allowed (default 1)'),
-    sa.Column('course_id', GUID(length=16), nullable=True, comment='FK to course'),
-    sa.Column('tenant_id', GUID(length=16), nullable=True, comment='FK to tenant/organization'),
+    sa.Column('course_id', sa.dialects.postgresql.UUID(), nullable=True, comment='FK to course'),
+    sa.Column('tenant_id', sa.dialects.postgresql.UUID(), nullable=True, comment='FK to tenant/organization'),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('created_by', GUID(length=16), nullable=True, comment='User who created'),
-    sa.Column('updated_by', GUID(length=16), nullable=True, comment='User who last updated'),
+    sa.Column('created_by', sa.dialects.postgresql.UUID(), nullable=True, comment='User who created'),
+    sa.Column('updated_by', sa.dialects.postgresql.UUID(), nullable=True, comment='User who last updated'),
     sa.CheckConstraint('duration > 0', name='ck_exams_duration_positive'),
     sa.CheckConstraint('max_attempts > 0', name='ck_exams_max_attempts_positive'),
     sa.ForeignKeyConstraint(['course_id'], ['academic.courses.id'], ondelete='CASCADE'),
@@ -339,8 +339,8 @@ def upgrade() -> None:
     op.create_index('ix_exams_updated_at', 'exams', ['updated_at'], unique=False, schema='academic')
     op.create_index('ix_exams_updated_by', 'exams', ['updated_by'], unique=False, schema='academic')
     op.create_table('payment_method_details',
-    sa.Column('id', GUID(length=16), nullable=False, comment='Primary key: UUIDv7 time-ordered'),
-    sa.Column('payment_method_id', GUID(length=16), nullable=False, comment='Foreign key to payment_methods'),
+    sa.Column('id', sa.dialects.postgresql.UUID(), nullable=False, comment='Primary key: UUIDv7 time-ordered'),
+    sa.Column('payment_method_id', sa.dialects.postgresql.UUID(), nullable=False, comment='Foreign key to payment_methods'),
     sa.Column('details', sa.JSON(), nullable=False, comment='Payment method details'),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False, comment='When the record was created'),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False, comment='When the record was last updated'),
@@ -351,8 +351,8 @@ def upgrade() -> None:
     op.create_index('ix_payment_method_details_created_at', 'payment_method_details', ['created_at'], unique=False, schema='billings')
     op.create_index('ix_payment_method_details_payment_method_id', 'payment_method_details', ['payment_method_id'], unique=False, schema='billings')
     op.create_table('question_exams',
-    sa.Column('question_id', GUID(length=16), nullable=False, comment='FK to question'),
-    sa.Column('exam_id', GUID(length=16), nullable=False, comment='FK to exam'),
+    sa.Column('question_id', sa.dialects.postgresql.UUID(), nullable=False, comment='FK to question'),
+    sa.Column('exam_id', sa.dialects.postgresql.UUID(), nullable=False, comment='FK to exam'),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['exam_id'], ['academic.exams.id'], ondelete='CASCADE'),
@@ -363,10 +363,10 @@ def upgrade() -> None:
     op.create_index('ix_question_exams_exam_id', 'question_exams', ['exam_id'], unique=False, schema='academic')
     op.create_index('ix_question_exams_question_id', 'question_exams', ['question_id'], unique=False, schema='academic')
     op.create_table('student_answers',
-    sa.Column('id', GUID(length=16), nullable=False),
-    sa.Column('student_id', GUID(length=16), nullable=False),
-    sa.Column('exam_id', GUID(length=16), nullable=False),
-    sa.Column('question_id', GUID(length=16), nullable=False),
+    sa.Column('id', sa.dialects.postgresql.UUID(), nullable=False),
+    sa.Column('student_id', sa.dialects.postgresql.UUID(), nullable=False),
+    sa.Column('exam_id', sa.dialects.postgresql.UUID(), nullable=False),
+    sa.Column('question_id', sa.dialects.postgresql.UUID(), nullable=False),
     sa.Column('answer', sa.JSON(), nullable=False, comment="Student's in-progress answer JSON"),
     sa.Column('last_saved_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
@@ -385,9 +385,9 @@ def upgrade() -> None:
     op.create_index('ix_student_answers_student_id', 'student_answers', ['student_id'], unique=False, schema='academic')
     op.create_index('ix_student_answers_student_question', 'student_answers', ['student_id', 'question_id'], unique=False, schema='academic')
     op.create_table('submissions',
-    sa.Column('id', GUID(length=16), nullable=False),
-    sa.Column('student_id', GUID(length=16), nullable=False),
-    sa.Column('exam_id', GUID(length=16), nullable=False),
+    sa.Column('id', sa.dialects.postgresql.UUID(), nullable=False),
+    sa.Column('student_id', sa.dialects.postgresql.UUID(), nullable=False),
+    sa.Column('exam_id', sa.dialects.postgresql.UUID(), nullable=False),
     sa.Column('latest_score', sa.Numeric(precision=5, scale=2), nullable=True),
     sa.Column('attempts_count', sa.Integer(), nullable=False),
     sa.Column('graded_at', sa.DateTime(timezone=True), nullable=True),
@@ -409,8 +409,8 @@ def upgrade() -> None:
     op.create_index('ix_submissions_updated_at', 'submissions', ['updated_at'], unique=False, schema='academic')
     op.create_index('uq_submissions_student_exam', 'submissions', ['student_id', 'exam_id'], unique=True, schema='academic')
     op.create_table('submission_attempts',
-    sa.Column('id', GUID(length=16), nullable=False),
-    sa.Column('submission_id', GUID(length=16), nullable=False),
+    sa.Column('id', sa.dialects.postgresql.UUID(), nullable=False),
+    sa.Column('submission_id', sa.dialects.postgresql.UUID(), nullable=False),
     sa.Column('attempt_number', sa.Integer(), nullable=False),
     sa.Column('score', sa.Numeric(precision=5, scale=2), nullable=True),
     sa.Column('scan_pages', sa.JSON(), nullable=True, comment='List of scanned page URLs for offline exams'),

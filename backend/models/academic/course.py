@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from sqlalchemy import ForeignKey, String, Index, func, DateTime
 from sqlalchemy.orm import Mapped, mapped_column
-from core.types.guid import GUID
+from sqlalchemy.dialects.postgresql import UUID
 from core.database import Base
 from uuid_utils import uuid7
 
@@ -30,17 +30,17 @@ class Course(Base):
         {"schema": "academic"},
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid7, comment="Primary key: UUIDv7 time-ordered")
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7, comment="Primary key: UUIDv7 time-ordered")
     name: Mapped[str] = mapped_column(String(100), nullable=False, index=True, comment="Course name")
     description: Mapped[str] = mapped_column(String(255), nullable=True, comment="Optional course description")
     course_code: Mapped[str] = mapped_column(String(20), nullable=False, comment="Short course code")
-    lecturer_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="FK to users (lecturer)")
-    tenant_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.tenants.id", ondelete="CASCADE"), nullable=False, comment="FK to tenants (organization)")
-    semester_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("billings.semesters.id", ondelete="SET NULL"), nullable=True, comment="FK to semester")
+    lecturer_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="FK to users (lecturer)")
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.tenants.id", ondelete="CASCADE"), nullable=False, comment="FK to tenants (organization)")
+    semester_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("billings.semesters.id", ondelete="SET NULL"), nullable=True, comment="FK to semester")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), comment="Creation timestamp (timezone-aware)")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), comment="Last update timestamp (timezone-aware)")
-    created_by: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="FK: user who created this record")
-    updated_by: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="FK: user who last updated this record")
+    created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="FK: user who created this record")
+    updated_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="FK: user who last updated this record")
     
     def __repr__(self) -> str:
         return f"<Course(id={self.id}, course_code={self.course_code}, name={self.name})>"

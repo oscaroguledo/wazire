@@ -187,14 +187,7 @@ async def list_students_with_submissions(
             success=True,
             message="Students and submissions retrieved",
             data=results,
-            pagination={
-                "page": page,
-                "per_page": per_page,
-                "total": total,
-                "pages": total_pages,
-                "has_next": page < total_pages,
-                "has_prev": page > 1
-            },
+            page=page, per_page=per_page, total=total,
             request=request,
         )
     except ValueError as e:
@@ -229,18 +222,11 @@ async def list_submissions(
     total_pages = (total_count + per_page - 1) // per_page
     
     return Response(
-        success=True, 
-        message="Submissions retrieved", 
-        data=[s.to_dict() for s in items], 
-        pagination={
-            "page": page,
-            "per_page": per_page,
-            "total": total_count,
-            "pages": total_pages,
-            "has_next": page < total_pages,
-            "has_prev": page > 1
-        }, 
-        request=request
+        success=True,
+        message="Submissions retrieved",
+        data=[s.to_dict() for s in items],
+        page=page, per_page=per_page, total=total_count,
+        request=request,
     )
 
 
@@ -283,14 +269,7 @@ async def list_lecturer_submissions(
         success=True,
         message="Submissions retrieved",
         data=[await _enrich_submission(s, service.db) for s in items],
-        pagination={
-            "page": page,
-            "per_page": per_page,
-            "total": total_count,
-            "pages": total_pages,
-            "has_next": page < total_pages,
-            "has_prev": page > 1,
-        },
+        page=page, per_page=per_page, total=total_count,
         request=request,
     )
 

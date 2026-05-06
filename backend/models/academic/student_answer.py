@@ -6,8 +6,7 @@ from typing import Optional
 
 from sqlalchemy import ForeignKey, JSON, Index, func, DateTime
 from sqlalchemy.orm import Mapped, mapped_column
-
-from core.types.guid import GUID
+from sqlalchemy.dialects.postgresql import UUID
 from core.database import Base
 from uuid_utils import uuid7
 
@@ -35,17 +34,17 @@ class StudentAnswer(Base):
         {"schema": "academic"},
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid7)
-    student_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.users.id", ondelete="CASCADE"), nullable=False)
-    exam_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("academic.exams.id", ondelete="CASCADE"), nullable=False)
-    question_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("academic.questions.id", ondelete="CASCADE"), nullable=False)
-    tenant_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.tenants.id", ondelete="CASCADE"), nullable=False)
-    semester_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("billings.semesters.id", ondelete="SET NULL"), nullable=True, comment="FK to semester")
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
+    student_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.users.id", ondelete="CASCADE"), nullable=False)
+    exam_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("academic.exams.id", ondelete="CASCADE"), nullable=False)
+    question_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("academic.questions.id", ondelete="CASCADE"), nullable=False)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.tenants.id", ondelete="CASCADE"), nullable=False)
+    semester_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("billings.semesters.id", ondelete="SET NULL"), nullable=True, comment="FK to semester")
     answer: Mapped[dict] = mapped_column(JSON, nullable=False, comment="Student's in-progress answer JSON")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    updated_by: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="Optional FK to user who last updated the answer")
-    created_by: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="Optional FK to user who created the answer")
+    updated_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="Optional FK to user who last updated the answer")
+    created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="Optional FK to user who created the answer")
 
     def to_dict(self) -> dict:
         return {

@@ -71,15 +71,8 @@ async def list_answers(
         success=True,
         message="Answers retrieved",
         data=[i.to_dict() for i in items],
-        pagination={
-            "page": page,
-            "per_page": per_page,
-            "total": total,
-            "pages": total_pages,
-            "has_next": page < total_pages,
-            "has_prev": page > 1
-        },
-        request=request
+        page=page, per_page=per_page, total=total,
+        request=request,
     )
 
 

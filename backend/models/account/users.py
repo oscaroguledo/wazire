@@ -7,7 +7,7 @@ from datetime import datetime
 from sqlalchemy import String, Index, func, CheckConstraint, DateTime, ForeignKey, Boolean
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column
-from core.types.guid import GUID
+from sqlalchemy.dialects.postgresql import UUID
 
 
 from core.database import Base
@@ -41,8 +41,8 @@ class Semester(Base):
         {"schema": "billings"},
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid7, comment="Primary key: UUIDv7 time-ordered")
-    tenant_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.tenants.id", ondelete="CASCADE"), nullable=False, comment="FK to school/tenant")
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7, comment="Primary key: UUIDv7 time-ordered")
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.tenants.id", ondelete="CASCADE"), nullable=False, comment="FK to school/tenant")
 
     # Semester identity
     academic_year: Mapped[str] = mapped_column(String(20), nullable=False, comment="e.g. '2024/2025'")
@@ -66,8 +66,8 @@ class Semester(Base):
     # Audit fields
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    created_by: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.users.id", ondelete="SET NULL"))
-    updated_by: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.users.id", ondelete="SET NULL"))
+    created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.users.id", ondelete="SET NULL"))
+    updated_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.users.id", ondelete="SET NULL"))
 
 
     def to_dict(self):
@@ -135,7 +135,7 @@ class User(Base):
         {"schema": "account"},
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid7, comment="Primary key: UUIDv7 time-ordered")
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7, comment="Primary key: UUIDv7 time-ordered")
     first_name: Mapped[str] = mapped_column(String(100), comment="Given name")
     middle_name: Mapped[str] = mapped_column(String(100), nullable=True, comment="Middle name, optional")
     last_name: Mapped[str] = mapped_column(String(100), comment="Family name")
@@ -146,12 +146,12 @@ class User(Base):
     is_deleted: Mapped[bool] = mapped_column(default=False, comment="Soft delete flag")
     deleted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True, comment="Soft delete timestamp")
     is_locked: Mapped[bool] = mapped_column(default=True, comment="Account locked flag - students locked until semester software fees are paid")
-    tenant_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.tenants.id", ondelete="CASCADE"), nullable=True, comment="FK: tenant id for multi-tenancy")
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.tenants.id", ondelete="CASCADE"), nullable=True, comment="FK: tenant id for multi-tenancy")
     institution_id: Mapped[str] = mapped_column(String(100), nullable=True, comment="Institution ID e.g., Student matric/registration number")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    created_by: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="FK: user who created this record")
-    updated_by: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="FK: user who last updated this record")
+    created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="FK: user who created this record")
+    updated_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="FK: user who last updated this record")
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email={self.email}, role={self.role})>"
@@ -190,7 +190,7 @@ class User(Base):
             "role": self.role.value,
             "is_active": self.is_active,
             "is_locked": self.is_locked,
-            "tenant_id": str(self.tenant_id),
+            "tenant_id": str(self.tenant_id) if self.tenant_id else None,
             "institution_id": str(self.institution_id) if self.institution_id else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,

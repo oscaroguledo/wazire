@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.account.tenant import Tenant
 from schemas.account.tenant import TenantCreate, TenantUpdate,TenantDelete
-
+from models.account.users import User
 
 class TenantService:
     def __init__(self, db: AsyncSession, token_service=None):
@@ -20,15 +20,15 @@ class TenantService:
     async def get(
         self,
         tenant_id: UUID,
-        is_active: Optional[bool] = True,  
-        is_deleted: Optional[bool] = False, 
+        is_active: Optional[bool] = True,
+        is_deleted: Optional[bool] = False,
     ) -> Optional[Tenant]:
         """Fetch a single tenant by primary key."""
 
         # ID first — hits primary key index immediately
         stmt = select(Tenant).where(Tenant.id == tenant_id)
 
-        # Filter deleted — default excludes soft deleted records
+        # Filter deleted — apply explicit is_deleted filter (default excludes deleted)
         if is_deleted is not None:
             stmt = stmt.where(Tenant.is_deleted.is_(is_deleted))
 
@@ -92,16 +92,21 @@ class TenantService:
         name   = tenant_in.name.strip().lower()
         domain = tenant_in.domain.strip().lower() if tenant_in.domain else None
 
-        existing = (await self.db.execute(
-            select(Tenant.name, Tenant.domain)
-            .where(Tenant.is_deleted.is_(False))
-            .where(
-                or_(
-                    Tenant.name == name,
-                    Tenant.domain == domain if domain else False,
-                )
+        # Build uniqueness query correctly depending on whether domain was provided
+        if domain:
+            existing_query = (
+                select(Tenant.name, Tenant.domain)
+                .where(Tenant.is_deleted.is_(False))
+                .where(or_(Tenant.name == name, Tenant.domain == domain))
             )
-        )).all()
+        else:
+            existing_query = (
+                select(Tenant.name, Tenant.domain)
+                .where(Tenant.is_deleted.is_(False))
+                .where(Tenant.name == name)
+            )
+
+        existing = (await self.db.execute(existing_query)).all()
 
         for row in existing:
             if row.name == name:
@@ -118,6 +123,13 @@ class TenantService:
             created_by=tenant_in.created_by,
             updated_by=tenant_in.created_by,
         )
+        # update the tenant_id of any admin user to link them to this tenant
+        if tenant_in.admin_user_ids:
+            admin_users = await self.db.execute(
+                select(User).where(User.id.in_(tenant_in.admin_user_ids))
+            )
+            for user in admin_users.scalars().all():
+                user.tenant_id = tenant.id
 
         self.db.add(tenant)
         await self.db.flush()           # catch DB errors before commit

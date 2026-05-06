@@ -6,7 +6,7 @@ from uuid import UUID
 from sqlalchemy import select, func as sqlfunc
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.account.users import User
+from models.account.users import User, UserRole
 from schemas.account.users import UserCreate, UserUpdate
 from core.utils.encryption import EncryptionService
 from core.utils.token import TokenService
@@ -74,18 +74,26 @@ class UserService:
     # CREATE
     # ------------------------------------------------------------------
 
-    async def create(self, user_in: UserCreate, tenant_id: Optional[UUID] = None) -> User:
+    async def create(self, user_in: UserCreate) -> User:
         if not self.encryption:
             raise RuntimeError("EncryptionService required to create users")
         hashed = self.encryption.hash_password(user_in.password)
+        # Ensure role is a UserRole enum (models expect enum)
+        role_val = user_in.role
+        if isinstance(role_val, str):
+            try:
+                role_val = UserRole(role_val)
+            except Exception:
+                role_val = UserRole.STUDENT
+
         user = User(
             first_name=user_in.first_name,
             middle_name=user_in.middle_name,
             last_name=user_in.last_name,
             email=user_in.email,
             password=hashed,
-            role=user_in.role,
-            tenant_id=tenant_id or user_in.tenant_id,
+            role=role_val,
+            tenant_id=user_in.tenant_id,
             institution_id=user_in.institution_id,
             is_active=True,
         )

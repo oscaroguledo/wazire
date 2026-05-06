@@ -8,8 +8,7 @@ from typing import Optional
 
 from sqlalchemy import ForeignKey, JSON, Numeric, Integer, Index, func, CheckConstraint, DateTime, Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from core.types.guid import GUID
+from sqlalchemy.dialects.postgresql import UUID
 from core.database import Base
 from uuid_utils import uuid7
 
@@ -47,11 +46,11 @@ class Submission(Base):
         {"schema": "academic"},
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid7)
-    student_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.users.id", ondelete="CASCADE"), nullable=False)
-    exam_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("academic.exams.id", ondelete="CASCADE"), nullable=False)
-    tenant_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.tenants.id", ondelete="CASCADE"), nullable=False)
-    semester_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("billings.semesters.id", ondelete="SET NULL"), nullable=True, comment="FK to semester")
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
+    student_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.users.id", ondelete="CASCADE"), nullable=False)
+    exam_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("academic.exams.id", ondelete="CASCADE"), nullable=False)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.tenants.id", ondelete="CASCADE"), nullable=False)
+    semester_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("billings.semesters.id", ondelete="SET NULL"), nullable=True, comment="FK to semester")
     latest_score: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     status: Mapped[SubmissionStatus] = mapped_column(SAEnum(SubmissionStatus, name="submission_status_enum", create_type=True), nullable=False, default=SubmissionStatus.PENDING, comment="Submission status: pending|submitted|graded")
@@ -91,7 +90,7 @@ class SubmissionAttempt(Base):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1, nullable=False, autoincrement=True, comment="Auto-incrementing ID which also serves as attempt number")
-    submission_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("academic.submissions.id", ondelete="CASCADE"), nullable=False, comment="FK to submission")
+    submission_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("academic.submissions.id", ondelete="CASCADE"), nullable=False, comment="FK to submission")
     score: Mapped[Optional[float]] = mapped_column(Decimal(5, 2), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

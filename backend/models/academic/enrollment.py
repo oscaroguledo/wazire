@@ -5,7 +5,7 @@ import enum
 import uuid
 
 from core.database import Base
-from core.types.guid import GUID
+from sqlalchemy.dialects.postgresql import UUID
 from uuid_utils import uuid7
 
 
@@ -37,16 +37,16 @@ class Enrollment(Base):
         UniqueConstraint('student_id', 'course_id', 'semester_id', name='uq_student_course_semester'),
         {"schema": "academic"},
     )
-    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid7, comment="Primary key: UUIDv7 time-ordered")
-    student_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.users.id"), nullable=False, comment="FK: Student user ID")
-    course_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("academic.courses.id"), nullable=False, comment="FK: Course ID")
-    semester_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("billings.semesters.id", ondelete="SET NULL"), nullable=True, comment="FK to semester from billings")
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7, comment="Primary key: UUIDv7 time-ordered")
+    student_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.users.id"), nullable=False, comment="FK: Student user ID")
+    course_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("academic.courses.id"), nullable=False, comment="FK: Course ID")
+    semester_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("billings.semesters.id", ondelete="SET NULL"), nullable=True, comment="FK to semester from billings")
     status: Mapped[EnrollmentStatus] = mapped_column(SQLEnum(EnrollmentStatus, name="enrollment_status", create_type=True), nullable=False, default=EnrollmentStatus.ACTIVE, comment="Current enrollment status")
-    tenant_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.tenants.id"), nullable=False, comment="FK: Tenant ID")
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.tenants.id"), nullable=False, comment="FK: Tenant ID")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), comment="Creation timestamp (timezone-aware)")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), comment="Last update timestamp (timezone-aware)")
-    created_by: Mapped[uuid.UUID] = mapped_column(GUID(), nullable=True, comment="FK: user who created this record")
-    updated_by: Mapped[uuid.UUID] = mapped_column(GUID(), nullable=True, comment="FK: user who last updated this record")
+    created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=True, comment="FK: user who created this record")
+    updated_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=True, comment="FK: user who last updated this record")
 
     def __repr__(self):
         return f"<Enrollment(student_id={self.student_id}, course_id={self.course_id}, semester_id={self.semester_id}, status={self.status.value})>"
