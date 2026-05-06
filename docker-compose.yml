@@ -82,7 +82,7 @@ services:
           memory: 128M
 
   kafka:
-    image: bitnami/kafka:4
+    # image: bitnami/kafka:4.2.0
     restart: unless-stopped
     container_name: wazire-kafka
     env_file:
