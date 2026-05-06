@@ -2,15 +2,14 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Request, Depends, status
+from fastapi import APIRouter, Request, Depends, status, Query
 from core.middleware.error_handler import ForbiddenError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
-from core.utils.response import Response
+from core.utils.response import Response, offset
 from core.utils.token import TokenService
-from core.dependencies.common import get_token_service, admin_only_dep
-from core.dependencies.pagination import get_pagination, PaginationParams, PaginationResponse
+from core.middleware.auth import get_token_service, require_admin
 from services.account.tenant import TenantService
 from schemas.account.tenant import TenantCreate, TenantUpdate, TenantRead
 
@@ -24,7 +23,7 @@ router = APIRouter(prefix="/tenants", tags=["tenants"])
 async def create_tenant(
     tenant_in: TenantCreate,
     request: Request,
-    current_user: TenantRead = admin_only_dep,
+    current_user: TenantRead = Depends(require_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
     token_service: TokenService = Depends(get_token_service),
 ):
@@ -53,7 +52,7 @@ async def create_tenant(
 @router.get("/")
 async def list_tenants(
     request: Request,
-    current_user: TenantRead = admin_only_dep,
+    current_user: TenantRead = Depends(require_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
     token_service: TokenService = Depends(get_token_service),
 ):
@@ -79,7 +78,7 @@ async def list_tenants(
 async def get_tenant(
     tenant_id: uuid.UUID,
     request: Request,
-    current_user: TenantRead = admin_only_dep,
+    current_user: TenantRead = Depends(require_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
     token_service: TokenService = Depends(get_token_service),
 ):
@@ -106,7 +105,7 @@ async def update_tenant(
     tenant_id: uuid.UUID,
     tenant_in: TenantUpdate,
     request: Request,
-    current_user: TenantRead = admin_only_dep,
+    current_user: TenantRead = Depends(require_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
     token_service: TokenService = Depends(get_token_service),
 ):
@@ -133,7 +132,7 @@ async def update_tenant(
 async def delete_tenant(
     tenant_id: uuid.UUID,
     request: Request,
-    current_user: TenantRead = admin_only_dep,
+    current_user: TenantRead = Depends(require_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
     token_service: TokenService = Depends(get_token_service),
 ):
@@ -183,7 +182,7 @@ async def delete_tenant(
 async def restore_tenant(
     tenant_id: uuid.UUID,
     request: Request,
-    current_user: TenantRead = admin_only_dep,
+    current_user: TenantRead = Depends(require_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
     token_service: TokenService = Depends(get_token_service),
 ):
@@ -217,8 +216,9 @@ async def restore_tenant(
 async def get_tenant_users(
     tenant_id: uuid.UUID,
     request: Request,
-    pagination: PaginationParams = Depends(get_pagination),
-    current_user: TenantRead = admin_only_dep,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(10, ge=1, le=100),
+    current_user: TenantRead = Depends(require_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
     token_service: TokenService = Depends(get_token_service),
 ):
@@ -226,29 +226,16 @@ async def get_tenant_users(
     service = TenantService(db, token_service=token_service)
     tenant = await service.get(tenant_id)
     if not tenant:
-        return Response(
-            success=False,
-            error="Tenant not found",
-            request=request,
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
-    users, total = await service.get_tenant_users(
-        tenant_id, limit=pagination.limit, offset=pagination.offset
-    )
-    return Response(
-        success=True,
-        message="Tenant users retrieved successfully",
-        data=users,
-        pagination=PaginationResponse.create(pagination.page, pagination.per_page, total),
-        request=request,
-    )
+        return Response(success=False, error="Tenant not found", request=request, status_code=status.HTTP_404_NOT_FOUND)
+    users, total = await service.get_tenant_users(tenant_id, limit=per_page, offset=offset(page, per_page))
+    return Response(success=True, message="Tenant users retrieved successfully", data=users, page=page, per_page=per_page, total=total, request=request)
 
 
 @router.get("/{tenant_id}/stats")
 async def get_tenant_stats(
     tenant_id: uuid.UUID,
     request: Request,
-    current_user: TenantRead = admin_only_dep,
+    current_user: TenantRead = Depends(require_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
     token_service: TokenService = Depends(get_token_service),
 ):

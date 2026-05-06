@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.database import get_db
 from core.utils.response import Response
 from core.utils.token import TokenService
-from core.dependencies.common import get_token_service, lecturer_or_admin_dep, authenticated_dep, student_only_dep
+from core.middleware.auth import get_token_service, create_auth_dependency, require_lecturer_or_admin, require_student
 from services.academic.submission import SubmissionService
 # StudentAnswerService is used in services and grading; not required at route-level
 from services.engine.answer_sheet_extractor import AnswerSheetParser
@@ -78,7 +78,7 @@ def _tenant(user: UserRead) -> Optional[uuid.UUID]:
 async def submit_exam(
     body: SubmissionCreate,
     request: Request,
-    current_user: UserRead = student_only_dep,
+    current_user: UserRead = Depends(require_student(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = SubmissionService(db)
@@ -136,7 +136,7 @@ class StartExamRequest(BaseModel):
 async def start_submission(
     body: StartExamRequest,
     request: Request,
-    current_user: UserRead = student_only_dep,
+    current_user: UserRead = Depends(require_student(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = SubmissionService(db)
@@ -167,7 +167,7 @@ async def list_students_with_submissions(
     request: Request,
     page: int = 1,
     per_page: int = 50,
-    current_user: UserRead = lecturer_or_admin_dep,
+    current_user: UserRead = Depends(require_lecturer_or_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = SubmissionService(db)
@@ -211,7 +211,7 @@ async def list_submissions(
     status: Optional[str] = None,
     page: int = 1,
     per_page: int = 50,
-    current_user: UserRead = lecturer_or_admin_dep,
+    current_user: UserRead = Depends(require_lecturer_or_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = SubmissionService(db)
@@ -253,7 +253,7 @@ async def list_lecturer_submissions(
     request: Request,
     page: int = 1,
     per_page: int = 50,
-    current_user: UserRead = lecturer_or_admin_dep,
+    current_user: UserRead = Depends(require_lecturer_or_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = SubmissionService(db)
@@ -303,7 +303,7 @@ async def list_lecturer_submissions(
 async def my_submission(
     request: Request,
     exam_id: Optional[uuid.UUID] = None,
-    current_user: UserRead = student_only_dep,
+    current_user: UserRead = Depends(require_student(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = SubmissionService(db)
@@ -350,7 +350,7 @@ async def my_submission(
 @router.get("/mine/all")
 async def all_my_submissions(
     request: Request,
-    current_user: UserRead = student_only_dep,
+    current_user: UserRead = Depends(require_student(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = SubmissionService(db)
@@ -366,7 +366,7 @@ async def all_my_submissions(
 async def get_attempts(
     submission_id: uuid.UUID,
     request: Request,
-    current_user: UserRead = lecturer_or_admin_dep,
+    current_user: UserRead = Depends(require_lecturer_or_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = SubmissionService(db)
@@ -387,7 +387,7 @@ async def get_attempts(
 async def scan_answer_sheet(
     body: ScanSubmit,
     request: Request,
-    current_user: UserRead = lecturer_or_admin_dep,
+    current_user: UserRead = Depends(require_lecturer_or_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = SubmissionService(db)

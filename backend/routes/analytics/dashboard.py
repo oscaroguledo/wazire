@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.database import get_db
 from core.utils.response import Response
 from core.utils.token import TokenService
-from core.dependencies.common import get_token_service, authenticated_dep, admin_only_dep, lecturer_or_admin_dep, admin_or_superadmin_dep
+from core.middleware.auth import get_token_service, create_auth_dependency, require_admin, require_lecturer_or_admin, require_admin_or_superadmin
 from models.account.users import User, UserRole
 from services.analytics.dashboard import DashboardService
 from schemas.analytics.dashboard import (
@@ -30,7 +30,7 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 @router.get("/", status_code=status.HTTP_200_OK)
 async def get_my_dashboard(
     request: Request,
-    current_user: User = authenticated_dep,
+    current_user: User = Depends(create_auth_dependency(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = DashboardService(db)
@@ -58,7 +58,7 @@ async def get_my_dashboard(
 async def get_lecturer_dashboard(
     lecturer_id: uuid.UUID,
     request: Request,
-    current_user: User = lecturer_or_admin_dep,
+    current_user: User = Depends(require_lecturer_or_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = DashboardService(db)
@@ -104,7 +104,7 @@ async def get_lecturer_dashboard(
 async def get_admin_dashboard(
     admin_id: uuid.UUID,
     request: Request,
-    current_user: User = admin_only_dep,
+    current_user: User = Depends(require_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = DashboardService(db)
@@ -146,7 +146,7 @@ async def get_admin_dashboard(
 async def get_student_dashboard(
     student_id: uuid.UUID,
     request: Request,
-    current_user: User = authenticated_dep,
+    current_user: User = Depends(create_auth_dependency(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = DashboardService(db)
@@ -191,7 +191,7 @@ async def get_student_dashboard(
 @router.get("/stats/tenant", status_code=status.HTTP_200_OK)
 async def get_tenant_stats(
     request: Request,
-    current_user: User = admin_only_dep,
+    current_user: User = Depends(require_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = DashboardService(db)

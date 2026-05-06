@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.database import get_db
 from core.utils.response import Response
 from core.utils.token import TokenService
-from core.dependencies.common import get_token_service, lecturer_or_admin_dep, authenticated_dep
+from core.middleware.auth import get_token_service, create_auth_dependency, require_lecturer_or_admin
 from services.academic.answer import AnswerService
 from services.academic.student_answer import StudentAnswerService
 from schemas.academic.answer import AnswerCreate
@@ -22,7 +22,7 @@ async def upsert_answer(
     question_id: uuid.UUID,
     body: AnswerCreate,
     request: Request,
-    current_user: UserRead = authenticated_dep,
+    current_user: UserRead = Depends(create_auth_dependency(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = StudentAnswerService(db)
@@ -38,7 +38,7 @@ async def upsert_answer(
 async def list_student_answers(
     request: Request,
     exam_id: Optional[uuid.UUID] = None,
-    current_user: UserRead = authenticated_dep,
+    current_user: UserRead = Depends(create_auth_dependency(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = StudentAnswerService(db)
@@ -53,7 +53,7 @@ async def list_answers(
     request: Request,
     page: int = 1,
     per_page: int = 50,
-    current_user: UserRead = lecturer_or_admin_dep,
+    current_user: UserRead = Depends(require_lecturer_or_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     """List all answer records with offset/limit pagination (lecturer/admin only)."""
@@ -87,7 +87,7 @@ async def list_answers(
 async def create_answer(
     answer_in: AnswerCreate,
     request: Request,
-    current_user: UserRead = lecturer_or_admin_dep,
+    current_user: UserRead = Depends(require_lecturer_or_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new answer record (lecturer/admin only)."""
@@ -100,7 +100,7 @@ async def create_answer(
 async def get_answer(
     answer_id: uuid.UUID,
     request: Request,
-    current_user: UserRead = lecturer_or_admin_dep,
+    current_user: UserRead = Depends(require_lecturer_or_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     """Get a specific answer (lecturer/admin only)."""
@@ -115,7 +115,7 @@ async def get_answer(
 async def delete_answer(
     answer_id: uuid.UUID,
     request: Request,
-    current_user: UserRead = lecturer_or_admin_dep,
+    current_user: UserRead = Depends(require_lecturer_or_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     """Delete an answer record (lecturer/admin only)."""

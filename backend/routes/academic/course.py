@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.database import get_db
 from core.utils.response import Response
 from core.utils.token import TokenService
-from core.dependencies.common import get_token_service, lecturer_or_admin_dep, authenticated_dep
+from core.middleware.auth import get_token_service, create_auth_dependency, require_lecturer_or_admin
 from services.academic.course import CourseService
 from tasks.submission import refresh_dashboard_task
 from schemas.academic.course import CourseCreate, CourseUpdate
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/courses", tags=["courses"])
 async def create_course(
     course_in: CourseCreate,
     request: Request,
-    current_user: UserRead = lecturer_or_admin_dep,
+    current_user: UserRead = Depends(require_lecturer_or_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = CourseService(db)
@@ -61,7 +61,7 @@ async def list_courses(
     page: int = 1,
     per_page: int = 50,
     lecturer_id: Optional[uuid.UUID] = None,
-    current_user: UserRead = authenticated_dep,
+    current_user: UserRead = Depends(create_auth_dependency(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = CourseService(db)
@@ -87,14 +87,9 @@ async def list_courses(
         success=True,
         message="Courses retrieved",
         data=[item.to_dict() for item in items],
-        pagination={
-            "page": page,
-            "per_page": per_page,
-            "total": total_count,
-            "pages": total_pages,
-            "has_next": page < total_pages,
-            "has_prev": page > 1,
-        },
+        page=page,
+        per_page=per_page,
+        total=total_count,
         request=request,
     )
 
@@ -103,7 +98,7 @@ async def list_courses(
 async def get_course(
     course_id: uuid.UUID,
     request: Request,
-    current_user: UserRead = authenticated_dep,
+    current_user: UserRead = Depends(create_auth_dependency(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = CourseService(db)
@@ -119,7 +114,7 @@ async def update_course(
     course_id: uuid.UUID,
     course_in: CourseUpdate,
     request: Request,
-    current_user: UserRead = lecturer_or_admin_dep,
+    current_user: UserRead = Depends(require_lecturer_or_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = CourseService(db)
@@ -146,7 +141,7 @@ async def update_course(
 async def delete_course(
     course_id: uuid.UUID,
     request: Request,
-    current_user: UserRead = lecturer_or_admin_dep,
+    current_user: UserRead = Depends(require_lecturer_or_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = CourseService(db)

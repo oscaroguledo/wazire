@@ -11,7 +11,7 @@ from core.database import get_db
 from core.utils.response import Response
 from core.utils.logger import logger
 from core.utils.token import TokenService
-from core.dependencies.common import get_token_service, lecturer_or_admin_dep, authenticated_dep
+from core.middleware.auth import get_token_service, create_auth_dependency, require_lecturer_or_admin
 from services.academic.question import QuestionService
 from tasks.question import detect_answer_task, parse_and_create_task
 from services.engine.exam_extractor import ExamParser
@@ -38,7 +38,7 @@ class ExamUpload(BaseModel):
 async def create_question(
     question_in: QuestionCreate,
     request: Request,
-    current_user: UserRead = lecturer_or_admin_dep,
+    current_user: UserRead = Depends(require_lecturer_or_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = QuestionService(db)
@@ -68,7 +68,7 @@ async def create_question(
 async def list_questions(
     request: Request,
     exam_id: Optional[uuid.UUID] = None,
-    current_user: UserRead = authenticated_dep,
+    current_user: UserRead = Depends(create_auth_dependency(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = QuestionService(db)
@@ -89,7 +89,7 @@ async def list_questions(
 async def get_exam_questions(
     exam_id: uuid.UUID,
     request: Request,
-    current_user: UserRead = authenticated_dep,
+    current_user: UserRead = Depends(create_auth_dependency(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     """Get questions for exam."""
@@ -107,7 +107,7 @@ async def get_exam_questions(
 async def get_question(
     question_id: uuid.UUID,
     request: Request,
-    current_user: UserRead = authenticated_dep,
+    current_user: UserRead = Depends(create_auth_dependency(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = QuestionService(db)
@@ -123,7 +123,7 @@ async def update_question(
     question_id: uuid.UUID,
     question_in: QuestionUpdate,
     request: Request,
-    current_user: UserRead = lecturer_or_admin_dep,
+    current_user: UserRead = Depends(require_lecturer_or_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = QuestionService(db)
@@ -146,7 +146,7 @@ async def update_question(
 async def delete_question(
     question_id: uuid.UUID,
     request: Request,
-    current_user: UserRead = lecturer_or_admin_dep,
+    current_user: UserRead = Depends(require_lecturer_or_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = QuestionService(db)
@@ -166,7 +166,7 @@ async def delete_question(
 async def upload_exam_paper(
     body: ExamUpload,
     request: Request,
-    current_user: UserRead = lecturer_or_admin_dep,
+    current_user: UserRead = Depends(require_lecturer_or_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = QuestionService(db)

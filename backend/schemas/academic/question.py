@@ -4,13 +4,10 @@ from typing import Optional, List, Literal, Any, Dict
 from uuid import UUID
 from datetime import datetime
 import re
-from models.academic.question import AnswerEnum, Industry
-from pydantic import BaseModel, ConfigDict, model_validator
-from typing import TypeVar
 import json
 
-from core.utils.response import ResponseModel as _BaseResponseModel, MetaModel as _MetaModel, LinksModel as _LinksModel
-
+from models.academic.question import AnswerEnum, Industry
+from pydantic import BaseModel, ConfigDict, model_validator
 
 class QuestionBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -139,13 +136,3 @@ class QuestionRead(QuestionBase):
         self.parsed_options = []
         return self
 
-
-# Response envelope types used by routes/OpenAPI so nested QuestionRead appears
-class QuestionResponse(_BaseResponseModel):
-    data: Optional[QuestionRead] = None
-
-
-class QuestionListResponse(_BaseResponseModel):
-    data: Optional[List[QuestionRead]] = None
-    meta: Optional[_MetaModel] = None
-    links: Optional[_LinksModel] = None

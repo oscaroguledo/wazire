@@ -11,7 +11,7 @@ from sqlalchemy import select
 from core.database import get_db
 from core.utils.response import Response
 from core.utils.token import TokenService
-from core.dependencies.common import get_token_service, lecturer_or_admin_dep, authenticated_dep
+from core.middleware.auth import get_token_service, create_auth_dependency, require_lecturer_or_admin
 from services.academic.exam import ExamService
 from tasks.submission import refresh_dashboard_task
 from schemas.academic.exam import ExamCreate, ExamUpdate
@@ -30,7 +30,7 @@ def _tenant(user: UserRead):
 async def create_exam(
     exam_in: ExamCreate,
     request: Request,
-    current_user: UserRead = lecturer_or_admin_dep,
+    current_user: UserRead = Depends(require_lecturer_or_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = ExamService(db)
@@ -68,7 +68,7 @@ async def list_exams(
     course_id: Optional[uuid.UUID] = None,
     status: Optional[str] = None,
     year: Optional[int] = None,
-    current_user: UserRead = authenticated_dep,
+    current_user: UserRead = Depends(create_auth_dependency(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = ExamService(db)
@@ -92,18 +92,11 @@ async def list_exams(
         # If student has no enrollments, return empty list
         if not student_course_ids:
             return Response(
-                success=True, 
-                message="No exams found", 
-                data=[], 
-                pagination={
-                    "page": page,
-                    "per_page": per_page,
-                    "total": 0,
-                    "pages": 0,
-                    "has_next": False,
-                    "has_prev": False
-                }, 
-                request=request
+                success=True,
+                message="No exams found",
+                data=[],
+                page=page, per_page=per_page, total=0,
+                request=request,
             )
     
     # Calculate offset from page
@@ -130,22 +123,15 @@ async def list_exams(
         success=True,
         message="Exams retrieved",
         data=[e.to_dict() for e in exams],
-        pagination={
-            "page": page,
-            "per_page": per_page,
-            "total": total_count,
-            "pages": total_pages,
-            "has_next": page < total_pages,
-            "has_prev": page > 1
-        },
-        request=request
+        page=page, per_page=per_page, total=total_count,
+        request=request,
     )
 
 
 @router.get("/years")
 async def get_exam_years(
     request: Request,
-    current_user: UserRead = authenticated_dep,
+    current_user: UserRead = Depends(create_auth_dependency(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = ExamService(db)
@@ -164,7 +150,7 @@ async def get_exam_years(
 async def get_exam(
     exam_id: uuid.UUID,
     request: Request,
-    current_user: UserRead = authenticated_dep,
+    current_user: UserRead = Depends(create_auth_dependency(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = ExamService(db)
@@ -179,7 +165,7 @@ async def update_exam(
     exam_id: uuid.UUID,
     exam_in: ExamUpdate,
     request: Request,
-    current_user: UserRead = lecturer_or_admin_dep,
+    current_user: UserRead = Depends(require_lecturer_or_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = ExamService(db)
@@ -242,7 +228,7 @@ async def update_exam(
 async def delete_exam(
     exam_id: uuid.UUID,
     request: Request,
-    current_user: UserRead = lecturer_or_admin_dep,
+    current_user: UserRead = Depends(require_lecturer_or_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
     service = ExamService(db)

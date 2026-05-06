@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
 from core.utils.token import TokenService
+from core.config import get_settings
 from services.account.user import UserService
 from schemas.account.users import UserRead
 from models.account.users import UserRole
@@ -19,6 +20,12 @@ from models.account.users import UserRole
 logger = logging.getLogger(__name__)
 
 security = HTTPBearer()
+
+
+def get_token_service() -> TokenService:
+    """Get TokenService instance with secret from settings."""
+    settings = get_settings()
+    return TokenService(settings.SECRET_KEY.get_secret_value() if settings.SECRET_KEY else None)
 
 # In-memory cache for authenticated users
 # Format: {user_id: (UserRead, expiry_timestamp)}
