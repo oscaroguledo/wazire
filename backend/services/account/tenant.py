@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Optional, List, Dict, Any, Tuple
 from uuid import UUID
 
-from sqlalchemy import select, func as sqlfunc
+from sqlalchemy import select, func as sqlfunc, table, column
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -35,7 +35,6 @@ class TenantService:
         Returns a tuple of (items, total_count).
         """
         # Build a subquery selecting tenant_ids from the tenant_admins association table
-        from sqlalchemy import table, column
         tenant_admins = table("tenant_admins", column("tenant_id"), column("user_id"))
 
         tenant_ids_stmt = select(tenant_admins.c.tenant_id).where(tenant_admins.c.user_id == str(admin_user_id))
