@@ -8,16 +8,21 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
 
-class SubmissionAttemptRead(BaseModel):
+class SubmissionBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    id: UUID
-    submission_id: UUID
-    attempt_number: int
-    # answers removed: per-question answers are stored in StudentAnswer table
-    score: Optional[Decimal]   # total of (answer_score * mark) across all questions
-    scan_pages: Optional[List[str]] = None  # storage URLs for paper submissions
-    graded_at: Optional[datetime]
-    created_at: Optional[datetime]
+    exam_id: UUID
+    student_id: Optional[UUID] = None
+    course_id: Optional[UUID] = None
+
+
+class SubmissionCreate(SubmissionBase):
+    max_attempts: Optional[int] = None
+
+
+class SubmissionUpdate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    score: Optional[Decimal] = None
+    status: Optional[str] = None
 
 
 class SubmissionRead(BaseModel):
@@ -26,34 +31,25 @@ class SubmissionRead(BaseModel):
     student_id: UUID
     exam: Dict[str, Any]
     course_id: Optional[UUID] = None
-    latest_score: Optional[Decimal]
+    latest_score: Optional[Decimal] = None
     attempts_count: int
-    # in_progress_answers removed: drafts are stored in student_answers table
-    status: str = "pending"  # Computed: pending, submitted, graded
-    graded_at: Optional[datetime]
-    created_at: Optional[datetime]
-    updated_at: Optional[datetime]
+    status: str = "pending"
+    graded_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    attempts: List["SubmissionAttemptRead"] = []
 
 
-class SubmissionWithAttemptsRead(SubmissionRead):
-    """Submission + all its attempts — returned to the student viewing their own work."""
-    attempts: List[SubmissionAttemptRead] = []
-
-
-class ExamSubmit(BaseModel):
-    """Payload to submit an exam attempt."""
+class SubmissionAttemptRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    exam_id: UUID
-    max_attempts: Optional[int] = None
+    id: UUID
+    submission_id: UUID
+    attempt_number: int
+    score: Optional[Decimal] = None
+    scan_pages: Optional[List[str]] = None
+    graded_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
 
 
-class ExamSubmitResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    submission: SubmissionRead
-    attempt: SubmissionAttemptRead
-
-
-class AttemptGrade(BaseModel):
-    """Lecturer manually sets a score on a theory attempt."""
-    model_config = ConfigDict(from_attributes=True)
-    score: Decimal
+class SubmissionDelete(BaseModel):
+    id: UUID

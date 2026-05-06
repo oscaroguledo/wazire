@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 import logging
 from typing import Optional, Union
+import time
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,9 +14,9 @@ from models.academic.course import Course
 from models.academic.exam import Exam
 from models.academic.submission import Submission
 from schemas.analytics.dashboard import (
-    LecturerDashboardResponse,
-    AdminDashboardResponse,
-    StudentDashboardResponse,
+    LecturerDashboardRead,
+    AdminDashboardRead,
+    StudentDashboardRead,
 )
 
 logger = logging.getLogger(__name__)
@@ -33,7 +34,6 @@ class DashboardService:
     
     async def get_or_create_lecturer_dashboard(self, lecturer_id: uuid.UUID) -> LecturerDashboard:
         """Get existing or create new lecturer dashboard."""
-        import time
         start = time.time()
         
         stmt = select(LecturerDashboard).where(LecturerDashboard.lecturer_id == lecturer_id)

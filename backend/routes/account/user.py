@@ -20,8 +20,6 @@ from schemas.account.users import UserCreate, UserUpdate, UserRead
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
-
-
 # ---------------------------------------------------------------------------
 # Public auth endpoints
 # ---------------------------------------------------------------------------

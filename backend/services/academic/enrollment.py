@@ -8,8 +8,7 @@ from datetime import datetime, timezone
 from schemas.academic.enrollment import (
     EnrollmentCreate, EnrollmentUpdate,
     EnrollmentListParams, EnrollmentStatus, Semester
-)
-from models.account.users import User, UserRole
+)from models.account.users import User, UserRole
 from models.academic.enrollment import Enrollment as EnrollmentModel
 from models.academic.course import Course as CourseModel
 

@@ -21,9 +21,10 @@ from models.academic.exam import Exam as ExamModel
 from models.academic.course import Course
 from models.account.users import User as UserModel
 from schemas.academic.submission import (
-    ExamSubmit, ExamSubmitResponse,
-    SubmissionRead, SubmissionWithAttemptsRead, SubmissionAttemptRead,
-    AttemptGrade,
+    SubmissionCreate,
+    SubmissionRead,
+    SubmissionAttemptRead,
+    SubmissionDelete,
 )
 from schemas.account.users import UserRead
 
@@ -75,7 +76,7 @@ def _tenant(user: UserRead) -> Optional[uuid.UUID]:
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 async def submit_exam(
-    body: ExamSubmit,
+    body: SubmissionCreate,
     request: Request,
     current_user: UserRead = student_only_dep,
     db: AsyncSession = Depends(get_db),
@@ -118,10 +119,10 @@ async def submit_exam(
     return Response(
         success=True,
         message=f"Attempt #{attempt.attempt_number} submitted — grading in progress",
-        data=ExamSubmitResponse(
-            submission=submission.to_dict(),
-            attempt=attempt.to_dict(),
-        ),
+        data={
+            "submission": submission.to_dict(),
+            "attempt": attempt.to_dict(),
+        },
         request=request,
         status_code=status.HTTP_201_CREATED,
     )
@@ -322,10 +323,10 @@ async def my_submission(
         return Response(
             success=True,
             message="Your submission retrieved",
-            data=SubmissionWithAttemptsRead(
+            data={
                 **submission.to_dict(),
-                attempts=[a.to_dict() for a in attempts],
-            ),
+                "attempts": [a.to_dict() for a in attempts],
+            },
             request=request,
         )
     else:
@@ -458,10 +459,10 @@ async def scan_answer_sheet(
     return Response(
         success=True,
         message=f"Answer sheet scanned. Attempt #{attempt.attempt_number} — grading in progress",
-        data=ExamSubmitResponse(
-            submission=submission.to_dict(),
-            attempt=attempt.to_dict(),
-        ),
+        data={
+            "submission": submission.to_dict(),
+            "attempt": attempt.to_dict(),
+        },
         request=request,
         status_code=status.HTTP_201_CREATED,
     )

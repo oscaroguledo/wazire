@@ -91,6 +91,7 @@ from routes.account import user, tenant
 from routes.academic import submission, course, exam, question, answer, enrollments
 from routes.analytics import dashboard
 from routes import websocket
+import uvicorn
 
 # API Version 1
 app.include_router(health, prefix="/api/v1")
@@ -108,7 +109,5 @@ app.include_router(dashboard.router, prefix="/api/v1/analytics")
 
 
 if __name__ == "__main__":
-	import uvicorn
-
 	logger.info("Running via uvicorn entrypoint")
 	uvicorn.run("main:app", host=settings.HOST, port=settings.PORT, reload=True)

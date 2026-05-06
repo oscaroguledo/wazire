@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Index, func, DateTime
+from sqlalchemy import String, Index, func, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from core.types.guid import GUID
 from core.database import Base
@@ -29,6 +29,8 @@ class Tenant(Base):
 		Index("ix_tenants_is_active", "is_active"),
 		Index("ix_tenants_deleted_at", "deleted_at"),
 		Index("ix_tenants_name", "name"),
+		Index("ix_tenants_start_date", "start_date"),
+		Index("ix_tenants_end_date", "end_date"),
 		Index("ix_tenants_created_at", "created_at"),
 		Index("ix_tenants_updated_at", "updated_at"),
 		Index("ix_tenants_created_by", "created_by"),

@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import List, Optional
 
 from pydantic import BaseModel, Field, SecretStr
+import os
+from dotenv import load_dotenv
 
 
 class Settings(BaseModel):
@@ -136,9 +138,6 @@ def get_settings(force_reload: bool = False) -> Settings:
     This function intentionally avoids `BaseSettings` to keep the runtime
     dependency-free across environments.
     """
-    import os
-    from dotenv import load_dotenv
-
     global _settings
     if _settings is None or force_reload:
         # Load .env file if it exists

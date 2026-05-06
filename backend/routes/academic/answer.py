@@ -11,9 +11,7 @@ from core.dependencies.common import get_token_service, lecturer_or_admin_dep, a
 from services.academic.answer import AnswerService
 from services.academic.student_answer import StudentAnswerService
 from schemas.academic.answer import AnswerCreate
-from schemas.academic.student_answer import StudentAnswerRead
 from schemas.account.users import UserRead
-from schemas.academic.answer import UpsertPayload
 
 
 router = APIRouter(prefix="/answers", tags=["answers"])
@@ -22,7 +20,7 @@ router = APIRouter(prefix="/answers", tags=["answers"])
 @router.put("/{question_id}")
 async def upsert_answer(
     question_id: uuid.UUID,
-    body: UpsertPayload,
+    body: AnswerCreate,
     request: Request,
     current_user: UserRead = authenticated_dep,
     db: AsyncSession = Depends(get_db),

@@ -143,8 +143,10 @@ class User(Base):
     password: Mapped[str] = mapped_column(String(255), comment="Hashed password")
     role: Mapped[UserRole] = mapped_column(SAEnum(UserRole, name="user_role", create_type=True, values_callable=lambda x: [e.value for e in x]), nullable=False, comment="User role enum")
     is_active: Mapped[bool] = mapped_column(default=False, comment="Account active flag")
+    is_deleted: Mapped[bool] = mapped_column(default=False, comment="Soft delete flag")
+    deleted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True, comment="Soft delete timestamp")
     is_locked: Mapped[bool] = mapped_column(default=True, comment="Account locked flag - students locked until semester software fees are paid")
-    tenant_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.tenants.id", ondelete="CASCADE"), nullable=False, comment="FK: tenant id for multi-tenancy")
+    tenant_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("account.tenants.id", ondelete="CASCADE"), nullable=True, comment="FK: tenant id for multi-tenancy")
     institution_id: Mapped[str] = mapped_column(String(100), nullable=True, comment="Institution ID e.g., Student matric/registration number")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -158,6 +160,25 @@ class User(Base):
         if self.middle_name:
             return f"{self.first_name} {self.middle_name} {self.last_name}"
         return f"{self.first_name} {self.last_name}"
+    
+    def delete(self):
+        """Soft delete user by setting is_active to False and is_locked to True."""
+        self.is_active = False
+        self.is_deleted = True
+        self.deleted_at = datetime.utcnow()
+        self.updated_at = datetime.utcnow()
+
+    def restore(self):
+        """Restore a soft-deleted user by setting is_active to True."""
+        self.is_active = True
+        self.is_deleted = False
+        self.deleted_at = None
+        self.updated_at = datetime.utcnow()
+    
+    def lock(self):
+        """Lock user account (e.g., for students with unpaid fees)."""
+        self.is_locked = True
+        self.updated_at = datetime.utcnow()
     
     def to_dict(self) -> dict:
         return {

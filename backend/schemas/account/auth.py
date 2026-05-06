@@ -2,39 +2,32 @@ from __future__ import annotations
 
 from typing import Optional
 from uuid import UUID
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+from pydantic import BaseModel, ConfigDict, EmailStr
 
 from .users import UserRead
 
 
-class AuthLogin(BaseModel):
+class AuthBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     email: EmailStr
+
+
+class AuthCreate(AuthBase):
+    """Login request."""
     password: str
 
 
-class AuthTokens(BaseModel):
+class AuthUpdate(BaseModel):
+    """Refresh token request."""
+    model_config = ConfigDict(from_attributes=True)
+    refresh_token: str
+
+
+class AuthRead(BaseModel):
+    """Successful auth response — tokens + user."""
     model_config = ConfigDict(from_attributes=True)
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
-
-
-class AuthRefresh(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    refresh_token: str
-
-
-class AuthResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
     user: UserRead
-    tokens: AuthTokens
-
-
-class TokenPayload(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    user_id: str
-    email: str
-    role: str
-    tenant_id: Optional[str] = None
-    token_type: str

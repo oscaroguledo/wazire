@@ -1,8 +1,12 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List
+from __future__ import annotations
+
 from datetime import datetime
 from enum import Enum
+from typing import Optional, List
 from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
+
 
 class EnrollmentStatus(str, Enum):
     ACTIVE = "active"
@@ -10,12 +14,8 @@ class EnrollmentStatus(str, Enum):
     DROPPED = "dropped"
     PENDING = "pending"
 
+
 class Semester(str, Enum):
-    FALL = "fall"
-    SPRING = "spring"
-    SUMMER = "summer"
-    WINTER = "winter"
-    INTERIM = "interim"
     FIRST = "first"
     SECOND = "second"
     THIRD = "third"
@@ -24,56 +24,41 @@ class Semester(str, Enum):
     SIXTH = "sixth"
     SEVENTH = "seventh"
     EIGHTH = "eighth"
+    FALL = "fall"
+    SPRING = "spring"
+    SUMMER = "summer"
+    WINTER = "winter"
+    INTERIM = "interim"
 
-class EnrollmentCreate(BaseModel):
-    student_id: str = Field(..., description="Student user ID")
-    course_id: str = Field(..., description="Course ID")
-    semester: Semester = Field(..., description="Academic semester")
-    year: Optional[int] = Field(None, ge=2020, le=2100, description="Academic year (auto-set from current year if not provided)")
+
+class EnrollmentBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    student_id: UUID
+    course_id: UUID
+    semester: Semester
+    year: Optional[int] = Field(None, ge=2020, le=2100)
+
+
+class EnrollmentCreate(EnrollmentBase):
+    pass
+
 
 class EnrollmentUpdate(BaseModel):
-    status: Optional[EnrollmentStatus] = Field(None, description="Enrollment status")
+    model_config = ConfigDict(from_attributes=True)
+    status: Optional[EnrollmentStatus] = None
 
-class EnrollmentResponse(BaseModel):
-    id: str
-    student_id: str
-    student_name: Optional[str] = Field(None, description="Student full name")
-    student_email: Optional[str] = Field(None, description="Student email address")
-    institution_id: Optional[str] = Field(None, description="Student matric/reg number")
-    course_id: str
-    course_name: Optional[str] = Field(None, description="Course name")
-    lecturer_id: Optional[str] = Field(None, description="Lecturer ID")
-    semester: Semester
-    year: Optional[int] = Field(None, description="Academic year")
+
+class EnrollmentRead(EnrollmentBase):
+    id: UUID
+    student_name: Optional[str] = None
+    student_email: Optional[str] = None
+    institution_id: Optional[str] = None
+    course_name: Optional[str] = None
+    lecturer_id: Optional[UUID] = None
     status: EnrollmentStatus
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
 
-class EnrollmentListParams(BaseModel):
-    page: Optional[int] = Field(1, ge=1, description="Page number")
-    per_page: Optional[int] = Field(10, ge=1, le=100, description="Items per page")
-    search: Optional[str] = Field(None, description="Search term")
-    student_id: Optional[str] = Field(None, description="Filter by student ID")
-    course_id: Optional[str] = Field(None, description="Filter by course ID")
-    lecturer_id: Optional[UUID] = Field(None, description="Filter by lecturer ID")
-    status: Optional[EnrollmentStatus] = Field(None, description="Filter by status")
-    semester: Optional[Semester] = Field(None, description="Filter by semester")
-    year: Optional[int] = Field(None, ge=2020, le=2100, description="Filter by academic year")
-
-class BulkEnrollmentRequest(BaseModel):
-    enrollments: List[EnrollmentCreate] = Field(..., description="List of enrollments to create")
-
-class EnrollmentCheckRequest(BaseModel):
-    student_id: str = Field(..., description="Student user ID")
-    course_id: str = Field(..., description="Course ID")
-
-class EnrollmentCheckResponse(BaseModel):
-    enrolled: bool = Field(..., description="Whether student is enrolled")
-    enrollment: Optional[EnrollmentResponse] = Field(None, description="Enrollment details if enrolled")
-
-class EnrollmentListResponse(BaseModel):
-    items: List[EnrollmentResponse]
-    pagination: dict
+class EnrollmentDelete(BaseModel):
+    id: UUID

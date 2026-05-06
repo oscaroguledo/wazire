@@ -7,6 +7,7 @@ import re
 from models.academic.question import AnswerEnum, Industry
 from pydantic import BaseModel, ConfigDict, model_validator
 from typing import TypeVar
+import json
 
 from core.utils.response import ResponseModel as _BaseResponseModel, MetaModel as _MetaModel, LinksModel as _LinksModel
 
@@ -119,8 +120,6 @@ class QuestionRead(QuestionBase):
             self.parsed_options = [{"label": lbl.strip(), "text": txt.strip()} for lbl, txt in m]
             return self
         try:
-            import json
-
             parsed = json.loads(raw)
             if isinstance(parsed, list):
                 items = []

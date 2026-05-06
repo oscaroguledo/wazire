@@ -2,6 +2,7 @@ from pydantic import BaseModel, field_validator, ConfigDict
 from typing import Optional, List, Union
 import re
 from datetime import datetime
+import uuid
 
 
 class ValidationMixin(BaseModel):
@@ -75,7 +76,6 @@ class SanitizeMixin(BaseModel):
 def validate_uuid(uuid_str: str) -> bool:
     """Validate UUID format."""
     try:
-        import uuid
         uuid.UUID(str(uuid_str))
         return True
     except (ValueError, AttributeError):

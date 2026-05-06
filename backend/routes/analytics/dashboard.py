@@ -13,9 +13,9 @@ from core.dependencies.common import get_token_service, authenticated_dep, admin
 from models.account.users import User, UserRole
 from services.analytics.dashboard import DashboardService
 from schemas.analytics.dashboard import (
-    LecturerDashboardResponse,
-    AdminDashboardResponse,
-    StudentDashboardResponse,
+    LecturerDashboardRead,
+    AdminDashboardRead,
+    StudentDashboardRead,
 )
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])

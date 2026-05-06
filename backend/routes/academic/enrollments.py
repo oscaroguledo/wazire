@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Request, Depends, Query, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_
 import uuid
@@ -13,13 +14,14 @@ from models.account.users import User, UserRole
 from models.academic.course import Course
 from models.academic.enrollment import Enrollment
 from schemas.academic.enrollment import (
-    EnrollmentCreate, EnrollmentUpdate, EnrollmentResponse,
-    EnrollmentListResponse, EnrollmentListParams, EnrollmentStatus, EnrollmentCheckResponse,
-    BulkEnrollmentRequest, Semester
+    EnrollmentCreate, EnrollmentUpdate, EnrollmentRead,
+    EnrollmentListParams, EnrollmentStatus, EnrollmentDelete, Semester,
+    EnrollmentBase,
 )
 from core.dependencies.common import authenticated_dep, get_token_service, lecturer_or_admin_dep
 from services.academic.enrollment import EnrollmentService
 from tasks.submission import refresh_dashboard_task
+import traceback
 
 router = APIRouter(prefix="/enrollment", tags=["enrollment"])
 
@@ -72,7 +74,6 @@ async def list_enrollment(
         return Response(success=True, data=items_dicts, pagination=pagination_meta.model_dump(), request=request)
     except Exception as e:
         logger.error(f"list_enrollments error: {e}")
-        import traceback
         logger.error(traceback.format_exc())
         return Response(success=False, error=f"Failed to fetch enrollments: {str(e)}", request=request, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -443,6 +444,10 @@ async def get_lecturer_enrollments(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch lecturer enrollments: {str(e)}"
         )
+
+class BulkEnrollmentRequest(BaseModel):
+    enrollments: List[EnrollmentCreate]
+
 
 @router.post("/bulk/", status_code=status.HTTP_201_CREATED)
 async def bulk_enroll_students(
