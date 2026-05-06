@@ -14,7 +14,7 @@ from models.academic.exam import Exam as ExamModel
 from models.academic.course import Course as CourseModel
 from schemas.academic.question import QuestionCreate, QuestionUpdate
 from services.engine.exam_extractor import ExamParser
-from core.websockets import notify_exam_update
+from core.utils.logger import logger
 
 class QuestionService:
     def __init__(self, db: AsyncSession):
@@ -545,14 +545,7 @@ class QuestionService:
                 except Exception as e:
                     errors.append({"number": raw.get("number"), "error": str(e)})
 
-        # Notify completion
-        await notify_exam_update(exam_id, "extraction_complete", {
-            "total": total,
-            "created": len(created),
-            "errors": len(errors),
-            "error_details": errors if errors else None
-        })
-
-        print(f"[question] Paper parsing complete: {len(created)} created, {len(errors)} errors for exam {exam_id}")
+        # Log completion (websocket notifications removed)
+        logger.info("[question] Paper parsing complete: %d created, %d errors for exam %s", len(created), len(errors), exam_id)
         if errors:
-            print(f"[question] Errors: {errors}")
+            logger.info("[question] Errors: %s", errors)

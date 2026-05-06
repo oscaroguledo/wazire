@@ -90,12 +90,10 @@ from routes import health
 from routes.account import user, tenant
 from routes.academic import submission, course, exam, question, answer, enrollments
 from routes.analytics import dashboard
-from routes import websocket
 import uvicorn
 
 # API Version 1
 app.include_router(health, prefix="/api/v1")
-app.include_router(websocket, prefix="/api/v1")
 app.include_router(user.router, prefix="/api/v1")
 app.include_router(tenant.router, prefix="/api/v1")
 app.include_router(submission.router, prefix="/api/v1/academic")

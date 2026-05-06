@@ -21,7 +21,6 @@ import questionApi from '@/apis/question'
 import { config } from '@/config'
 import { compressImageToWebP, validateImageFile } from '@/lib/imageUtils'
 import { processDocument } from '@/lib/pdfConverter'
-import { useWebSocket, WebSocketMessage } from '@/hooks/useWebSocket'
 import type { Exam, ExamQuestion, QuestionCreate } from '@/apis/exam'
 import { errorTracker } from '@/utils/errorTracking'
 import { Modal } from '@/components/Modal'
@@ -137,7 +136,7 @@ export default function ExamQuestions() {
   const error = examError?.message || questionsError?.message || null
 
   // WebSocket message handler for real-time updates
-  const handleWebSocketMessage = useCallback((msg: WebSocketMessage) => {
+  const handleWebSocketMessage = useCallback((msg: any) => {
     if (msg.exam_id !== examId) return; // Only handle messages for this exam
     
     switch (msg.type) {
@@ -170,8 +169,6 @@ export default function ExamQuestions() {
     }
   }, [examId, refetchQuestions])
 
-  // Setup WebSocket connection
-  useWebSocket(handleWebSocketMessage)
 
   // Client-side pagination for filtered questions
   const totalItems = filteredQuestions.length
