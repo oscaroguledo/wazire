@@ -239,7 +239,7 @@ async def get_tenant_users(
         success=True,
         message="Tenant users retrieved successfully",
         data=users,
-        pagination=PaginationResponse.create(pagination.page, pagination.per_page, total).model_dump(),
+        pagination=PaginationResponse.create(pagination.page, pagination.per_page, total),
         request=request,
     )
 

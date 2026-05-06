@@ -198,7 +198,7 @@ async def update_enrollment(
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Can only update enrollments for your courses"
-            )
+                    return Response(success=True, data=items_dicts, pagination=pagination_meta, request=request)
 
         enrollment = await enrollment_service.update_enrollment(enrollment_id, enrollment_data, tenant_id=tenant_id)
         return Response(success=True, data=enrollment.to_dict(), request=request, status_code=status.HTTP_200_OK)

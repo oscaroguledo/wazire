@@ -134,13 +134,13 @@ async def list_users(
             per_page=pagination.per_page,
             total=total_count
         )
-        
+
         return Response(
-            success=True, 
-            message="Users retrieved", 
-            data=[u.to_dict() for u in users], 
-            pagination=pagination_meta.model_dump(),
-            request=request
+            success=True,
+            message="Users retrieved",
+            data=[u.to_dict() for u in users],
+            pagination=pagination_meta,
+            request=request,
         )
     except Exception as e:
         logger.error(f"list_users failed: {e}")

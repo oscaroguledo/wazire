@@ -1,9 +1,8 @@
-from typing import Any, Dict, Optional, Sequence, Tuple, Type
+from typing import Any, Dict, Optional, Tuple
 
 from fastapi.responses import JSONResponse
 from starlette import status
 from starlette.responses import Response as StarletteResponse
-from pydantic import BaseModel
 from fastapi.encoders import jsonable_encoder
 import secrets
 from datetime import datetime, timezone
@@ -87,55 +86,6 @@ def _build_pagination(
 
 	# return meta and links separately (links may be None)
 	return pagination, links
-
-
-class ErrorObject(BaseModel):
-	type: Optional[str] = None
-	title: Optional[str] = None
-	status: Optional[int] = None
-	detail: Optional[str] = None
-	instance: Optional[str] = None
-
-
-class _ResponseSchema(BaseModel):
-	success: bool
-	message: Optional[str] = None
-	# error can be a plain string or RFC7807-style object
-	error: Optional[Any] = None
-	data: Optional[Any] = None
-	meta: Optional[Dict[str, Any]] = None
-	links: Optional[Dict[str, Optional[str]]] = None
-	request_id: str
-	timestamp: str
-
-
-# Typed models for OpenAPI use
-class MetaModel(BaseModel):
-	page: int
-	per_page: int
-	total: int
-	pages: int
-	has_next: bool
-	has_prev: bool
-	next_page: Optional[int] = None
-	prev_page: Optional[int] = None
-
-
-class LinksModel(BaseModel):
-	self: str
-	next: Optional[str] = None
-	prev: Optional[str] = None
-
-
-class ResponseModel(BaseModel):
-	success: bool
-	message: Optional[str] = None
-	error: Optional[Any] = None
-	data: Optional[Any] = None
-	meta: Optional[MetaModel] = None
-	links: Optional[LinksModel] = None
-	request_id: str
-	timestamp: str
 
 
 class Response:
@@ -238,14 +188,8 @@ class Response:
 		payload["request_id"] = rid
 		payload["timestamp"] = datetime.now(timezone.utc).isoformat() + "Z"
 
-		# runtime validate payload against pydantic model for OpenAPI consistency
-		try:
-			validated = _ResponseSchema(**payload)
-			# exclude None fields so `meta`/`links` are omitted when absent
-			content = validated.model_dump(exclude_none=True)
-		except Exception as e:
-			# If validation fails, raise to surface the problem during development
-			raise
+		# prepare content dict; exclude None values
+		content = {k: v for k, v in payload.items() if v is not None}
 
 		# 204 No Content: return an empty Starlette Response
 		if sc == status.HTTP_204_NO_CONTENT:
