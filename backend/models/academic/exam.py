@@ -94,7 +94,7 @@ class Exam(Base):
             "duration_minutes": duration_minutes,
             "total_marks": self.total_marks,
             "passing_marks": self.passing_marks,
-            "status": self.status,
+            "status": self.status.value if self.status else None,
             "max_attempts": self.max_attempts,
             "tenant_id": str(self.tenant_id),
             "semester_id": str(self.semester_id) if self.semester_id else None,

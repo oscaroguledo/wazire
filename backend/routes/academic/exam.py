@@ -16,6 +16,8 @@ from services.academic.exam import ExamService
 from tasks.submission import refresh_dashboard_task
 from schemas.academic.exam import ExamCreate, ExamUpdate
 from schemas.account.users import UserRead
+from models.account.users import UserRole
+from models.academic.enrollment import EnrollmentStatus
 from models.academic.course import Course
 from models.academic.enrollment import Enrollment
 
@@ -23,7 +25,7 @@ router = APIRouter(prefix="/exams", tags=["exams"])
 
 
 def _tenant(user: UserRead):
-    return None if user.role == "superadmin" else user.tenant_id
+    return None if user.role == UserRole.SUPERADMIN else user.tenant_id
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
@@ -39,11 +41,11 @@ async def create_exam(
 
     # Set tenant_id based on user role
     tenant_id = _tenant(current_user)
-    if not tenant_id and current_user.role not in ("admin", "superadmin"):
+    if not tenant_id and current_user.role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
         return Response(success=False, error="No tenant assigned to your account", request=request, status_code=status.HTTP_403_FORBIDDEN)
 
     # Override tenant_id if provided in payload for admins
-    if exam_data.tenant_id and current_user.role in ("admin", "superadmin"):
+    if exam_data.tenant_id and current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN):
         tenant_id = exam_data.tenant_id
 
     # course_id can be None for standalone exams
@@ -77,15 +79,15 @@ async def list_exams(
     
     # For lecturers, only show exams they teach (via course) or created
     lecturer_id = None
-    if current_user.role == "lecturer":
+    if current_user.role == UserRole.LECTURER:
         lecturer_id = current_user.id
     
     # For students, get their enrolled course IDs
     student_course_ids = None
-    if current_user.role == "student":
+    if current_user.role == UserRole.STUDENT:
         enrollment_stmt = select(Enrollment.course_id).where(
             Enrollment.student_id == current_user.id,
-            Enrollment.status.in_(["active", "completed"])
+            Enrollment.status.in_([EnrollmentStatus.ACTIVE.value, EnrollmentStatus.COMPLETED.value])
         )
         enrollment_result = await db.execute(enrollment_stmt)
         student_course_ids = [row[0] for row in enrollment_result.all()]
