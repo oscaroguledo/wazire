@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.database import get_db
 from core.middleware.auth import create_auth_dependency, get_token_service, require_admin
 from core.utils.response import Response
-from services.billings.payment_methods import PaymentMethodService
+from services.billings.payments import PaymentMethodService
 
 router = APIRouter(prefix="/billing/payment-methods", tags=["billing"])
 

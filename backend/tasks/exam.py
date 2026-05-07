@@ -10,6 +10,8 @@ from sqlalchemy import select
 from core.database import get_db
 from core.utils.logger import logger
 from models.academic.exam import Exam, ExamStatus
+from models.academic.course import Course
+from tasks.submission import emit_refresh_dashboard, emit_grade_attempt
 
 
 async def _update_exam_statuses() -> Dict[str, int]:
@@ -188,18 +190,35 @@ async def handle_force_submit_exam(data: Dict[str, Any]) -> None:
             db.add(attempt)
             await db.flush()  # get attempt.id
 
-            # Emit GRADE_SUBMISSION_ATTEMPT
-            await producer_service.publish_safe(
-                "tenant-tasks",
-                "GRADE_SUBMISSION_ATTEMPT",
-                {
-                    "submission_id": str(submission.id),
-                    "attempt_id": attempt.id,
-                    "tenant_id": str(effective_tenant_id),
-                },
-            )
+            # Emit GRADE_SUBMISSION_ATTEMPT via task helper (ensures partition key handling)
+            await emit_grade_attempt(str(attempt.id), str(exam_id), tenant_id=str(effective_tenant_id) if effective_tenant_id else None)
 
+            # Track for dashboard refresh after commit
+            # (we emit after commit to ensure reads see committed state)
+            # Collecting is done below
+        
+        # Commit all created submissions/attempts
         await db.commit()
+
+        # Refresh dashboards for affected students and lecturer
+        try:
+            lecturer_id = exam.course_id and (await db.execute(select(Course).where(Course.id == exam.course_id))).scalar_one_or_none()
+        except Exception:
+            lecturer_id = None
+        for enrollment in unsubmitted:
+            try:
+                await emit_refresh_dashboard(str(enrollment.student_id), tenant_id=str(effective_tenant_id) if effective_tenant_id else None)
+            except Exception:
+                logger.exception("FORCE_SUBMIT_EXAM: failed to emit refresh for student %s", enrollment.student_id)
+        if exam and exam.course_id:
+            # Emit for lecturer if available
+            course_result = await db.execute(select(Course).where(Course.id == exam.course_id))
+            course = course_result.scalar_one_or_none()
+            if course and course.lecturer_id:
+                try:
+                    await emit_refresh_dashboard(str(course.lecturer_id), tenant_id=str(effective_tenant_id) if effective_tenant_id else None)
+                except Exception:
+                    logger.exception("FORCE_SUBMIT_EXAM: failed to emit refresh for lecturer %s", course.lecturer_id)
         logger.info(
             "FORCE_SUBMIT_EXAM: committed %d auto-submissions for exam %s",
             len(unsubmitted), exam_id,

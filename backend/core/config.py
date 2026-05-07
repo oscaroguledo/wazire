@@ -39,6 +39,22 @@ class Settings(BaseModel):
     DB_WRITE_BATCH_SIZE: int = 500
     GRADING_CONCURRENCY_PER_TENANT: int = 2
 
+    # ── Per-request timeout (seconds) ────────────────────────────────────────
+    # Every API request must complete within this budget.  Requests that exceed
+    # the limit receive HTTP 504.  Set to 0 to disable (not recommended).
+    API_TIMEOUT_SECONDS: float = 1.0
+
+    # ── Database timeout knobs ────────────────────────────────────────────────
+    # DB_POOL_TIMEOUT      — seconds to wait for a free pool connection
+    # DB_COMMAND_TIMEOUT   — asyncpg network round-trip timeout (seconds)
+    # DB_STATEMENT_TIMEOUT_MS — PostgreSQL server-side statement_timeout (ms)
+    DB_POOL_SIZE: int = 10
+    DB_MAX_OVERFLOW: int = 20
+    DB_POOL_RECYCLE: int = 1800
+    DB_POOL_TIMEOUT: float = 2.0
+    DB_COMMAND_TIMEOUT: float = 5.0
+    DB_STATEMENT_TIMEOUT_MS: int = 900
+
     # Logging
     LOG_LEVEL: str = "INFO"
 
@@ -214,7 +230,15 @@ def get_settings(force_reload: bool = False) -> Settings:
             GRADING_BATCH_SIZE=int(os.getenv("GRADING_BATCH_SIZE", str(_defaults.GRADING_BATCH_SIZE))),
             DB_WRITE_BATCH_SIZE=int(os.getenv("DB_WRITE_BATCH_SIZE", str(_defaults.DB_WRITE_BATCH_SIZE))),
             GRADING_CONCURRENCY_PER_TENANT=int(os.getenv("GRADING_CONCURRENCY_PER_TENANT", str(_defaults.GRADING_CONCURRENCY_PER_TENANT))),
-            LOG_LEVEL=os.getenv("LOG_LEVEL", _defaults.LOG_LEVEL).upper(),            FRONTEND_ORIGIN=os.getenv("FRONTEND_ORIGIN", _defaults.FRONTEND_ORIGIN),
+            API_TIMEOUT_SECONDS=float(os.getenv("API_TIMEOUT_SECONDS", str(_defaults.API_TIMEOUT_SECONDS))),
+            DB_POOL_SIZE=int(os.getenv("DB_POOL_SIZE", str(_defaults.DB_POOL_SIZE))),
+            DB_MAX_OVERFLOW=int(os.getenv("DB_MAX_OVERFLOW", str(_defaults.DB_MAX_OVERFLOW))),
+            DB_POOL_RECYCLE=int(os.getenv("DB_POOL_RECYCLE", str(_defaults.DB_POOL_RECYCLE))),
+            DB_POOL_TIMEOUT=float(os.getenv("DB_POOL_TIMEOUT", str(_defaults.DB_POOL_TIMEOUT))),
+            DB_COMMAND_TIMEOUT=float(os.getenv("DB_COMMAND_TIMEOUT", str(_defaults.DB_COMMAND_TIMEOUT))),
+            DB_STATEMENT_TIMEOUT_MS=int(os.getenv("DB_STATEMENT_TIMEOUT_MS", str(_defaults.DB_STATEMENT_TIMEOUT_MS))),
+            LOG_LEVEL=os.getenv("LOG_LEVEL", _defaults.LOG_LEVEL).upper(),
+            FRONTEND_ORIGIN=os.getenv("FRONTEND_ORIGIN", _defaults.FRONTEND_ORIGIN),
             KAFKA_BOOTSTRAP_SERVERS=os.getenv("KAFKA_BOOTSTRAP_SERVERS", _defaults.KAFKA_BOOTSTRAP_SERVERS),
             KAFKA_TOPIC_PREFIX=os.getenv("KAFKA_TOPIC_PREFIX", _defaults.KAFKA_TOPIC_PREFIX),
             KAFKA_USERNAME=os.getenv("KAFKA_USERNAME", _defaults.KAFKA_USERNAME),

@@ -830,9 +830,9 @@
      PHASE 12 — API DOCUMENTATION
      ============================================================ -->
 
-- [ ] 14. Create API documentation and Postman collection
+- [x] 14. Create API documentation and Postman collection
 
-  - [ ] 14.1 Create `docs/API.md` covering all endpoints
+  - [x] 14.1 Create `docs/API.md` covering all endpoints
     - Document every endpoint across all domains (account, academic, billing, analytics, health)
     - For each endpoint: method, path, required headers (`Authorization`, `X-Tenant-ID`), request body schema, example response
     - _Bug_Condition: isBugCondition(input) where input.target = 'docs/API.md' AND defectPresent('file does not exist')_
@@ -840,7 +840,7 @@
     - _Preservation: no source code modified (3.41)_
     - _Requirements: 2.56_
 
-  - [ ] 14.2 Create `docs/Wazire.postman_collection.json`
+  - [x] 14.2 Create `docs/Wazire.postman_collection.json`
     - Create Postman collection covering all endpoints across all domains
     - Include example request bodies, headers, and environment variables
     - _Requirements: 2.56_
@@ -850,7 +850,7 @@
      PHASE 13 — TEST INFRASTRUCTURE & COVERAGE
      ============================================================ -->
 
-- [ ] 15. Set up test infrastructure and write comprehensive test coverage
+- [-] 15. Set up test infrastructure and write comprehensive test coverage
 
   - [ ] 15.1 Set up pytest + pytest-cov configuration (`backend/pyproject.toml`)
     - Add `pytest`, `pytest-asyncio`, `pytest-cov`, `httpx` to `backend/requirements.txt`

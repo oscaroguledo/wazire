@@ -10,7 +10,7 @@ from typing import Any, Dict
 from uuid import UUID
 
 from core.utils.logger import logger
-from tasks.utils import with_db
+from core.utils.tasks import with_db
 
 
 async def handle_initiate_billing(data: Dict[str, Any]) -> None:
@@ -45,7 +45,7 @@ async def handle_initiate_billing(data: Dict[str, Any]) -> None:
 
     async def _run(db):
         from services.billings.invoice import InvoiceService
-        from services.billing.payment_gateway import PaymentGatewayService, PaymentGatewayError
+        from services.billings.payment_gateway import PaymentGatewayService, PaymentGatewayError
 
         svc = InvoiceService(db)
         invoice = await svc.get(invoice_id)

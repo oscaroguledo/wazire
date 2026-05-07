@@ -199,6 +199,13 @@ async def update_enrollment(
         elif current_user.role == UserRole.LECTURER and existing.course.lecturer_id != current_user.id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Can only update enrollments for your courses")
         enrollment = await service.update(enrollment_id, enrollment_data, tenant_id=tenant_id)
+        # Emit dashboard refreshes if status or course/student association affects dashboards
+        try:
+            await emit_refresh_dashboard(str(enrollment.student_id))
+            if enrollment.course and enrollment.course.lecturer_id:
+                await emit_refresh_dashboard(str(enrollment.course.lecturer_id))
+        except Exception:
+            logger.exception("update_enrollment: failed to emit dashboard refreshes")
         return Response(success=True, data=enrollment.to_dict(), request=request)
     except HTTPException:
         raise
@@ -245,6 +252,20 @@ async def bulk_enroll_students(
     tenant_id = None if current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else current_user.tenant_id
     try:
         enrollments = await service.bulk_create(bulk_request.enrollments, current_user, tenant_id=tenant_id)
+        # Emit refresh for each created enrollment (students + lecturers)
+        lecturers = set()
+        for e in enrollments:
+            try:
+                await emit_refresh_dashboard(str(e.student_id))
+                if e.course and e.course.lecturer_id:
+                    lecturers.add(str(e.course.lecturer_id))
+            except Exception:
+                logger.exception("bulk_enroll_students: failed to emit refresh for student %s", e.student_id)
+        for l in lecturers:
+            try:
+                await emit_refresh_dashboard(l)
+            except Exception:
+                logger.exception("bulk_enroll_students: failed to emit refresh for lecturer %s", l)
         return Response(success=True, data=[e.to_dict() for e in enrollments], request=request, status_code=status.HTTP_201_CREATED)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

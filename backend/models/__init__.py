@@ -10,7 +10,7 @@ from models.account.tenant import Tenant
 # Import billing models (depend on account models)
 from models.billings.invoice import Invoice
 from models.billings.usage import CurrentUsage
-from models.billings.paymentmethod import PaymentMethod
+from models.billings.payment import PaymentMethod
 
 # Import academic models (depend on account models)
 from models.academic.course import Course

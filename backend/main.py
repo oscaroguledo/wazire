@@ -103,7 +103,7 @@ from core.middleware.request_id import RequestIDMiddleware
 from core.middleware.tenant import TenantMiddleware
 from core.middleware.timing import TimingMiddleware
 
-app.add_middleware(TimingMiddleware)
+app.add_middleware(TimingMiddleware, timeout_seconds=settings.API_TIMEOUT_SECONDS)
 app.add_middleware(RequestIDMiddleware)
 app.add_middleware(TenantMiddleware)
 
@@ -112,13 +112,13 @@ from routes import health
 from routes.account import users, tenants
 from routes.academic import submissions, courses, exams, questions, answers, enrollments, students
 from routes.analytics import dashboard
-from routes.billings import invoice as billings_invoice
-from routes.billing import invoices as billing_invoices
-from routes.billing import billing_plans
-from routes.billing import payment_methods
-from routes.billing import usage as billing_usage
-from routes.billing import semesters
-from routes.billing import webhooks as billing_webhooks
+from routes.billings import webhook
+from routes.billings import invoices
+from routes.billings import plans
+from routes.billings import payments
+from routes.billings import usage
+from routes.billings import semesters
+from routes.billings import webhooks
 import uvicorn
 
 # API Version 1
@@ -134,16 +134,14 @@ app.include_router(enrollments.router, prefix="/api/v1/academic")
 app.include_router(students.router, prefix="/api/v1/academic")
 app.include_router(dashboard.router, prefix="/api/v1/analytics")
 
-# Billings routes (legacy)
-app.include_router(billings_invoice.router, prefix="/api/v1")
-
-# Billing routes (new, under /api/v1/billing)
-app.include_router(billing_invoices.router, prefix="/api/v1")
-app.include_router(billing_plans.router, prefix="/api/v1")
-app.include_router(payment_methods.router, prefix="/api/v1")
-app.include_router(billing_usage.router, prefix="/api/v1")
+# Billing routes
+app.include_router(webhook.router, prefix="/api/v1")
+app.include_router(invoices.router, prefix="/api/v1")
+app.include_router(plans.router, prefix="/api/v1")
+app.include_router(payments.router, prefix="/api/v1")
+app.include_router(usage.router, prefix="/api/v1")
 app.include_router(semesters.router, prefix="/api/v1")
-app.include_router(billing_webhooks.router, prefix="/api/v1")
+app.include_router(webhooks.router, prefix="/api/v1")
 
 
 

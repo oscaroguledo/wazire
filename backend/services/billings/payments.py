@@ -7,7 +7,7 @@ from uuid import UUID
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.billings.paymentmethod import PaymentMethod
+from models.billings.payment import PaymentMethod
 
 
 class PaymentMethodService:

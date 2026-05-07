@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional
 from sqlalchemy import select
 
 from core.database import get_db
+from core.utils.kafka import producer_service
 from core.utils.logger import logger
 from models.account.users import User, UserRole
 from models.academic.submission import SubmissionAttempt
@@ -140,16 +141,10 @@ async def emit_refresh_dashboard(user_id: str, tenant_id: Optional[str] = None) 
     Awaiting ensures failures are observable and logged rather than silently
     dropped by a fire-and-forget ``asyncio.ensure_future`` call.
     """
-    from core.utils.kafka.manager import kafka_manager
-    success = await kafka_manager.emit(
-        "REFRESH_DASHBOARD",
-        {"user_id": user_id},
-        partition_key=tenant_id,
-    )
-    if not success:
+    ok = await producer_service.publish_safe(TOPIC, "REFRESH_DASHBOARD", {"user_id": user_id})
+    if not ok:
         logger.error(
-            "emit_refresh_dashboard: failed to publish REFRESH_DASHBOARD for user=%s — "
-            "dashboard may be stale; replay manually if needed",
+            "emit_refresh_dashboard: failed to publish REFRESH_DASHBOARD for user=%s — dashboard may be stale; replay manually if needed",
             user_id,
         )
 
@@ -161,16 +156,10 @@ async def emit_grade_attempt(attempt_id: str, exam_id: str, tenant_id: Optional[
     are routed to the same partition and worker replica, making per-tenant
     asyncio.Semaphore effective across the worker fleet.
     """
-    from core.utils.kafka.manager import kafka_manager
-    success = await kafka_manager.emit(
-        "GRADE_SUBMISSION_ATTEMPT",
-        {"attempt_id": attempt_id, "exam_id": exam_id},
-        partition_key=tenant_id,
-    )
-    if not success:
+    ok = await producer_service.publish_safe(TOPIC, "GRADE_SUBMISSION_ATTEMPT", {"attempt_id": attempt_id, "exam_id": exam_id})
+    if not ok:
         logger.error(
-            "emit_grade_attempt: failed to publish GRADE_SUBMISSION_ATTEMPT "
-            "(attempt=%s exam=%s) — grading job may be lost; replay manually if needed",
+            "emit_grade_attempt: failed to publish GRADE_SUBMISSION_ATTEMPT (attempt=%s exam=%s) — grading job may be lost; replay manually if needed",
             attempt_id, exam_id,
         )
 

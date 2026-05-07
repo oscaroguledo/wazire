@@ -48,6 +48,13 @@ class PostgresDB:
             pool_size = int(getattr(settings, "DB_POOL_SIZE", 10))
             max_overflow = int(getattr(settings, "DB_MAX_OVERFLOW", 20))
 
+            # Timeouts are intentionally tight to enforce the 1 s API SLA:
+            #   command_timeout  — asyncpg cancels any single network round-trip
+            #                      that takes longer than this (seconds).
+            #   pool_timeout     — how long to wait for a free connection from
+            #                      the pool before raising PoolTimeout.
+            # Both default to values well under 1 s so that DB latency alone
+            # cannot blow the SLA.  Override via env vars for batch/admin jobs.
             self._engine = create_async_engine(
                 database_url,
                 echo=bool(settings.DEBUG),
@@ -55,10 +62,19 @@ class PostgresDB:
                 max_overflow=max_overflow,
                 pool_pre_ping=True,
                 pool_recycle=int(getattr(settings, "DB_POOL_RECYCLE", 1800)),
-                pool_timeout=int(getattr(settings, "DB_POOL_TIMEOUT", 30)),
+                pool_timeout=float(getattr(settings, "DB_POOL_TIMEOUT", 2)),
                 connect_args={
-                    "command_timeout": int(getattr(settings, "DB_COMMAND_TIMEOUT", 60)),
-                    "server_settings": {"application_name": settings.APP_NAME},
+                    "command_timeout": float(getattr(settings, "DB_COMMAND_TIMEOUT", 5)),
+                    "server_settings": {
+                        "application_name": settings.APP_NAME,
+                        # PostgreSQL-level statement timeout (ms).  Kills any
+                        # query that runs longer than this on the server side,
+                        # providing a second line of defence after asyncpg's
+                        # command_timeout.
+                        "statement_timeout": str(
+                            int(getattr(settings, "DB_STATEMENT_TIMEOUT_MS", 900))
+                        ),
+                    },
                 },
             )
         return self._engine

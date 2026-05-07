@@ -273,6 +273,9 @@ async def run() -> None:
     scheduler.add_job(_trigger_preload_questions, "interval", minutes=preload_interval, id="preload_questions")
     scheduler.add_job(_trigger_force_submit_exams, "interval", minutes=force_submit_interval, id="force_submit_exams")
     scheduler.add_job(_trigger_billing, "interval", minutes=billing_interval, id="billing")
+    # Outbox publishing has been removed per configuration — database triggers
+    # and a Postgres LISTEN/pg_notify listener are used to forward DB changes
+    # to Kafka instead.
 
     scheduler.start()
     logger.info(

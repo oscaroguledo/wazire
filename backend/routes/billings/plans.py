@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.database import get_db
 from core.middleware.auth import create_auth_dependency, get_token_service, require_admin
 from core.utils.response import Response
-from services.billings.billing_plans import BillingPlanService
+from services.billings.plans import BillingPlanService
 
 router = APIRouter(prefix="/billing/plans", tags=["billing"])
 

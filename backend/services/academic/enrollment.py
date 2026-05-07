@@ -16,6 +16,7 @@ from models.academic.course import Course as CourseModel
 class EnrollmentService:
     def __init__(self, db: AsyncSession):
         self.db = db
+        
     async def list(self, params: EnrollmentListParams, tenant_id: Optional[uuid.UUID] = None) -> Tuple[List[EnrollmentModel], int]:
         """List enrollments with filtering and pagination.
 

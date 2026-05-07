@@ -29,6 +29,7 @@ class Worker:
         self._consumer = consumer_service
         self._stop_event: asyncio.Event = asyncio.Event()
         self._task: Optional[asyncio.Task] = None
+        
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -40,6 +41,7 @@ class Worker:
         try:
             await self._consumer.start()
             logger.info("Worker: Kafka consumer started")
+            
         except Exception:
             logger.exception("Worker: failed to start Kafka consumer")
             raise
@@ -75,6 +77,7 @@ class Worker:
             await self._consumer.stop()
         except Exception:
             logger.exception("Worker: error stopping Kafka consumer")
+        
         logger.info("Worker stopped")
 
     # ------------------------------------------------------------------
