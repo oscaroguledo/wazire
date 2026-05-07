@@ -38,12 +38,15 @@ env/
 *.sqlite
 *.sqlite3
 
-# IDE
-.vscode/
+.# IDE
+.vscode/*
 .idea/
 *.swp
 *.swo
 *~
+
+# Allow tracking recommended Extensions list
+!.vscode/extensions.json
 
 # OS
 .DS_Store
