@@ -26,9 +26,9 @@ export type InvoiceStatus = 'pending' | 'paid' | 'overdue' | 'cancelled';
 // 13.7: Added payment fields to Invoice
 export interface Invoice {
   id: string;
-  tenant_id: string | null;
+  tenant_id: string;
   semester_id: string | null;
-  description: string | null;
+  description: string;
   student_count: number;
   amount_per_student: number;
   total_amount: number;
@@ -39,6 +39,8 @@ export interface Invoice {
   payment_url: string | null;
   created_at: string;
   updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
 }
 
 export type PlanType = 'starter' | 'intermediate' | 'enterprise';
@@ -46,23 +48,28 @@ export type PlanType = 'starter' | 'intermediate' | 'enterprise';
 // 13.7: Aligned CurrentUsage with backend model fields
 export interface CurrentUsage {
   id: string;
-  tenant_id: string | null;
+  tenant_id: string;
+  semester_id: string | null;
   student_count: number;
-  exams_graded: number;
-  plan: PlanType;
-  plan_updated_at: string;
+  current_plan: string | null;
   created_at: string;
   updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
 }
 
-export type PaymentMethodType = 'credit_card' | 'paypal' | 'bank_transfer' | 'other';
+export type PaymentMethodType = 'credit_card' | 'bank_transfer' | 'direct_debit' | 'other';
 
 export interface PaymentMethod {
   id: string;
   type: PaymentMethodType;
-  tenant_id: string | null;
+  tenant_id: string;
+  details: Record<string, any>;
+  is_default: boolean;
   created_at: string;
   updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
 }
 
 // 13.7: Added domain, is_active, is_deleted, deleted_at, tenant_code fields to Tenant

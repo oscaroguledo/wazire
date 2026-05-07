@@ -852,19 +852,19 @@
 
 - [-] 15. Set up test infrastructure and write comprehensive test coverage
 
-  - [ ] 15.1 Set up pytest + pytest-cov configuration (`backend/pyproject.toml`)
+  - [x] 15.1 Set up pytest + pytest-cov configuration (`backend/pyproject.toml`)
     - Add `pytest`, `pytest-asyncio`, `pytest-cov`, `httpx` to `backend/requirements.txt`
     - Create `backend/pyproject.toml` with `[tool.pytest.ini_options]` and `[tool.coverage.run]` sections
     - Configure `--cov=.`, `--cov-branch`, `--cov-fail-under=90`
     - Exclude `alembic/env.py`, `seed_db.py` from coverage measurement
     - _Requirements: 2.87, 2.89, 2.93_
 
-  - [ ] 15.2 Set up Vitest + `@vitest/coverage-v8` (`frontend/vitest.config.ts`)
+  - [x] 15.2 Set up Vitest + `@vitest/coverage-v8` (`frontend/vitest.config.ts`)
     - Add `vitest`, `@vitest/coverage-v8`, `@testing-library/react`, `msw` to `frontend/package.json` devDependencies
     - Create `frontend/vitest.config.ts` with `coverage.provider = 'v8'` and `coverage.thresholds = { lines: 90, branches: 90 }`
     - _Requirements: 2.88, 2.92_
 
-  - [ ] 15.3 Set up MSW mock handlers (`frontend/src/mocks/`)
+  - [-] 15.3 Set up MSW mock handlers (`frontend/src/mocks/`)
     - Create `frontend/src/mocks/handlers.ts` with MSW handlers for all backend API endpoints
     - Create `frontend/src/mocks/server.ts` for Node.js test environment setup
     - _Requirements: 2.100_

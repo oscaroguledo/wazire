@@ -9,15 +9,18 @@ export type { Invoice, CurrentUsage, PaymentMethod }
 
 export interface BillingPlan {
   id: string
+  tenant_id: string
+  plan_id: string
   name: string
-  plan_type: string
+  description: string
   price_per_student: number
-  max_students: number | null
-  max_exams: number | null
+  min_students: number
   features: string[]
   is_active: boolean
   created_at: string
   updated_at: string
+  created_by: string | null
+  updated_by: string | null
 }
 
 export interface BillingListParams {
