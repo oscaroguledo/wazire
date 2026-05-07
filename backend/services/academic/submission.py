@@ -93,6 +93,8 @@ class SubmissionService:
         )
         self.db.add(attempt)
         submission.attempts = attempt_number
+        submission.status = "submitted"
+        submission.submitted_at = datetime.now(timezone.utc)
         self.db.add(submission)
 
         await self.db.commit()

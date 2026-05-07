@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from datetime import timedelta
 from typing import Optional, List, Tuple
 from uuid import UUID
 
@@ -33,6 +34,11 @@ class ExamService:
         duration_hours = exam_in.duration_hours + (exam_in.duration_minutes / 60)
         duration = Decimal(str(duration_hours))
 
+        # Compute end_time if start_time is provided
+        end_time = None
+        if exam_in.start_time is not None:
+            end_time = exam_in.start_time + timedelta(hours=float(duration))
+
         exam = ExamModel(
             title=exam_in.title,
             description=exam_in.description,
@@ -41,6 +47,7 @@ class ExamService:
             passing_marks=exam_in.passing_marks,
             status=exam_in.status or 'not_started',
             start_time=exam_in.start_time,
+            end_time=end_time,
             course_id=exam_in.course_id,
             tenant_id=effective_tenant_id,
         )
@@ -94,6 +101,13 @@ class ExamService:
 
         for field, value in data.items():
             setattr(exam, field, value)
+
+        # Recompute end_time whenever start_time or duration changes
+        effective_start = exam.start_time
+        effective_duration = exam.duration
+        if effective_start is not None and effective_duration is not None:
+            exam.end_time = effective_start + timedelta(hours=float(effective_duration))
+
         self.db.add(exam)
         await self.db.commit()
         await self.db.refresh(exam)

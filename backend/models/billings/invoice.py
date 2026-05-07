@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from enum import Enum
 from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import Index, func, CheckConstraint, Integer, DateTime, ForeignKey, String
 from sqlalchemy import Enum as SAEnum
@@ -51,6 +52,12 @@ class Invoice(Base):
     total_amount: Mapped[int] = mapped_column(Integer, nullable=False, comment="Total invoice amount")
     status: Mapped[InvoiceStatus] = mapped_column(SAEnum(InvoiceStatus, name="invoice_status_enum", create_type=True), nullable=False, default=InvoiceStatus.PENDING, comment="Invoice status: pending|paid|overdue|cancelled")
     
+    # Payment tracking columns
+    payment_reference: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, comment="Gateway transaction reference")
+    payment_gateway: Mapped[Optional[str]] = mapped_column(SAEnum('paystack', 'monnify', name="payment_gateway_enum", create_type=True), nullable=True, comment="Which payment gateway was used")
+    paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, comment="Confirmed payment timestamp")
+    payment_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True, comment="Checkout/redirect URL from gateway")
+    
     # Audit fields
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), comment="Creation timestamp (timezone-aware)")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), comment="Last update timestamp (timezone-aware)")
@@ -70,6 +77,10 @@ class Invoice(Base):
             "amount_per_student": self.amount_per_student,
             "total_amount": self.total_amount,
             "status": self.status.value,
+            "payment_reference": self.payment_reference,
+            "payment_gateway": self.payment_gateway,
+            "paid_at": self.paid_at.isoformat() if self.paid_at else None,
+            "payment_url": self.payment_url,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "created_by": str(self.created_by) if self.created_by else None,

@@ -23,6 +23,7 @@ class TenantService:
     async def get(
         self,
         tenant_id: UUID,
+        tenant_code: Optional[str] = None,
         is_active: Optional[bool] = True,
         is_deleted: Optional[bool] = False,
     ) -> Optional[Tenant]:
@@ -30,6 +31,10 @@ class TenantService:
 
         # ID first — hits primary key index immediately
         stmt = select(Tenant).where(Tenant.id == tenant_id)
+
+        # Filter by tenant_code if provided
+        if tenant_code is not None:
+            stmt = stmt.where(Tenant.tenant_code == tenant_code)
 
         # Filter deleted — apply explicit is_deleted filter (default excludes deleted)
         if is_deleted is not None:

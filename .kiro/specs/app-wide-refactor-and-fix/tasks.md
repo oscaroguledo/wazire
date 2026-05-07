@@ -153,9 +153,9 @@
      PHASE 2 — DOCKER & INFRASTRUCTURE
      ============================================================ -->
 
-- [ ] 4. Fix Docker Compose YAML structure and add missing infrastructure services
+- [x] 4. Fix Docker Compose YAML structure and add missing infrastructure services
 
-  - [ ] 4.1 Fix `docker-compose.yml` YAML indentation for `pgbouncer` and `scheduler`
+  - [x] 4.1 Fix `docker-compose.yml` YAML indentation for `pgbouncer` and `scheduler`
     - Move `pgbouncer` service definition to top-level (same indentation as `postgres`, `redis`, `backend`)
     - Move `scheduler` service definition to top-level (same indentation as `worker`)
     - Verify `backend` `depends_on: pgbouncer` resolves correctly after fix
@@ -164,7 +164,7 @@
     - _Preservation: postgres, redis, backend, frontend, worker service definitions unchanged (3.14, 3.30)_
     - _Requirements: 2.12, 2.13_
 
-  - [ ] 4.2 Add Kafka service to `docker-compose.yml`
+  - [x] 4.2 Add Kafka service to `docker-compose.yml`
     - Uncomment or add the `kafka` service with KRaft-mode configuration
     - Add `kafka: condition: service_healthy` to `worker` and `scheduler` `depends_on` blocks
     - Add health check for Kafka service
@@ -173,7 +173,7 @@
     - _Preservation: postgres, redis, backend, frontend, worker, scheduler service definitions unchanged (3.30)_
     - _Requirements: 2.38_
 
-  - [ ] 4.3 Add nginx service and `nginx/nginx.conf` configuration file
+  - [x] 4.3 Add nginx service and `nginx/nginx.conf` configuration file
     - Create `nginx/nginx.conf` with: reverse proxy to `backend:8000` for `/api/v1/`, WebSocket upgrade for `/ws/`, gzip compression, cache headers for `/assets/`, rate-limiting zone (30r/s), SPA fallback for `/`
     - Add `nginx` service to `docker-compose.yml` with ports `80:80` and `443:443`, mounting `nginx.conf` and `frontend_dist` volume
     - Add `frontend_dist` named volume to `docker-compose.yml`
@@ -182,7 +182,7 @@
     - _Preservation: all other services unchanged (3.83)_
     - _Requirements: 2.131, 2.132, 2.133_
 
-  - [ ] 4.4 Fix frontend `Dockerfile` to multi-stage production build
+  - [x] 4.4 Fix frontend `Dockerfile` to multi-stage production build
     - Stage 1 (`builder`): `FROM node:20-alpine AS builder`, `npm ci`, `npm run build` → produces `/app/dist`
     - Stage 2: `FROM alpine:3.19`, copy `/app/dist` to `/dist`, `CMD ["sh", "-c", "cp -r /dist/. /output/ && echo 'Frontend assets copied'"]`
     - Update `docker-compose.yml` frontend service to use `volumes: - frontend_dist:/output`
@@ -192,7 +192,7 @@
     - _Preservation: frontend application runtime behaviour unchanged (3.84)_
     - _Requirements: 2.14, 2.134_
 
-  - [ ] 4.5 Remove backend direct port exposure from `docker-compose.yml`
+  - [x] 4.5 Remove backend direct port exposure from `docker-compose.yml`
     - Remove `ports: - "${BACKEND_PORT:-8000}:8000"` from the `backend` service
     - Backend is only reachable via nginx on the internal `wazire-network`
     - _Bug_Condition: isBugCondition(input) where input.target = 'docker-compose.yml' AND structuralDefectPresent('backend port exposed directly')_
@@ -200,7 +200,7 @@
     - _Preservation: backend service environment, volumes, depends_on unchanged (3.83)_
     - _Requirements: 2.135_
 
-  - [ ] 4.6 Add `gunicorn` to `backend/requirements.txt` and update backend `Dockerfile` CMD
+  - [x] 4.6 Add `gunicorn` to `backend/requirements.txt` and update backend `Dockerfile` CMD
     - Add `gunicorn` at a pinned version to `backend/requirements.txt`
     - Update `CMD` in `backend/Dockerfile` to: `gunicorn main:app -k uvicorn.workers.UvicornWorker --workers ${GUNICORN_WORKERS:-4} --bind 0.0.0.0:8000`
     - _Bug_Condition: isBugCondition(input) where input.target = 'backend/Dockerfile' AND structuralDefectPresent('single-process uvicorn, no gunicorn')_
@@ -208,7 +208,7 @@
     - _Preservation: FastAPI app entrypoint (main:app) and all route registrations unchanged (3.85)_
     - _Requirements: 2.136_
 
-  - [ ] 4.7 Add `GET /health` endpoint to the backend
+  - [x] 4.7 Add `GET /health` endpoint to the backend
     - Create a `/api/v1/health` route that probes DB, Redis, and Kafka connectivity
     - Return `{"status": "ok", "db": "ok"|"error", "redis": "ok"|"error", "kafka": "ok"|"error"}` with HTTP 200 always
     - Register the health router in `main.py`
@@ -217,7 +217,7 @@
     - _Preservation: all existing routes unchanged_
     - _Requirements: 2.137_
 
-  - [ ] 4.8 Fix all `docker-compose.yml` restart policies and add `deploy.replicas`
+  - [x] 4.8 Fix all `docker-compose.yml` restart policies and add `deploy.replicas`
     - Ensure every service has `restart: unless-stopped`
     - Add `deploy: replicas: 1` to services that must remain single-instance (scheduler, kafka, postgres, redis, frontend, nginx)
     - Remove `container_name: wazire-backend` from the backend service to allow horizontal scaling
@@ -231,47 +231,47 @@
      PHASE 3 — MODEL SCHEMA ADDITIONS
      ============================================================ -->
 
-- [ ] 5. Add all missing model columns and constraints, then write a single Alembic migration
+- [x] 5. Add all missing model columns and constraints, then write a single Alembic migration
 
-  - [ ] 5.1 Add `Exam.end_time` column to `backend/models/academic/exam.py`
+  - [x] 5.1 Add `Exam.end_time` column to `backend/models/academic/exam.py`
     - Add `end_time: Mapped[Optional[datetime]]` with `DateTime(timezone=True)`, nullable
     - Compute and persist `end_time = start_time + timedelta(hours=float(duration))` in exam create/update service methods
     - Include `end_time` in all exam API responses
     - _Requirements: 2.35, 2.51, 3.28_
 
-  - [ ] 5.2 Remove `Exam.student_id` column from `backend/models/academic/exam.py`
+  - [x] 5.2 Remove `Exam.student_id` column from `backend/models/academic/exam.py`
     - Remove `student_id` column and its index `ix_exams_student_id`
     - Student participation continues via `Enrollment` and `Submission` records
     - Update any service or schema that references `exam.student_id`
     - _Requirements: 2.48, 3.37_
 
-  - [ ] 5.3 Add `Submission.submitted_at` column to `backend/models/academic/submission.py`
+  - [x] 5.3 Add `Submission.submitted_at` column to `backend/models/academic/submission.py`
     - Add `submitted_at: Mapped[Optional[datetime]]` with `DateTime(timezone=True)`, nullable, default `None`
     - Populate with `datetime.now(timezone.utc)` when a submission is received
     - Include in all submission API responses
     - _Requirements: 2.36, 2.50, 3.29_
 
-  - [ ] 5.4 Add `SubmissionAttempt.grading_started_at` column to `backend/models/academic/submission.py`
+  - [x] 5.4 Add `SubmissionAttempt.grading_started_at` column to `backend/models/academic/submission.py`
     - Add `grading_started_at: Mapped[Optional[datetime]]` with `DateTime(timezone=True)`, nullable, default `None`
     - Set to `datetime.now(timezone.utc)` at the start of grading
     - _Requirements: 2.148, 3.92_
 
-  - [ ] 5.5 Add `StudentAnswer` UNIQUE constraint to `backend/models/academic/student_answer.py`
+  - [x] 5.5 Add `StudentAnswer` UNIQUE constraint to `backend/models/academic/student_answer.py`
     - Add `UniqueConstraint('student_id', 'exam_id', 'question_id', name='uq_student_answer_student_exam_question')` to `__table_args__`
     - Update `StudentAnswerService.upsert()` to use `INSERT ... ON CONFLICT (student_id, exam_id, question_id) DO UPDATE SET answer=EXCLUDED.answer, updated_at=now()`
     - _Requirements: 2.30, 2.49, 3.38_
 
-  - [ ] 5.6 Add `Tenant.tenant_code` column to `backend/models/account/tenant.py`
+  - [x] 5.6 Add `Tenant.tenant_code` column to `backend/models/account/tenant.py`
     - Add `tenant_code: Mapped[str]` with `String(6)`, `unique=True`, `nullable=False`
     - Add `Index("ix_tenants_tenant_code", "tenant_code", unique=True)`
     - _Requirements: 2.102, 3.66_
 
-  - [ ] 5.7 Add `Tenant.paystack_customer_code` and `Tenant.monnify_account_reference` columns
+  - [x] 5.7 Add `Tenant.paystack_customer_code` and `Tenant.monnify_account_reference` columns
     - Add `paystack_customer_code: Mapped[Optional[str]]` with `String(100)`, nullable
     - Add `monnify_account_reference: Mapped[Optional[str]]` with `String(100)`, nullable
     - _Requirements: 2.106, 3.69_
 
-  - [ ] 5.8 Add `Invoice` payment columns to `backend/models/billings/invoice.py`
+  - [x] 5.8 Add `Invoice` payment columns to `backend/models/billings/invoice.py`
     - Add `payment_reference: Mapped[Optional[str]]` (`String(100)`, nullable)
     - Add `payment_gateway: Mapped[Optional[str]]` (`SAEnum('paystack','monnify')`, nullable)
     - Add `paid_at: Mapped[Optional[datetime]]` (`DateTime(timezone=True)`, nullable)
@@ -279,12 +279,12 @@
     - Include all four fields in `Invoice.to_dict()` and all invoice API responses
     - _Requirements: 2.105, 3.68_
 
-  - [ ] 5.9 Add `SubmissionStatus.grading_in_progress` enum value
+  - [x] 5.9 Add `SubmissionStatus.grading_in_progress` enum value
     - Add `GRADING_IN_PROGRESS = "grading_in_progress"` to the `SubmissionStatus` enum
     - Ensure all existing status values (`pending`, `submitted`, `graded`) remain valid
     - _Requirements: 2.147, 3.91_
 
-  - [ ] 5.10 Write single Alembic migration covering all schema changes
+  - [x] 5.10 Write single Alembic migration covering all schema changes
     - Create `backend/alembic/versions/YYYYMMDD_app_wide_refactor.py`
     - Migration covers in one transaction: `Exam.end_time` add, `Exam.student_id` drop, `Submission.submitted_at` add, `SubmissionAttempt.grading_started_at` add, `StudentAnswer` UNIQUE constraint add, `Tenant.tenant_code` add, `Tenant.paystack_customer_code` add, `Tenant.monnify_account_reference` add, `Invoice.status` add, `Invoice` payment columns add, `BillingPlan.is_active` add, `Tenant.start_date` add, `Tenant.end_date` add, `SubmissionStatus` enum update
     - Include `downgrade()` that reverses all changes
@@ -295,7 +295,7 @@
      PHASE 4 — BACKEND ARCHITECTURE REFACTOR
      ============================================================ -->
 
-- [ ] 6. Refactor backend architecture: rename files, implement KafkaManager, class-based Worker, dispatcher pattern, OLAP/OLTP separation, and production settings
+- [-] 6. Refactor backend architecture: rename files, implement KafkaManager, class-based Worker, dispatcher pattern, OLAP/OLTP separation, and production settings
 
   - [ ] 6.1 Rename all route and service files from singular to plural nouns
     - Rename route files: `user.py`→`users.py`, `tenant.py`→`tenants.py`, `course.py`→`courses.py`, `exam.py`→`exams.py`, `question.py`→`questions.py`, `answer.py`→`answers.py`, `submission.py`→`submissions.py`

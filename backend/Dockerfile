@@ -42,5 +42,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # Switch to non-root user
 USER appuser
 
-# Start application
-CMD uvicorn main:app --host 0.0.0.0 --port 8000
+# Start application via gunicorn with uvicorn workers for production-grade concurrency
+CMD gunicorn main:app -k uvicorn.workers.UvicornWorker --workers ${GUNICORN_WORKERS:-4} --bind 0.0.0.0:8000

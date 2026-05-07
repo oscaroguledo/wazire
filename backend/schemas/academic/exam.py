@@ -87,6 +87,7 @@ class ExamUpdate(BaseModel):
 
 class ExamRead(ExamBase):
     id: UUID
+    end_time: Optional[datetime] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

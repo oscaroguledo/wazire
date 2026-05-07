@@ -47,6 +47,7 @@ class TenantCreate(BaseModel):
 class TenantUpdate(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
+    tenant_code: Optional[str] = None
     name: Optional[str] = None
     domain: Optional[str] = None
     logo_url: Optional[str] = None
@@ -66,6 +67,7 @@ class TenantUpdate(BaseModel):
 
 class TenantDelete(BaseModel):
     id: UUID
+    tenant_code: Optional[str] = None
     updated_by: UUID
 
 
@@ -73,6 +75,7 @@ class TenantRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     name: str
+    tenant_code: Optional[str] = None
     domain: Optional[str] = None
     logo_url: Optional[str] = None
     is_active: bool

@@ -30,6 +30,7 @@ class Tenant(Base):
 		Index("ix_tenants_is_active", "is_active"),
 		Index("ix_tenants_deleted_at", "deleted_at"),
 		Index("ix_tenants_name", "name"),
+		Index("ix_tenants_tenant_code", "tenant_code", unique=True),
 		Index("ix_tenants_start_date", "start_date"),
 		Index("ix_tenants_end_date", "end_date"),
 		Index("ix_tenants_created_at", "created_at"),
@@ -43,11 +44,14 @@ class Tenant(Base):
 	name: Mapped[str] = mapped_column(String(200), nullable=False, comment="Tenant display name")
 	domain: Mapped[str] = mapped_column(String(255), nullable=True, comment="Canonical domain, e.g. example.edu")
 	logo_url: Mapped[str] = mapped_column(String(255), nullable=True, comment="Optional logo URL")
+	tenant_code: Mapped[str] = mapped_column(String(6), unique=True, nullable=False, comment="6-char uppercase alphanumeric join code, auto-generated per tenant")
 	is_active: Mapped[bool] = mapped_column(default=True, comment="Tenant enabled flag")
 	is_deleted: Mapped[bool] = mapped_column(default=False, comment="Tenant deleted flag")
 	deleted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True, comment="Soft delete timestamp")
 	start_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, comment="Tenant contract start date")
 	end_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, comment="Tenant contract end date")
+	paystack_customer_code: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, comment="Paystack customer reference code")
+	monnify_account_reference: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, comment="Monnify account reference")
 	created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 	updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 	created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="FK: user who created this record")
@@ -91,9 +95,14 @@ class Tenant(Base):
 				"name": self.name,
 				"domain": self.domain,
 				"logo_url": self.logo_url,
+				"tenant_code": self.tenant_code,
 				"is_active": self.is_active,
 				"is_deleted": self.is_deleted,
 				"deleted_at": self.deleted_at.isoformat() if self.deleted_at else None,
+				"start_date": self.start_date.isoformat() if self.start_date else None,
+				"end_date": self.end_date.isoformat() if self.end_date else None,
+				"paystack_customer_code": self.paystack_customer_code,
+				"monnify_account_reference": self.monnify_account_reference,
 				"created_at": self.created_at.isoformat() if self.created_at else None,
 				"updated_at": self.updated_at.isoformat() if self.updated_at else None,
 				"created_by": str(self.created_by) if self.created_by else None,

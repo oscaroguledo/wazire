@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Request, Depends, status, Query
+from typing import Optional
 from core.middleware.error_handler import ForbiddenError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -88,10 +89,11 @@ async def get_tenant(
     current_user: UserRead = Depends(require_admin(get_token_service())),
     db: AsyncSession = Depends(get_db),
     token_service: TokenService = Depends(get_token_service),
+    tenant_code: Optional[str] = Query(None, description="Optional tenant code for additional lookup"),
 ):
     """Get tenant by ID (admin only)."""
     service = TenantService(db, token_service=token_service)
-    tenant = await service.get(tenant_id)
+    tenant = await service.get(tenant_id, tenant_code=tenant_code)
     if not tenant:
         return Response(
             success=False,
@@ -118,7 +120,7 @@ async def update_tenant(
 ):
     """Update tenant (admin only). Service handles domain uniqueness check."""
     service = TenantService(db, token_service=token_service)
-    tenant = await service.get(tenant_id)
+    tenant = await service.get(tenant_id, tenant_code=tenant_in.tenant_code)
     if not tenant:
         return Response(
             success=False,

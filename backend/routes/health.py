@@ -1,9 +1,22 @@
-from fastapi import APIRouter, Request, HTTPException
+"""Health check endpoint.
+
+Returns a structured JSON response probing DB, Redis, and Kafka connectivity.
+Always returns HTTP 200 so that load-balancers and Docker health checks can
+distinguish between "service is up but degraded" and "service is completely down".
+
+Response shape (per spec requirement 2.137):
+    {
+        "status": "ok",
+        "db":     "ok" | "error",
+        "redis":  "ok" | "error",
+        "kafka":  "ok" | "error"
+    }
+"""
+
+from fastapi import APIRouter, Request
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.utils.logger import logger
-from core.utils.response import Response
 from core.database import get_db
 from core.config import get_settings
 
@@ -12,67 +25,66 @@ router = APIRouter()
 
 @router.get("/health")
 async def health(request: Request):
-    """Health check endpoint with dependency verification."""
-    logger.debug("Health check requested")
-    
-    health_data = {
+    """Probe DB, Redis, and Kafka; always return HTTP 200 with structured status."""
+    settings = get_settings()
+
+    result = {
         "status": "ok",
-        "service": "wazire-api",
-        "dependencies": {}
+        "db": "ok",
+        "redis": "ok",
+        "kafka": "ok",
     }
-    
-    # Check database connectivity
+
+    # ── Database ──────────────────────────────────────────────────────────────
     try:
         async for db in get_db():
             await db.execute(text("SELECT 1"))
-            health_data["dependencies"]["database"] = "healthy"
-            await db.close()
             break
-    except Exception as e:
-        logger.error(f"Health check - database unhealthy: {e}")
-        health_data["dependencies"]["database"] = "unhealthy"
-        health_data["status"] = "degraded"
-    
-    # Check Redis connectivity
+    except Exception as exc:
+        logger.error("Health check — DB unhealthy: %s", exc)
+        result["db"] = "error"
+        result["status"] = "degraded"
+
+    # ── Redis ─────────────────────────────────────────────────────────────────
     try:
-        import redis.asyncio as redis
-        settings = get_settings()
+        import redis.asyncio as aioredis
+
         redis_url = settings.REDIS_URL
         if redis_url:
-            # If REDIS_PASSWORD is set, include it in the URL and pass as password
+            kwargs: dict = {"decode_responses": True}
             if settings.REDIS_PASSWORD:
-                # Insert password into URL if not already present
+                kwargs["password"] = settings.REDIS_PASSWORD
                 if "@" not in redis_url:
-                    redis_url = redis_url.replace("redis://", f"redis://:{settings.REDIS_PASSWORD}@")
-                redis_client = redis.from_url(redis_url, decode_responses=True, password=settings.REDIS_PASSWORD)
-            else:
-                # Connect without password
-                redis_client = redis.from_url(redis_url, decode_responses=True)
-            await redis_client.ping()
-            await redis_client.close()
-            health_data["dependencies"]["redis"] = "healthy"
+                    redis_url = redis_url.replace(
+                        "redis://", f"redis://:{settings.REDIS_PASSWORD}@"
+                    )
+            client = aioredis.from_url(redis_url, **kwargs)
+            await client.ping()
+            await client.aclose()
         else:
-            health_data["dependencies"]["redis"] = "not_configured"
-    except Exception as e:
-        logger.error(f"Health check - redis unhealthy: {e}")
-        # Don't mark as degraded for Redis failures in development
-        health_data["dependencies"]["redis"] = f"unhealthy: {str(e)}"
-    
-    # Determine overall status
-    if health_data["status"] == "degraded":
-        return Response(
-            success=False,
-            message="Service is degraded",
-            data=health_data,
-            request=request,
-            status_code=503
-        )
-    
-    return Response(
-        success=True,
-        message="Service is healthy",
-        data=health_data,
-        request=request
-    )
+            result["redis"] = "error"
+            result["status"] = "degraded"
+    except Exception as exc:
+        logger.error("Health check — Redis unhealthy: %s", exc)
+        result["redis"] = "error"
+        result["status"] = "degraded"
 
+    # ── Kafka ─────────────────────────────────────────────────────────────────
+    try:
+        from aiokafka.admin import AIOKafkaAdminClient
 
+        brokers = settings.kafka_bootstrap_list()
+        if brokers:
+            admin = AIOKafkaAdminClient(bootstrap_servers=brokers)
+            await admin.start()
+            await admin.close()
+        else:
+            result["kafka"] = "error"
+            result["status"] = "degraded"
+    except Exception as exc:
+        logger.error("Health check — Kafka unhealthy: %s", exc)
+        result["kafka"] = "error"
+        result["status"] = "degraded"
+
+    # Always HTTP 200 — callers inspect the body to determine degraded state
+    return result

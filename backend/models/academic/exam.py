@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import uuid
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
+from typing import Optional
 
 from sqlalchemy import ForeignKey, Enum as SQLEnum, String, Integer, Numeric, Index, func, CheckConstraint, DateTime, inspect
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -35,10 +36,10 @@ class Exam(Base):
     __table_args__ = (
         Index("ix_exams_course_id", "course_id"),
         Index("ix_exams_tenant_id", "tenant_id"),
-        Index("ix_exams_student_id", "student_id"),
         Index("ix_exams_semester_id", "semester_id"),
         Index("ix_exams_status", "status"),
         Index("ix_exams_start_time", "start_time"),
+        Index("ix_exams_end_time", "end_time"),
         Index("ix_exams_created_by", "created_by"),
         Index("ix_exams_updated_by", "updated_by"),
         Index("ix_exams_created_at", "created_at"),
@@ -58,7 +59,8 @@ class Exam(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7, comment="Primary key: UUIDv7 time-ordered")
     title: Mapped[str] = mapped_column(String(200), nullable=False, comment="Exam title")
     description: Mapped[str] = mapped_column(String(2000), nullable=True, comment="Exam description")
-    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True, comment="Exam start time (timezone-aware)")
+    start_time: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, comment="Exam start time (timezone-aware)")
+    end_time: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, comment="Exam end time: start_time + duration (persisted)")
     duration: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, comment="Duration in hours (decimal)")
     total_marks: Mapped[int] = mapped_column(Integer, nullable=True, comment="Total marks for the exam")
     passing_marks: Mapped[int] = mapped_column(Integer, nullable=True, comment="Passing marks for the exam")
@@ -68,7 +70,6 @@ class Exam(Base):
     course_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("academic.courses.id", ondelete="CASCADE"), nullable=True, comment="FK to course")
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.tenants.id", ondelete="CASCADE"), nullable=False, comment="FK to tenant/organization")
     semester_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("billings.semesters.id", ondelete="SET NULL"), nullable=True, comment="FK to semester")
-    student_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.users.id", ondelete="CASCADE"), nullable=True, comment="FK to student")
     
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -90,6 +91,7 @@ class Exam(Base):
             "title": self.title,
             "description": self.description,
             "start_time": self.start_time.isoformat() if self.start_time else None,
+            "end_time": self.end_time.isoformat() if self.end_time else None,
             "duration_hours": duration_hours,
             "duration_minutes": duration_minutes,
             "total_marks": self.total_marks,
@@ -98,7 +100,6 @@ class Exam(Base):
             "max_attempts": self.max_attempts,
             "tenant_id": str(self.tenant_id),
             "semester_id": str(self.semester_id) if self.semester_id else None,
-            "student_id": str(self.student_id) if self.student_id else None,
             "created_by": str(self.created_by) if self.created_by else None,
             "updated_by": str(self.updated_by) if self.updated_by else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,

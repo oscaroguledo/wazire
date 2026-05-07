@@ -16,6 +16,7 @@ from uuid_utils import uuid7
 class SubmissionStatus(str, Enum):
     PENDING = "pending"
     SUBMITTED = "submitted"
+    GRADING_IN_PROGRESS = "grading_in_progress"
     GRADED = "graded"
 
 
@@ -53,7 +54,8 @@ class Submission(Base):
     semester_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("billings.semesters.id", ondelete="SET NULL"), nullable=True, comment="FK to semester")
     latest_score: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    status: Mapped[SubmissionStatus] = mapped_column(SAEnum(SubmissionStatus, name="submission_status_enum", create_type=True), nullable=False, default=SubmissionStatus.PENDING, comment="Submission status: pending|submitted|graded")
+    status: Mapped[SubmissionStatus] = mapped_column(SAEnum(SubmissionStatus, name="submission_status_enum", create_type=True), nullable=False, default=SubmissionStatus.PENDING, comment="Submission status: pending|submitted|grading_in_progress|graded")
+    submitted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, default=None, comment="UTC moment when the student submitted the exam")
     graded_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -71,6 +73,7 @@ class Submission(Base):
             "latest_score": str(self.latest_score) if self.latest_score is not None else None,
             "attempts": self.attempts,
             "status": self.status.value,
+            "submitted_at": self.submitted_at.isoformat() if self.submitted_at else None,
             "graded_at": self.graded_at.isoformat() if self.graded_at else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
@@ -92,6 +95,7 @@ class SubmissionAttempt(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1, nullable=False, autoincrement=True, comment="Auto-incrementing ID which also serves as attempt number")
     submission_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("academic.submissions.id", ondelete="CASCADE"), nullable=False, comment="FK to submission")
     score: Mapped[Optional[float]] = mapped_column(Decimal(5, 2), nullable=True)
+    grading_started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, default=None, comment="UTC moment when grading began for this attempt")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     def __repr__(self) -> str:
@@ -102,5 +106,6 @@ class SubmissionAttempt(Base):
             "id": self.id,
             "submission_id": str(self.submission_id),
             "score": str(self.score) if self.score is not None else None,
+            "grading_started_at": self.grading_started_at.isoformat() if self.grading_started_at else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
