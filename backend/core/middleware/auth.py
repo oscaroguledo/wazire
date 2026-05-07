@@ -180,7 +180,7 @@ def require_admin(token_service: TokenService):
     async def admin_dependency(
         current_user: UserRead = Depends(create_auth_dependency(token_service))
     ) -> UserRead:
-        if current_user.role != "admin":
+        if current_user.role != UserRole.ADMIN:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Admin access required"
@@ -193,7 +193,7 @@ def require_superadmin(token_service: TokenService):
     async def superadmin_dependency(
         current_user: UserRead = Depends(create_auth_dependency(token_service))
     ) -> UserRead:
-        if current_user.role != "superadmin":
+        if current_user.role != UserRole.SUPERADMIN:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Superadmin access required"
@@ -206,7 +206,7 @@ def require_admin_or_superadmin(token_service: TokenService):
     async def admin_superadmin_dependency(
         current_user: UserRead = Depends(create_auth_dependency(token_service))
     ) -> UserRead:
-        if current_user.role not in ("admin", "superadmin"):
+        if current_user.role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Admin or superadmin access required"
@@ -217,7 +217,7 @@ def require_lecturer(token_service: TokenService):
     async def lecturer_dependency(
         current_user: UserRead = Depends(create_auth_dependency(token_service))
     ) -> UserRead:
-        if current_user.role != "lecturer":
+        if current_user.role != UserRole.LECTURER:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Lecturer access required"
@@ -229,7 +229,7 @@ def require_lecturer_or_admin(token_service: TokenService):
     async def lecturer_admin_dependency(
         current_user: UserRead = Depends(create_auth_dependency(token_service))
     ) -> UserRead:
-        if current_user.role not in ("lecturer", "admin"):
+        if current_user.role not in (UserRole.LECTURER, UserRole.ADMIN):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Lecturer or admin access required"
@@ -242,7 +242,7 @@ def require_student(token_service: TokenService):
     async def student_dependency(
         current_user: UserRead = Depends(create_auth_dependency(token_service))
     ) -> UserRead:
-        if current_user.role != "student":
+        if current_user.role != UserRole.STUDENT:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Student access required"
@@ -255,7 +255,7 @@ def require_student_or_above(token_service: TokenService):
     async def student_above_dependency(
         current_user: UserRead = Depends(create_auth_dependency(token_service))
     ) -> UserRead:
-        if current_user.role not in ("student", "lecturer", "admin", "superadmin"):
+        if current_user.role not in (UserRole.STUDENT, UserRole.LECTURER, UserRole.ADMIN, UserRole.SUPERADMIN):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Student access or higher required"
@@ -268,7 +268,7 @@ def require_lecturer_or_admin_or_superadmin(token_service: TokenService):
     async def lecturer_admin_superadmin_dependency(
         current_user: UserRead = Depends(create_auth_dependency(token_service))
     ) -> UserRead:
-        if current_user.role not in ("lecturer", "admin", "superadmin"):
+        if current_user.role not in (UserRole.LECTURER, UserRole.ADMIN, UserRole.SUPERADMIN):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Lecturer, admin, or superadmin access required"
@@ -282,7 +282,7 @@ def require_same_tenant(token_service: TokenService):
         tenant_id: uuid.UUID,
         current_user: UserRead = Depends(create_auth_dependency(token_service))
     ) -> UserRead:
-        if current_user.role == "admin":
+        if current_user.role == UserRole.ADMIN:
             return current_user
         if current_user.tenant_id != tenant_id:
             raise HTTPException(
@@ -298,7 +298,7 @@ def require_own_resource_or_admin(token_service: TokenService):
         user_id: uuid.UUID,
         current_user: UserRead = Depends(create_auth_dependency(token_service))
     ) -> UserRead:
-        if current_user.role == "admin":
+        if current_user.role == UserRole.ADMIN:
             return current_user
         if current_user.id != user_id:
             raise HTTPException(
@@ -319,10 +319,21 @@ def require_roles(allowed_roles: List[str]):
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Authentication required"
                 )
-            if current_user.role not in allowed_roles:
+            # Normalize allowed_roles to UserRole enums for comparison
+            normalized = set()
+            for r in allowed_roles:
+                try:
+                    if isinstance(r, UserRole):
+                        normalized.add(r)
+                    else:
+                        normalized.add(UserRole(str(r).lower()))
+                except Exception:
+                    # skip invalid role entries
+                    continue
+            if current_user.role not in normalized:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Access denied. Required roles: {', '.join(allowed_roles)}"
+                    detail=f"Access denied. Required roles: {', '.join([r.value for r in normalized])}"
                 )
             return await func(*args, **kwargs)
         return wrapper
