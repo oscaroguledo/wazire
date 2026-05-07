@@ -11,6 +11,8 @@ from core.database import get_db
 from core.utils.response import Response, offset
 from core.utils.encryption import EncryptionService
 from core.utils.token import TokenService
+from core.config import get_settings
+from tasks.email import queue_send_email
 from core.middleware.auth import get_token_service, create_auth_dependency, require_admin, require_lecturer_or_admin
 from services.account.user import UserService
 from schemas.account.auth import AuthCreate, AuthUpdate, AuthRead
@@ -22,6 +24,7 @@ router = APIRouter(prefix="/auth", tags=["authentication"])
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(
+    request: Request,
     user_in: UserCreate,
     tenant_id: Optional[uuid.UUID] = Query(None),
     db: AsyncSession = Depends(get_db),
@@ -34,6 +37,18 @@ async def register(
     if await service.get(email=user_in.email):
         return Response(success=False, error="Email already registered", request=request, status_code=status.HTTP_400_BAD_REQUEST)
     user = await service.create(user_in)
+
+    # Queue verification email
+    try:
+        token = token_service.create_timed_token({"user_id": str(user.id), "token_type": "verify"}, expires_in=60 * 60 * 24)
+        settings = get_settings()
+        frontend = settings.FRONTEND_URL.rstrip("/") if settings.FRONTEND_URL else "http://localhost:5173"
+        verify_url = f"{frontend}/verify-email?token={token}"
+        full_name = f"{user.first_name} {user.last_name}".strip()
+        await queue_send_email(to=user.email, subject="Verify your email", template="verify_email", template_vars={"verify_url": verify_url, "full_name": full_name})
+    except Exception:
+        logger.exception("Failed to queue verification email for user %s", user.email)
+
     return Response(success=True, message="Registered successfully", data=user.to_dict(), request=request, status_code=status.HTTP_201_CREATED)
 
 

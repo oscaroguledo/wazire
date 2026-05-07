@@ -18,6 +18,7 @@ from models.account.users import User
 from models.academic.course import Course
 from models.academic.exam import Exam
 from sqlalchemy import select, func as sqlfunc
+from tasks.email import queue_send_email
 
 router = APIRouter(prefix="/tenants", tags=["tenants"])
 
@@ -181,6 +182,13 @@ async def delete_tenant(
 
     tenant_delete = TenantDelete(id=tenant_id, updated_by=current_user.id)
     await service.delete(tenant_delete)
+    # Notify the acting admin that the tenant was deleted
+    try:
+        await queue_send_email(to=current_user.email, subject=f"Tenant deleted: {tenant.name}", template="delete_tenant", template_vars={"tenant_name": tenant.name})
+    except Exception:
+        # Best-effort: log and continue
+        from core.utils.logger import logger
+        logger.exception("Failed to queue tenant-deleted email for tenant %s", tenant_id)
     return Response(
         success=True,
         message="Tenant deleted successfully",

@@ -50,9 +50,8 @@ class Settings(BaseModel):
     # Scheduler intervals (minutes) for the internal scheduler that publishes Kafka events
     SCHEDULER_EXAM_STATUS_UPDATE_INTERVAL: Optional[int] = None
     SCHEDULER_EMAIL_SEND_INTERVAL: Optional[int] = None
-            BREVO_API_KEY=SecretStr(os.getenv("BREVO_API_KEY")) if os.getenv("BREVO_API_KEY") else _defaults.BREVO_API_KEY,
-            BREVO_SENDER_NAME=os.getenv("BREVO_SENDER_NAME", _defaults.BREVO_SENDER_NAME),
-            BREVO_SENDER_EMAIL=os.getenv("BREVO_SENDER_EMAIL", _defaults.BREVO_SENDER_EMAIL),
+    # Frontend URL used to build verification links
+    FRONTEND_URL: Optional[str] = "http://localhost:5173"
 
     def cors_origins_list(self) -> List[str]:
         if isinstance(self.CORS_ORIGINS, str):
@@ -197,6 +196,10 @@ def get_settings(force_reload: bool = False) -> Settings:
             KAFKA_SASL_MECHANISM=os.getenv("KAFKA_SASL_MECHANISM", _defaults.KAFKA_SASL_MECHANISM),
             SCHEDULER_EXAM_STATUS_UPDATE_INTERVAL=os.getenv("SCHEDULER_EXAM_STATUS_UPDATE_INTERVAL", None),
             SCHEDULER_EMAIL_SEND_INTERVAL=os.getenv("SCHEDULER_EMAIL_SEND_INTERVAL", None),
+            FRONTEND_URL=os.getenv("FRONTEND_URL", _defaults.FRONTEND_URL),
+            BREVO_API_KEY=SecretStr(os.getenv("BREVO_API_KEY")) if os.getenv("BREVO_API_KEY") else _defaults.BREVO_API_KEY,
+            BREVO_SENDER_NAME=os.getenv("BREVO_SENDER_NAME", _defaults.BREVO_SENDER_NAME),
+            BREVO_SENDER_EMAIL=os.getenv("BREVO_SENDER_EMAIL", _defaults.BREVO_SENDER_EMAIL),
         )
         
         # Validate configuration
