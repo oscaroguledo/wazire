@@ -242,7 +242,7 @@ async def bulk_enroll_students(
     current_user: User = Depends(require_lecturer_or_admin(get_token_service())),
 ):
     service = EnrollmentService(db)
-    tenant_id = None if current_user.role in ("admin", "superadmin") else current_user.tenant_id
+    tenant_id = None if current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else current_user.tenant_id
     try:
         enrollments = await service.bulk_enroll(bulk_request.enrollments, current_user, tenant_id=tenant_id)
         return Response(success=True, data=[e.to_dict() for e in enrollments], request=request, status_code=status.HTTP_201_CREATED)
