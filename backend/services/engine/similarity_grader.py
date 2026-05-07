@@ -3,7 +3,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional, Tuple
 
 from core.config import get_settings
-from core.key_balancer import get_balancer
+from core.utils.key_balancer import get_balancer
 
 try:
     from groq import Groq

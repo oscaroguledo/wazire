@@ -19,7 +19,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import List, Dict, Any, Union, Optional
 
 from core.config import get_settings
-from core.key_balancer import get_balancer
+from core.utils.key_balancer import get_balancer
 from models.academic.question import AnswerEnum
 
 # Make pandas optional so the module can be imported in environments
