@@ -114,9 +114,8 @@ class AuthMiddleware:
             user_read = UserRead.model_validate(user)
             _user_cache[user_uuid] = (user_read, current_time + CACHE_TTL)
 
-            role = _role_str(user.role)
-
-            if role not in ("admin", "superadmin"):
+            # Prefer enum comparison on ORM `user.role` when possible
+            if getattr(user, 'role', None) not in (UserRole.ADMIN, UserRole.SUPERADMIN):
                 if token_tenant and user.tenant_id:
                     if str(user.tenant_id) != str(token_tenant):
                         raise HTTPException(
@@ -126,7 +125,7 @@ class AuthMiddleware:
 
             if request is not None:
                 req_tid = getattr(request.state, "tenant_id", None)
-                if req_tid and role not in ("admin", "superadmin"):
+                if req_tid and getattr(user, 'role', None) not in (UserRole.ADMIN, UserRole.SUPERADMIN):
                     if str(req_tid) != str(token_tenant):
                         raise HTTPException(
                             status_code=status.HTTP_403_FORBIDDEN,
