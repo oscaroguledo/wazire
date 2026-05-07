@@ -456,7 +456,23 @@ class SubmissionService:
 
             await db.commit()
             print(f"[grading] Graded attempt {attempt_id} with score {score}")
-            
+            # Persist per-question graded results in bulk to avoid N x single-row writes.
+            # Prepare mappings for bulk update: merge a `graded` key into existing `answer` JSON.
+            try:
+                from core.db_bulk import bulk_update_student_answers
+                mappings = []
+                for qid, entry in graded_answers.items():
+                    mappings.append({
+                        "student_id": str(student_id),
+                        "exam_id": str(UUID(exam_id)),
+                        "question_id": qid,
+                        "graded": entry,
+                    })
+                # perform bulk update in batches
+                await bulk_update_student_answers(db, mappings, batch_size=500)
+            except Exception as e:
+                print(f"[grading] Failed to persist graded answers in bulk: {e}")
+
             # Refresh dashboards after grading
             if submission:
                 emit_refresh_dashboard(str(submission.student_id))

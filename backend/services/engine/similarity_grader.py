@@ -25,10 +25,17 @@ class SimilarityGrader:
         self.model = model
         self.client = None
         if Groq is not None:
+            # Prefer caller-provided key, otherwise ask the balancer for a key.
             key = api_key
             if not key:
-                settings = get_settings()
-                key = settings.GROQ_API_KEY
+                balancer = get_balancer()
+                try:
+                    # best key selection is async but we run it here synchronously via asyncio
+                    import asyncio
+                    key = asyncio.get_event_loop().run_until_complete(balancer.get_best_key())
+                except Exception:
+                    settings = get_settings()
+                    key = settings.GROQ_API_KEY
             if key:
                 try:
                     self.client = Groq(api_key=key)

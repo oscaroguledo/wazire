@@ -1022,3 +1022,115 @@ The following bug conditions document the absence of a production-grade nginx re
 3.86 WHEN `backend/.env.example` and `frontend/.env.example` are updated to include all required variables THEN the actual `backend/.env` and `frontend/.env` files (which are git-ignored) SHALL NOT be modified; the `.env.example` files are documentation only and their update does not affect any running service or CI environment
 
 3.87 WHEN the CORS configuration is tightened to use `FRONTEND_ORIGIN` instead of `*` THEN all existing API endpoints and their response contracts SHALL CONTINUE TO function identically for requests originating from the configured frontend origin; only cross-origin requests from disallowed origins are newly rejected, and no existing frontend functionality is broken provided `FRONTEND_ORIGIN` is set correctly in the deployment environment
+
+
+---
+
+## Advanced AI Grading Engine — Batch Processing, Key Rotation & Throttling
+
+### Current Behavior (Defect) — Batch Processing, Key Rotation & Throttling
+
+1.142 WHEN `SubmissionService.grade_attempt_background()` grades a submission with multiple theory questions THEN it calls the Groq API once per question in a sequential loop; for a 20-question theory exam this produces 20 separate Groq API calls, multiplying latency, consuming 20× the rate-limit quota, and increasing the probability of hitting a 429 error
+
+1.143 WHEN the grading engine imports the Groq client THEN it uses `from groq import Groq`, which fails with `ImportError` in some deployment environments where the Groq package exposes the client only via the submodule path; the correct import is `from groq.client import Groq as GroqClient`
+
+1.144 WHEN the backend is configured for AI grading THEN only a single `GROQ_API_KEY` environment variable is supported; there is no mechanism to supply multiple API keys, so a single rate-limit event on that key blocks all grading for the entire platform until the cooldown expires
+
+1.145 WHEN multiple Groq API calls are made in rapid succession THEN no jitter is applied between calls; the burst of requests looks like automated traffic to Groq's infrastructure, increasing the likelihood of triggering rate-limit responses
+
+1.146 WHEN the Kafka worker processes `GRADE_SUBMISSION_ATTEMPT` events THEN there is no per-tenant concurrency limit; a single tenant submitting a large exam (e.g. 500 students × 20 questions) can saturate the worker's asyncio event loop with grading tasks, starving other tenants' grading jobs for the duration
+
+1.147 WHEN a grading job starts THEN `Submission.status` is not updated to reflect that grading is in progress; the frontend has no way to distinguish between a submission that is waiting to be graded and one that is actively being graded, so it cannot show a meaningful "grading in progress" state to the student or lecturer
+
+1.148 WHEN a `SubmissionAttempt` record is created at the start of grading THEN no `grading_started_at` timestamp is recorded; operators cannot detect stuck or hung grading jobs by querying for attempts where `grading_started_at` is set but `graded_at` remains null after a threshold duration
+
+1.149 WHEN the Kafka consumer offset commit strategy is applied to `GRADE_SUBMISSION_ATTEMPT` events THEN the offset may be committed before grading completes (or on error), meaning a worker crash mid-grading permanently loses the grading job with no redelivery
+
+---
+
+### Expected Behavior (Correct) — Batch Processing, Key Rotation & Throttling
+
+2.142 WHEN `SubmissionService.grade_attempt_background()` grades a submission containing multiple theory questions THEN it SHALL batch all theory questions into a single Groq API call by constructing a prompt that requests a structured JSON response keyed by `question_id`; the response SHALL be parsed and each question's score and reason extracted from the batch result; MCQ and FITB questions SHALL continue to be graded inline without an API call; batching SHALL reduce the number of Groq API calls to at most one per submission regardless of the number of theory questions
+
+2.143 WHEN any engine service imports the Groq client THEN it SHALL use `from groq.client import Groq as GroqClient` as the primary import path, with a fallback to `from groq import Groq` for environments where the submodule is not exposed; `GroqClient` SHALL be used consistently across `base.py`, `similarity_grader.py`, and `answer_grader.py`
+
+2.144 WHEN the grading engine initialises its Groq client THEN it SHALL read up to four API keys from environment variables `GROQ_API_KEY_1`, `GROQ_API_KEY_2`, `GROQ_API_KEY_3`, and `GROQ_API_KEY_4`; a `GroqKeyRotator` class SHALL manage the pool, cycling through available keys in round-robin order; if a key receives a 429 response it SHALL be marked as cooling down with a reset timestamp derived from the `Retry-After` header (or a default backoff), and SHALL be skipped until its reset time passes; if all keys are cooling down the rotator SHALL wait for the soonest reset time before proceeding; the `GroqKeyRotator` instance SHALL be a module-level singleton shared across all grading engine instances in the same worker process
+
+2.145 WHEN the Kafka worker's grading handler makes consecutive Groq API calls (e.g. when processing multiple submissions back-to-back) THEN it SHALL insert a random delay of 0.1–0.5 seconds between calls using `asyncio.sleep(random.uniform(0.1, 0.5))`; the jitter SHALL be applied between calls, not before the first call of a batch
+
+2.146 WHEN the Kafka worker processes a `GRADE_SUBMISSION_ATTEMPT` event for a given `tenant_id` THEN it SHALL acquire a per-tenant `asyncio.Semaphore` before starting the grading task; the maximum number of concurrent grading tasks per tenant SHALL default to 2 and SHALL be configurable via the `GRADING_CONCURRENCY_PER_TENANT` environment variable; if the semaphore is at capacity the task SHALL wait (not drop the message) until a slot is available; semaphores SHALL be stored in a module-level dict keyed by `tenant_id` and created on first use
+
+2.147 WHEN grading starts for a submission THEN `Submission.status` SHALL be updated to `grading_in_progress` before any Groq API call is made; the `SubmissionStatus` enum SHALL include `grading_in_progress` as a valid value; the frontend SHALL be able to read this status and display a "Grading in progress" indicator to the student and lecturer
+
+2.148 WHEN a `SubmissionAttempt` record enters the grading phase THEN a `grading_started_at` column (`DateTime(timezone=True)`, nullable, default `None`) SHALL be set to `datetime.now(timezone.utc)` at the moment grading begins; operators SHALL be able to detect stuck jobs by querying for attempts where `grading_started_at IS NOT NULL AND graded_at IS NULL AND grading_started_at < now() - interval '1 hour'`
+
+2.149 WHEN the Kafka consumer processes a `GRADE_SUBMISSION_ATTEMPT` event THEN the consumer offset SHALL NOT be committed until grading is fully complete and all DB writes have been committed; if grading raises an exception the offset SHALL not be committed so that the message is redelivered on worker restart, ensuring no grading job is silently lost
+
+---
+
+### Unchanged Behavior (Regression Prevention) — Batch Processing, Key Rotation & Throttling
+
+3.88 WHEN theory question batching is introduced THEN MCQ and FITB grading SHALL CONTINUE TO use direct comparison (no Groq API call) with the same score and reason contract (`Decimal("1.00")`/`Decimal("0.00")`, reason `"-"`) as currently implemented in `SimilarityGrader.grade()`
+
+3.89 WHEN the `GroqKeyRotator` singleton is introduced THEN the existing `GroqEngineBase._init_client()` method SHALL CONTINUE TO be the single place where the Groq client is initialised; `GroqKeyRotator` SHALL delegate client construction to `GroqEngineBase` or an equivalent factory, not duplicate the initialisation logic
+
+3.90 WHEN per-tenant semaphores are added to the grading worker THEN the existing `GRADE_SUBMISSION_ATTEMPT` handler logic (idempotency check on `attempt.graded_at`, retry with exponential backoff, dead-letter on exhausted retries) SHALL CONTINUE TO function as specified in requirements 2.31 and 2.33; the semaphore wraps the handler invocation and does not alter its internal logic
+
+3.91 WHEN `Submission.status` gains the `grading_in_progress` value THEN all existing status values (`pending`, `submitted`, `graded`) SHALL CONTINUE TO be valid and all existing code paths that set or check `Submission.status` SHALL CONTINUE TO function without modification; `grading_in_progress` is additive
+
+3.92 WHEN the `SubmissionAttempt` model gains a `grading_started_at` column THEN all existing `SubmissionAttempt` columns (`id`, `submission_id`, `score`, `created_at`) and all existing service methods that create or read `SubmissionAttempt` records SHALL CONTINUE TO function without modification; `grading_started_at` is additive and nullable
+
+3.93 WHEN jitter is added between consecutive Groq API calls in the worker THEN the total grading time for a single submission SHALL NOT be affected by jitter (jitter is applied between submissions, not between questions within a single batch call); the batch grading introduced in requirement 2.142 ensures a single submission still completes in one API round-trip
+
+
+---
+
+## High-Scale Bulk Write, Redis Key Balancer & Kafka Partitioning
+
+### Current Behavior (Defect) — Bulk Write, Redis Key Balancer & Kafka Partitioning
+
+1.150 WHEN grading completes for a batch of questions THEN `SubmissionService.grade_attempt_background()` writes each `StudentAnswer` result individually using `session.add()` inside a loop, producing O(N) database round trips; for a 500-question exam this means 500 separate INSERT statements instead of one
+
+1.151 WHEN `SubmissionAttempt` scores are updated after grading THEN the update is performed row-by-row rather than as a single `UPDATE ... WHERE id IN (...)` bulk statement, producing unnecessary additional round trips proportional to the number of attempts being updated
+
+1.152 WHEN multiple worker replicas (up to 20) are running and selecting a Groq API key THEN the `GroqKeyRotator` introduced in requirement 2.144 operates per-process only; each replica maintains its own independent in-memory key usage counters, so all 20 replicas can simultaneously select and hammer the same key with no cross-process coordination
+
+1.153 WHEN a Groq API key receives a 429 rate-limit response THEN the per-process `GroqKeyRotator` marks that key as cooling down only within its own process; other worker replicas are unaware of the rate-limit event and continue sending requests to the same key until they each independently receive their own 429
+
+1.154 WHEN the `GRADE_SUBMISSION_ATTEMPT` Kafka topic is consumed by multiple worker replicas THEN no partition key is set on the Kafka messages; events are distributed randomly across partitions, so grading events for the same tenant can be split across different workers, causing out-of-order grade writes and preventing per-tenant ordering guarantees
+
+1.155 WHEN PostgreSQL receives a high volume of grade writes from Groq Llama 4 Scout (which processes at ~600 tokens/sec) THEN `synchronous_commit` is set to the default (`on`), requiring a WAL flush to disk for every write; this creates a write bottleneck that causes the DB to fall behind the grading throughput, even though Kafka is the source of truth and a missed WAL flush is recoverable
+
+1.156 WHEN the grading batch size (questions per Groq API call) or the DB write batch size need to be tuned for a deployment THEN no environment variables exist to configure these values; they are hardcoded, requiring a code change and redeployment to adjust throughput parameters
+
+---
+
+### Expected Behavior (Correct) — Bulk Write, Redis Key Balancer & Kafka Partitioning
+
+2.150 WHEN grading completes for a batch of questions THEN all `StudentAnswer` results SHALL be written in a single database hit using `session.execute(insert(StudentAnswer).values([...]))` (SQLAlchemy bulk insert) or the PostgreSQL `COPY` command; looping `session.add()` per row SHALL be replaced entirely; the target is 500 question grades saved in a single database round trip; JSONB arrays in PostgreSQL SHALL be used where appropriate for storing batch results
+
+2.151 WHEN `SubmissionAttempt` scores are updated after grading THEN the update SHALL be performed as a single `UPDATE ... WHERE id IN (...)` bulk statement rather than row-by-row, so that all attempt score updates for a grading batch complete in one database round trip
+
+2.152 WHEN the grading engine selects a Groq API key THEN it SHALL use a Redis-backed global key balancer instead of the per-process `GroqKeyRotator`; a central Redis instance SHALL store the token usage count for each of the four Groq keys (e.g. `groq:key:1:tokens_used_this_minute`, `groq:key:2:tokens_used_this_minute`) with a 60-second TTL; all worker replicas SHALL read from the same Redis instance to decide which key to use, and SHALL atomically increment the chosen key's counter via `INCR` after each use
+
+2.153 WHEN a Groq API key's Redis token counter exceeds the configurable threshold (`GROQ_KEY_TOKEN_LIMIT`, default `280000` tokens/minute) THEN all worker replicas SHALL skip that key when selecting the next key to use; WHEN a key receives a 429 response THEN the worker SHALL set a Redis flag `groq:key:N:rate_limited` with a TTL equal to the `Retry-After` header value (or 60 seconds if the header is absent); all workers SHALL check this flag before using a key, ensuring no replica sends requests to a rate-limited key
+
+2.154 WHEN a `GRADE_SUBMISSION_ATTEMPT` Kafka message is produced THEN `tenant_id` SHALL be used as the Kafka message key so that all grading events for a given tenant are routed to the same partition and processed in order by the same worker replica; the `GRADE_SUBMISSION_ATTEMPT` topic SHALL have at least 4 partitions, configurable via the `KAFKA_GRADING_PARTITIONS` environment variable
+
+2.155 WHEN other Kafka topics (`UPSERT_STUDENT_ANSWER`, `REFRESH_DASHBOARD`) produce messages THEN they SHALL also use appropriate partition keys (`student_id` for `UPSERT_STUDENT_ANSWER`, `user_id` or `tenant_id` for `REFRESH_DASHBOARD`) to ensure related events are processed in order by the same worker
+
+2.156 WHEN PostgreSQL is configured for the grading write path THEN `synchronous_commit = off` SHALL be set for that path (acceptable because Kafka is the source of truth and the write is recoverable); PgBouncer connection pooling SHALL be fixed per defect 1.12; `work_mem` and `shared_buffers` SHALL be tuned for write-heavy workloads; these PostgreSQL settings SHALL be configurable via environment variables passed to the `postgres` service in `docker-compose.yml`; grading batch size SHALL be configurable via `GRADING_BATCH_SIZE` (default `20`) and DB write batch size via `DB_WRITE_BATCH_SIZE` (default `500`)
+
+---
+
+### Unchanged Behavior (Regression Prevention) — Bulk Write, Redis Key Balancer & Kafka Partitioning
+
+3.94 WHEN bulk `StudentAnswer` inserts replace per-row `session.add()` calls THEN the final set of rows written to the `student_answers` table SHALL be identical in content to what the per-row approach would have written; the `UniqueConstraint` on `(student_id, exam_id, question_id)` (requirement 2.49) SHALL CONTINUE TO be enforced, and the bulk insert SHALL use `ON CONFLICT DO UPDATE` to remain idempotent
+
+3.95 WHEN the Redis-backed global key balancer replaces the per-process `GroqKeyRotator` THEN the existing round-robin key selection order and 429-backoff behaviour SHALL CONTINUE TO be preserved in the new implementation; the change is a backend coordination upgrade, not a behaviour change; all four keys (`GROQ_API_KEY_1` through `GROQ_API_KEY_4`) SHALL CONTINUE TO be read from the same environment variables
+
+3.96 WHEN `tenant_id` is used as the Kafka partition key for `GRADE_SUBMISSION_ATTEMPT` THEN the existing message payload schema (`attempt_id`, `exam_id`) SHALL CONTINUE TO be unchanged; only the Kafka producer call gains a `key=tenant_id` argument; consumers SHALL CONTINUE TO deserialise and handle the payload identically
+
+3.97 WHEN `synchronous_commit = off` is applied to the grading write path THEN all other PostgreSQL write paths (user creation, tenant creation, exam creation, enrollment, billing) SHALL CONTINUE TO use the default `synchronous_commit = on` behaviour; the relaxed durability setting is scoped exclusively to the grading worker's DB session
+
+3.98 WHEN `GRADING_BATCH_SIZE` and `DB_WRITE_BATCH_SIZE` environment variables are introduced THEN all existing grading logic that does not depend on batch sizing (idempotency checks, retry logic, dead-letter forwarding, `grading_started_at` / `graded_at` timestamps) SHALL CONTINUE TO function identically regardless of the configured batch sizes
