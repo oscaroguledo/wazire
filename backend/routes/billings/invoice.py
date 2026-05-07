@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import uuid
 from typing import Optional
+import hmac
+import hashlib
 
 from fastapi import APIRouter, Depends, status, Request, Header
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -85,7 +87,20 @@ async def invoice_payment_webhook(
     settings = get_settings()
     secret = getattr(settings, "PAYMENT_WEBHOOK_SECRET", None)
     if secret:
-        if not x_signature or x_signature != secret:
+        body = await request.body()
+        # Secret may be a SecretStr — extract raw value
+        try:
+            secret_val = secret.get_secret_value()
+        except Exception:
+            secret_val = str(secret)
+
+        expected = hmac.new(secret_val.encode(), body, hashlib.sha256).hexdigest()
+        header_val = x_signature or ""
+        # Accept common prefixes like 'sha256=...'
+        if header_val.startswith("sha256="):
+            header_val = header_val.split("=", 1)[1]
+
+        if not hmac.compare_digest(expected, header_val):
             return Response(success=False, error="Invalid signature", status_code=status.HTTP_401_UNAUTHORIZED)
 
     svc = InvoiceService(db)

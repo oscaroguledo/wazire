@@ -39,6 +39,8 @@ class Settings(BaseModel):
     BREVO_API_KEY: Optional[SecretStr] = None
     BREVO_SENDER_NAME: Optional[str] = "Wazire"
     BREVO_SENDER_EMAIL: Optional[str] = None
+    # Secret used to validate incoming payment provider webhooks (HMAC-SHA256)
+    PAYMENT_WEBHOOK_SECRET: Optional[SecretStr] = None
 
     # Kafka settings
     KAFKA_BOOTSTRAP_SERVERS: Optional[str] = None
@@ -137,6 +139,9 @@ class Settings(BaseModel):
             # Warn / require BREVO in production if email sending is enabled by app logic
             if not self.BREVO_API_KEY or (self.BREVO_SENDER_EMAIL is None):
                 errors.append("BREVO_API_KEY and BREVO_SENDER_EMAIL must be set in production for transactional emails")
+            # Require webhook secret in production to secure payment callbacks
+            if not self.PAYMENT_WEBHOOK_SECRET:
+                errors.append("PAYMENT_WEBHOOK_SECRET must be set in production to validate payment webhooks")
         
         # Validate ACCESS_TOKEN_EXPIRE_SECONDS
         if self.ACCESS_TOKEN_EXPIRE_SECONDS < 60:
@@ -200,6 +205,7 @@ def get_settings(force_reload: bool = False) -> Settings:
             BREVO_API_KEY=SecretStr(os.getenv("BREVO_API_KEY")) if os.getenv("BREVO_API_KEY") else _defaults.BREVO_API_KEY,
             BREVO_SENDER_NAME=os.getenv("BREVO_SENDER_NAME", _defaults.BREVO_SENDER_NAME),
             BREVO_SENDER_EMAIL=os.getenv("BREVO_SENDER_EMAIL", _defaults.BREVO_SENDER_EMAIL),
+            PAYMENT_WEBHOOK_SECRET=SecretStr(os.getenv("PAYMENT_WEBHOOK_SECRET")) if os.getenv("PAYMENT_WEBHOOK_SECRET") else _defaults.PAYMENT_WEBHOOK_SECRET,
         )
         
         # Validate configuration
