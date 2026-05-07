@@ -12,7 +12,7 @@ from core.utils.response import Response
 from core.utils.logger import logger
 from core.utils.token import TokenService
 from core.middleware.auth import get_token_service, create_auth_dependency, require_lecturer_or_admin
-from services.academic.question import QuestionService
+from services.academic.questions import QuestionService
 from tasks.question import emit_detect_answer
 from tasks.submission import emit_refresh_dashboard
 from services.engine.exam_extractor import ExamParser

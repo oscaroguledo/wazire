@@ -14,6 +14,7 @@ from core.middleware.rate_limit import limiter, rate_limit_exceeded_handler
 from core.middleware.error_handler import setup_error_handlers
 from slowapi.errors import RateLimitExceeded
 from core.utils.kafka import producer_service
+from core.kafka_manager import kafka_manager
 
 settings = get_settings()
 
@@ -32,6 +33,8 @@ async def lifespan(app: FastAPI):
 	# Start pooled Kafka producer (used by tasks/dispatcher)
 	try:
 		await producer_service.start()
+		# Bind kafka_manager to the now-started producer
+		kafka_manager._producer = producer_service
 	except Exception:
 		logger.exception("Failed to start Kafka producer")
 
@@ -101,21 +104,21 @@ app.add_middleware(TenantMiddleware)
 
 # Register routers
 from routes import health
-from routes.account import user, tenant
-from routes.academic import submission, course, exam, question, answer, enrollments
+from routes.account import users, tenants
+from routes.academic import submissions, courses, exams, questions, answers, enrollments
 from routes.analytics import dashboard
 from routes.billings import invoice as billings_invoice
 import uvicorn
 
 # API Version 1
 app.include_router(health, prefix="/api/v1")
-app.include_router(user.router, prefix="/api/v1")
-app.include_router(tenant.router, prefix="/api/v1")
-app.include_router(submission.router, prefix="/api/v1/academic")
-app.include_router(course.router, prefix="/api/v1/academic")
-app.include_router(exam.router, prefix="/api/v1/academic")
-app.include_router(question.router, prefix="/api/v1/academic")
-app.include_router(answer.router, prefix="/api/v1/academic")
+app.include_router(users.router, prefix="/api/v1")
+app.include_router(tenants.router, prefix="/api/v1")
+app.include_router(submissions.router, prefix="/api/v1/academic")
+app.include_router(courses.router, prefix="/api/v1/academic")
+app.include_router(exams.router, prefix="/api/v1/academic")
+app.include_router(questions.router, prefix="/api/v1/academic")
+app.include_router(answers.router, prefix="/api/v1/academic")
 app.include_router(enrollments.router, prefix="/api/v1/academic")
 app.include_router(dashboard.router, prefix="/api/v1/analytics")
 

@@ -297,18 +297,18 @@
 
 - [-] 6. Refactor backend architecture: rename files, implement KafkaManager, class-based Worker, dispatcher pattern, OLAP/OLTP separation, and production settings
 
-  - [ ] 6.1 Rename all route and service files from singular to plural nouns
+  - [x] 6.1 Rename all route and service files from singular to plural nouns
     - Rename route files: `user.py`→`users.py`, `tenant.py`→`tenants.py`, `course.py`→`courses.py`, `exam.py`→`exams.py`, `question.py`→`questions.py`, `answer.py`→`answers.py`, `submission.py`→`submissions.py`
     - Rename service files: same pattern for all files in `backend/services/academic/` and `backend/services/account/`
     - _Requirements: 2.54, 3.40_
 
-  - [ ] 6.2 Update all imports in `main.py` and elsewhere to use renamed files
+  - [x] 6.2 Update all imports in `main.py` and elsewhere to use renamed files
     - Update all `from routes.account.user import ...` → `from routes.account.users import ...` etc.
     - Update all `from services.academic.course import ...` → `from services.academic.courses import ...` etc.
     - Verify no broken imports remain after renaming
     - _Requirements: 2.54, 2.55_
 
-  - [ ] 6.3 Implement `KafkaManager` facade class in `backend/core/kafka_manager.py`
+  - [x] 6.3 Implement `KafkaManager` facade class in `backend/core/kafka_manager.py`
     - Create `class KafkaManager` with `TOPIC_MAP` dict routing `UPSERT_STUDENT_ANSWER` to `wazire-answers` and all others to `tenant-tasks`
     - Implement `async def emit(self, event, data, partition_key=None) -> bool`
     - Create module-level singleton `kafka_manager: KafkaManager = None`; initialise in lifespan
@@ -317,7 +317,7 @@
     - _Preservation: KafkaProducerService unchanged; KafkaManager delegates to it (3.24)_
     - _Requirements: 2.28, 3.24_
 
-  - [ ] 6.4 Refactor `backend/worker.py` to class-based `Worker`
+  - [x] 6.4 Refactor `backend/worker.py` to class-based `Worker`
     - Create `class Worker` with `__init__`, `start()`, `run()`, `stop()`, and `classmethod main()` lifecycle methods
     - `start()` calls `self._consumer.start()`; `run()` waits on `_stop_event`; `stop()` sets event and calls `self._consumer.stop()`
     - Add signal handlers for `SIGINT` and `SIGTERM` in `run()`
@@ -327,7 +327,7 @@
     - _Preservation: existing Kafka event handlers continue to function (3.22)_
     - _Requirements: 2.26_
 
-  - [ ] 6.5 Implement dispatcher pattern — `HANDLERS` dict per tasks module
+  - [-] 6.5 Implement dispatcher pattern — `HANDLERS` dict per tasks module
     - Add `HANDLERS: Dict[str, Handler]` dict to each `backend/tasks/` module (`exam.py`, `submission.py`, `question.py`, `email.py`)
     - Update `KafkaConsumerService._load_handlers()` to iterate over task modules and merge their `HANDLERS` dicts
     - Make `KAFKA_CONSUMER_GROUP_ID` configurable via environment variable (default `"wazire-worker"`)

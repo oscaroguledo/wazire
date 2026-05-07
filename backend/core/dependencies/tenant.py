@@ -7,7 +7,7 @@ from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
-from services.account.tenant import TenantService
+from services.account.tenants import TenantService
 
 
 async def get_current_tenant(request: Request, db: AsyncSession = Depends(get_db)) -> Optional[object]:

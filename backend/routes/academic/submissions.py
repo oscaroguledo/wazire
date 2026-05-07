@@ -14,7 +14,7 @@ from core.utils.token import TokenService
 from core.middleware.auth import get_token_service, create_auth_dependency, require_lecturer_or_admin, require_student
 # StudentAnswerService is used in services and grading; not required at route-level
 from services.engine.answer_sheet_extractor import AnswerSheetParser
-from services.academic.submission import SubmissionService
+from services.academic.submissions import SubmissionService
 from tasks.submission import emit_refresh_dashboard, emit_grade_attempt
 from models.academic.question import Question as QuestionModel
 from models.academic.exam import Exam as ExamModel

@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.database import get_db
 from core.utils.token import TokenService
 from core.config import get_settings
-from services.account.user import UserService
+from services.account.users import UserService
 from schemas.account.users import UserRead
 from models.account.users import UserRole
 

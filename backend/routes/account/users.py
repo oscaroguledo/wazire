@@ -14,7 +14,7 @@ from core.utils.token import TokenService
 from core.config import get_settings
 from tasks.email import queue_send_email
 from core.middleware.auth import get_token_service, create_auth_dependency, require_admin, require_lecturer_or_admin
-from services.account.user import UserService
+from services.account.users import UserService
 from schemas.account.auth import AuthCreate, AuthUpdate, AuthRead
 from schemas.account.users import UserCreate, UserUpdate, UserRead
 from models.account.users import UserRole

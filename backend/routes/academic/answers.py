@@ -9,7 +9,7 @@ from core.utils.response import Response
 from core.utils.token import TokenService
 from core.middleware.auth import get_token_service, create_auth_dependency, require_lecturer_or_admin
 from core.utils.kafka import producer_service
-from services.academic.answer import AnswerService
+from services.academic.answers import AnswerService
 from services.academic.student_answer import StudentAnswerService
 from schemas.academic.answer import AnswerCreate
 from schemas.account.users import UserRead

@@ -39,7 +39,7 @@ async def handle_grade_submission_attempt(data: Dict[str, Any]) -> None:
     from .utils import with_db
 
     async def _run(db):
-        from services.academic.submission import SubmissionService
+        from services.academic.submissions import SubmissionService
         svc = SubmissionService(db)
         await svc.grade_attempt_background(attempt_id, exam_id)
 
@@ -110,3 +110,15 @@ def emit_grade_attempt(attempt_id: str, exam_id: str) -> None:
     asyncio.ensure_future(
         producer_service.publish_safe(TOPIC, "GRADE_SUBMISSION_ATTEMPT", {"attempt_id": attempt_id, "exam_id": exam_id})
     )
+
+
+# ---------------------------------------------------------------------------
+# Dispatcher registration
+# ---------------------------------------------------------------------------
+
+#: Map of Kafka event name → handler coroutine for this module.
+#: KafkaConsumerService discovers and merges these at startup.
+HANDLERS: dict = {
+    "GRADE_SUBMISSION_ATTEMPT": handle_grade_submission_attempt,
+    "REFRESH_DASHBOARD": handle_refresh_dashboard,
+}

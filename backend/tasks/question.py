@@ -61,7 +61,7 @@ async def detect_answer_background(db, question_id: str) -> None:
 async def parse_and_create_background(db, pages: list, industry: str, exam_id: str, mark_per_question: Optional[float], tenant_id: Optional[UUID]) -> None:
     """Parse exam pages and bulk-create questions using an existing DB session."""
     from services.engine.exam_extractor import ExamParser
-    from services.academic.question import QuestionService
+    from services.academic.questions import QuestionService
     from uuid import UUID
 
     parser = ExamParser()
@@ -168,3 +168,15 @@ async def handle_parse_and_create(data: Dict[str, Any]) -> None:
     except Exception:
         logger.exception("PARSE_AND_CREATE failed (exam=%s)", exam_id)
         raise
+
+
+# ---------------------------------------------------------------------------
+# Dispatcher registration
+# ---------------------------------------------------------------------------
+
+#: Map of Kafka event name → handler coroutine for this module.
+#: KafkaConsumerService discovers and merges these at startup.
+HANDLERS: dict = {
+    "DETECT_ANSWER": handle_detect_answer,
+    "PARSE_AND_CREATE": handle_parse_and_create,
+}

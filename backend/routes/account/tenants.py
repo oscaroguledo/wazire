@@ -11,8 +11,8 @@ from core.database import get_db
 from core.utils.response import Response, offset
 from core.utils.token import TokenService
 from core.middleware.auth import get_token_service, require_admin
-from services.account.tenant import TenantService
-from services.account.user import UserService
+from services.account.tenants import TenantService
+from services.account.users import UserService
 from schemas.account.tenant import TenantCreate, TenantUpdate, TenantRead, TenantDelete
 from schemas.account.users import UserRead
 from models.account.users import User

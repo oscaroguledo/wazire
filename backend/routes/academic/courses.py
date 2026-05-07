@@ -9,7 +9,7 @@ from core.database import get_db
 from core.utils.response import Response
 from core.utils.token import TokenService
 from core.middleware.auth import get_token_service, create_auth_dependency, require_lecturer_or_admin
-from services.academic.course import CourseService
+from services.academic.courses import CourseService
 from schemas.academic.course import CourseCreate, CourseUpdate
 from schemas.account.users import UserRead
 from models.account.users import UserRole

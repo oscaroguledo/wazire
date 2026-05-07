@@ -75,3 +75,15 @@ async def handle_send_queued_emails(data: Dict[str, Any]) -> None:
     """Process queued outbound emails."""
     # TODO: query DB for queued emails and dispatch via handle_send_email
     logger.info("SEND_QUEUED_EMAILS: no queued emails to process (stub)")
+
+
+# ---------------------------------------------------------------------------
+# Dispatcher registration
+# ---------------------------------------------------------------------------
+
+#: Map of Kafka event name → handler coroutine for this module.
+#: KafkaConsumerService discovers and merges these at startup.
+HANDLERS: dict = {
+    "UPDATE_EXAM_STATUS": handle_update_exam_status,
+    "SEND_QUEUED_EMAILS": handle_send_queued_emails,
+}

@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 import json
+import os
 import ssl
-from typing import Any, Callable, Coroutine, Dict, Optional
+from typing import Any, Callable, Coroutine, Dict, List, Optional
 
 from aiokafka import AIOKafkaConsumer, TopicPartition
 from aiokafka.errors import KafkaConnectionError, KafkaError
@@ -18,6 +20,15 @@ Handler = Callable[[Dict[str, Any]], Coroutine[Any, Any, None]]
 # Maximum consecutive broker errors before backing off
 _MAX_ERRORS = 5
 _BACKOFF_SECONDS = 10
+
+# Task modules that export a HANDLERS dict — add new modules here to register
+# their events without touching consumer.py.
+_TASK_MODULES: List[str] = [
+    "tasks.submission",
+    "tasks.exam",
+    "tasks.question",
+    "tasks.email",
+]
 
 
 def _build_consumer(topic: str, group_id: str) -> AIOKafkaConsumer:
@@ -53,7 +64,8 @@ class KafkaConsumerService:
     """Resilient Kafka consumer with manual commit and dead-letter logging."""
 
     TOPIC = "tenant-tasks"
-    GROUP_ID = "wazire-worker"
+    # Configurable via KAFKA_CONSUMER_GROUP_ID env var; default "wazire-worker"
+    GROUP_ID: str = os.environ.get("KAFKA_CONSUMER_GROUP_ID", "wazire-worker")
 
     def __init__(self) -> None:
         self._consumer: Optional[AIOKafkaConsumer] = None
@@ -170,29 +182,47 @@ class KafkaConsumerService:
             logger.exception("Failed to commit offset (offset=%d)", msg.offset)
 
     # ------------------------------------------------------------------
-    # Handler registration
+    # Handler registration — dispatcher pattern
     # ------------------------------------------------------------------
 
     def _load_handlers(self) -> None:
-        """Import task modules and register event handlers."""
-        try:
-            from tasks.submission import handle_grade_submission_attempt, handle_refresh_dashboard
-            from tasks.question import handle_detect_answer, handle_parse_and_create
-            from tasks.email import handle_send_email
-            from tasks.exam import handle_update_exam_status, handle_send_queued_emails
+        """Discover and merge HANDLERS dicts from all task modules.
 
-            self._handlers = {
-                "GRADE_SUBMISSION_ATTEMPT": handle_grade_submission_attempt,
-                "REFRESH_DASHBOARD": handle_refresh_dashboard,
-                "DETECT_ANSWER": handle_detect_answer,
-                "PARSE_AND_CREATE": handle_parse_and_create,
-                "SEND_EMAIL": handle_send_email,
-                "UPDATE_EXAM_STATUS": handle_update_exam_status,
-                "SEND_QUEUED_EMAILS": handle_send_queued_emails,
-            }
-            logger.info("Registered %d Kafka event handlers", len(self._handlers))
-        except Exception:
-            logger.exception("Failed to load Kafka event handlers")
+        Each module in _TASK_MODULES may export a module-level ``HANDLERS``
+        dict mapping event name → async handler coroutine.  This method
+        imports every listed module and merges their dicts so that
+        consumer.py never needs to be edited when a new event type is added.
+        """
+        merged: Dict[str, Handler] = {}
+        for module_path in _TASK_MODULES:
+            try:
+                mod = importlib.import_module(module_path)
+                handlers: Dict[str, Handler] = getattr(mod, "HANDLERS", {})
+                if not isinstance(handlers, dict):
+                    logger.warning(
+                        "Task module %s has a non-dict HANDLERS attribute — skipping",
+                        module_path,
+                    )
+                    continue
+                overlap = set(merged) & set(handlers)
+                if overlap:
+                    logger.warning(
+                        "Handler conflict in %s: events %s already registered — overwriting",
+                        module_path, overlap,
+                    )
+                merged.update(handlers)
+                logger.debug(
+                    "Loaded %d handler(s) from %s: %s",
+                    len(handlers), module_path, list(handlers),
+                )
+            except Exception:
+                logger.exception("Failed to load handlers from task module %s", module_path)
+
+        self._handlers = merged
+        logger.info(
+            "Registered %d Kafka event handler(s): %s",
+            len(self._handlers), sorted(self._handlers),
+        )
 
 
 # Only the class-based `KafkaConsumerService` is exported from this module.

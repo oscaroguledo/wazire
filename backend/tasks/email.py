@@ -97,3 +97,14 @@ async def handle_send_email(data: Dict[str, Any]) -> None:
     except Exception:
         logger.exception("SEND_EMAIL failed (to=%s)", to)
         raise
+
+
+# ---------------------------------------------------------------------------
+# Dispatcher registration
+# ---------------------------------------------------------------------------
+
+#: Map of Kafka event name → handler coroutine for this module.
+#: KafkaConsumerService discovers and merges these at startup.
+HANDLERS: dict = {
+    "SEND_EMAIL": handle_send_email,
+}

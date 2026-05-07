@@ -12,7 +12,7 @@ from core.database import get_db
 from core.utils.response import Response
 from core.utils.token import TokenService
 from core.middleware.auth import get_token_service, create_auth_dependency, require_lecturer_or_admin
-from services.academic.exam import ExamService
+from services.academic.exams import ExamService
 from tasks.submission import emit_refresh_dashboard
 from schemas.academic.exam import ExamCreate, ExamUpdate
 from schemas.account.users import UserRead
