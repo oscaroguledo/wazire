@@ -129,7 +129,7 @@ async def get_user(
 ):
     encryption = EncryptionService()
     service = UserService(db, encryption=encryption, token_service=token_service)
-    tenant_id = None if current_user.role in (UserRole.ADMIN.value, UserRole.SUPERADMIN.value) else current_user.tenant_id
+    tenant_id = None if current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else current_user.tenant_id
     user = await service.get(user_id=user_id, tenant_id=tenant_id)
     if not user:
         return Response(success=False, error="User not found", request=request, status_code=status.HTTP_404_NOT_FOUND)
