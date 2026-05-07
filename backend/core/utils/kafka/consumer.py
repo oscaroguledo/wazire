@@ -36,6 +36,7 @@ _TASK_MODULES: List[str] = [
     "tasks.exam",
     "tasks.question",
     "tasks.email",
+    "tasks.billing",
 ]
 
 

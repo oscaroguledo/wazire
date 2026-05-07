@@ -75,9 +75,14 @@ async def handle_grade_submission_attempt(data: Dict[str, Any]) -> None:
 
 
 async def handle_refresh_dashboard(data: Dict[str, Any]) -> None:
-    """Refresh a user's dashboard.
+    """Refresh a user's dashboard by computing fresh metrics and upserting.
 
     Expected data keys: user_id
+
+    Uses DashboardService.upsert_metrics() to compute live aggregate metrics
+    from OLTP tables and persist them via INSERT ... ON CONFLICT DO UPDATE.
+    Covers all three dashboard types: admin, lecturer, and student.
+    Preservation: existing admin and student dashboard refresh logic unchanged (3.80).
     """
     user_id_raw = data.get("user_id")
     if not user_id_raw:
@@ -101,16 +106,26 @@ async def handle_refresh_dashboard(data: Dict[str, Any]) -> None:
         from services.analytics.dashboard import DashboardService
         svc = DashboardService(db)
 
-        if user.role == UserRole.LECTURER:
-            await svc.get_or_create_lecturer_dashboard(user.id)
-        elif user.role in (UserRole.ADMIN, UserRole.SUPERADMIN):
-            await svc.get_or_create_admin_dashboard(user.id, user.tenant_id)
-        elif user.role == UserRole.STUDENT:
-            await svc.get_or_create_student_dashboard(user.id)
-        else:
-            logger.warning("REFRESH_DASHBOARD: unknown role '%s' for user %s", user.role, user_id)
+        role = user.role.value if hasattr(user.role, "value") else str(user.role)
+        tenant_id = user.tenant_id
 
-        logger.debug("Dashboard refreshed for user %s (role=%s)", user_id, user.role)
+        try:
+            await svc.upsert_metrics(user_id=user.id, role=role, tenant_id=tenant_id)
+            logger.debug("Dashboard upserted for user %s (role=%s)", user_id, role)
+        except Exception:
+            # Fall back to legacy get_or_create_* to preserve existing behaviour (3.80)
+            logger.warning(
+                "REFRESH_DASHBOARD: upsert_metrics failed for user %s — falling back to legacy",
+                user_id,
+            )
+            if user.role == UserRole.LECTURER:
+                await svc.get_or_create_lecturer_dashboard(user.id)
+            elif user.role in (UserRole.ADMIN, UserRole.SUPERADMIN):
+                await svc.get_or_create_admin_dashboard(user.id, user.tenant_id)
+            elif user.role == UserRole.STUDENT:
+                await svc.get_or_create_student_dashboard(user.id)
+            else:
+                logger.warning("REFRESH_DASHBOARD: unknown role '%s' for user %s", user.role, user_id)
 
     try:
         await with_db(_run)

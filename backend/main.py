@@ -110,9 +110,15 @@ app.add_middleware(TenantMiddleware)
 # Register routers
 from routes import health
 from routes.account import users, tenants
-from routes.academic import submissions, courses, exams, questions, answers, enrollments
+from routes.academic import submissions, courses, exams, questions, answers, enrollments, students
 from routes.analytics import dashboard
 from routes.billings import invoice as billings_invoice
+from routes.billing import invoices as billing_invoices
+from routes.billing import billing_plans
+from routes.billing import payment_methods
+from routes.billing import usage as billing_usage
+from routes.billing import semesters
+from routes.billing import webhooks as billing_webhooks
 import uvicorn
 
 # API Version 1
@@ -125,10 +131,19 @@ app.include_router(exams.router, prefix="/api/v1/academic")
 app.include_router(questions.router, prefix="/api/v1/academic")
 app.include_router(answers.router, prefix="/api/v1/academic")
 app.include_router(enrollments.router, prefix="/api/v1/academic")
+app.include_router(students.router, prefix="/api/v1/academic")
 app.include_router(dashboard.router, prefix="/api/v1/analytics")
 
-# Billings routes
+# Billings routes (legacy)
 app.include_router(billings_invoice.router, prefix="/api/v1")
+
+# Billing routes (new, under /api/v1/billing)
+app.include_router(billing_invoices.router, prefix="/api/v1")
+app.include_router(billing_plans.router, prefix="/api/v1")
+app.include_router(payment_methods.router, prefix="/api/v1")
+app.include_router(billing_usage.router, prefix="/api/v1")
+app.include_router(semesters.router, prefix="/api/v1")
+app.include_router(billing_webhooks.router, prefix="/api/v1")
 
 
 

@@ -647,29 +647,29 @@
      PHASE 9 — BILLING & PAYMENT INTEGRATION
      ============================================================ -->
 
-- [-] 11. Implement billing routes, services, payment gateway integration, and webhook handlers
+- [x] 11. Implement billing routes, services, payment gateway integration, and webhook handlers
 
-  - [ ] 11.1 Create billing routes and services (invoices, plans, payment_methods, usage, semesters)
+  - [x] 11.1 Create billing routes and services (invoices, plans, payment_methods, usage, semesters)
     - Create `backend/routes/billing/__init__.py`, `invoices.py`, `billing_plans.py`, `payment_methods.py`, `usage.py`, `semesters.py`, `webhooks.py`
     - Create `backend/services/billing/__init__.py`, `invoices.py`, `billing_plans.py`, `payment_methods.py`, `usage.py`, `semesters.py`
     - Register all billing routers in `main.py` under prefix `/api/v1/billing`
     - _Requirements: 2.55_
 
-  - [ ] 11.2 Implement `PaymentGatewayService` (Paystack + Monnify)
+  - [x] 11.2 Implement `PaymentGatewayService` (Paystack + Monnify)
     - Create `backend/services/billing/payment_gateway.py` with `PaymentGatewayService` class
     - Paystack: `POST https://api.paystack.co/transaction/initialize` using `PAYSTACK_SECRET_KEY`; store `authorization_url` → `Invoice.payment_url`, `reference` → `Invoice.payment_reference`
     - Monnify: equivalent direct-debit endpoint using `MONNIFY_API_KEY` and `MONNIFY_SECRET_KEY`
     - Add `PAYSTACK_SECRET_KEY`, `MONNIFY_API_KEY`, `MONNIFY_SECRET_KEY` to `backend/core/config.py` as optional settings with `None` defaults
     - _Requirements: 2.109_
 
-  - [ ] 11.3 Add `INITIATE_BILLING` Kafka event and worker handler
+  - [x] 11.3 Add `INITIATE_BILLING` Kafka event and worker handler
     - Create `backend/tasks/billing.py` with `handle_initiate_billing(payload)` handler
     - Handler calls `PaymentGatewayService.initiate(invoice)` and updates `Invoice.payment_url` and `Invoice.payment_reference`
     - Add `HANDLERS = {"INITIATE_BILLING": handle_initiate_billing}` to `billing.py`
     - Update `KafkaConsumerService._load_handlers()` to include `billing` module
     - _Requirements: 2.109_
 
-  - [ ] 11.4 Add end-of-semester billing scheduler job
+  - [x] 11.4 Add end-of-semester billing scheduler job
     - Add a periodic job (hourly or daily) to `backend/scheduler.py`
     - Query `Semester` records where `end_date <= now()` AND `is_billed = False` AND `status = 'ended'`
     - For each: count active students, create `Invoice(status='pending', ...)`, emit `INITIATE_BILLING` Kafka event
@@ -678,26 +678,26 @@
     - _Preservation: existing scheduler jobs unchanged (3.70)_
     - _Requirements: 2.107, 3.70_
 
-  - [ ] 11.5 Implement Paystack webhook handler (HMAC verification)
+  - [x] 11.5 Implement Paystack webhook handler (HMAC verification)
     - In `backend/routes/billing/webhooks.py`: `POST /api/v1/billing/webhooks/paystack`
     - Verify HMAC signature using `PAYSTACK_SECRET_KEY`; return HTTP 400 on invalid signature
     - On `charge.success`: look up `Invoice` by `payment_reference`; set `Invoice.status='paid'`, `Invoice.paid_at=now()`; call `SemesterService.mark_billed()`; return HTTP 200
     - _Requirements: 2.108_
 
-  - [ ] 11.6 Implement Monnify webhook handler (HMAC verification)
+  - [x] 11.6 Implement Monnify webhook handler (HMAC verification)
     - In `backend/routes/billing/webhooks.py`: `POST /api/v1/billing/webhooks/monnify`
     - Verify HMAC signature using `MONNIFY_API_SECRET`; return HTTP 400 on invalid signature
     - On successful payment event: same Invoice + Semester update as Paystack handler
     - _Requirements: 2.108_
 
-  - [ ] 11.7 Implement `SemesterService.mark_billed()`
+  - [x] 11.7 Implement `SemesterService.mark_billed()`
     - Add `mark_billed(semester_id, billed_at)` method to `SemesterService`
     - Sets `semester.is_billed = True` and `semester.billed_at = billed_at`; commits atomically with invoice status update
     - _Bug_Condition: isBugCondition(input) where input.target = 'SemesterService.mark_billed' AND defectPresent('method does not exist')_
     - _Expected_Behavior: Semester.is_billed and Semester.billed_at written atomically after payment confirmation_
     - _Requirements: 2.110_
 
-  - [ ] 11.8 Add `PAYSTACK_SECRET_KEY`, `MONNIFY_API_KEY`, `MONNIFY_SECRET_KEY` to config and `.env.example`
+  - [x] 11.8 Add `PAYSTACK_SECRET_KEY`, `MONNIFY_API_KEY`, `MONNIFY_SECRET_KEY` to config and `.env.example`
     - Add all three keys to `backend/core/config.py` as optional settings
     - Add to `backend/.env.example` with placeholder values and explanatory comments
     - _Requirements: 2.109, 2.138_
@@ -707,30 +707,30 @@
      PHASE 10 — NEW API ENDPOINTS
      ============================================================ -->
 
-- [ ] 12. Add new read-only and functional API endpoints
+- [x] 12. Add new read-only and functional API endpoints
 
-  - [ ] 12.1 Add `GET /api/v1/academic/exams/{exam_id}/results`
+  - [x] 12.1 Add `GET /api/v1/academic/exams/{exam_id}/results`
     - Return list of all `Submission` records for the exam: `student_id`, `latest_score`, `status`, `graded_at`, `submitted_at`
     - Scope to requesting user's tenant; restrict to lecturers and admins
     - _Requirements: 2.127, 3.81_
 
-  - [ ] 12.2 Add `GET /api/v1/academic/courses/{course_id}/students`
+  - [x] 12.2 Add `GET /api/v1/academic/courses/{course_id}/students`
     - Return list of all users enrolled in the course via `Enrollment` table: `student_id`, `user.first_name`, `user.last_name`, `enrollment.status`
     - Scope to requesting user's tenant; restrict to admins and lecturers
     - _Requirements: 2.128, 3.81_
 
-  - [ ] 12.3 Add `GET /api/v1/academic/students/{student_id}/exams`
+  - [x] 12.3 Add `GET /api/v1/academic/students/{student_id}/exams`
     - Return list of all exams for courses the student is enrolled in: `exam.id`, `exam.title`, `exam.start_time`, `exam.end_time`, `exam.status`, `exam.duration`
     - Scope to student's tenant; students can only query their own `student_id`
     - _Requirements: 2.129, 3.81_
 
-  - [ ] 12.4 Add `POST /api/v1/academic/exams/{exam_id}/scan` (answer sheet extraction)
+  - [x] 12.4 Add `POST /api/v1/academic/exams/{exam_id}/scan` (answer sheet extraction)
     - Accept multipart image upload; pass to `AnswerSheetExtractor` in `backend/services/engine/answer_sheet_extractor.py`
     - Return extracted answers as structured JSON
     - Wire to a Kafka task handler for async extraction of large batches
     - _Requirements: 2.130, 3.82_
 
-  - [ ] 12.5 Fix `REFRESH_DASHBOARD` worker handler
+  - [x] 12.5 Fix `REFRESH_DASHBOARD` worker handler
     - Implement `upsert_metrics` method on `DashboardService` that computes fresh aggregate metrics and writes via `INSERT ... ON CONFLICT DO UPDATE`
     - Include lecturer dashboard refresh: compute `total_courses`, `total_students`, `total_exams`, `pending_submissions`, `graded_submissions` for affected lecturer
     - _Bug_Condition: isBugCondition(input) where input.target = 'REFRESH_DASHBOARD handler' AND defectPresent('missing upsert_metrics, missing lecturer dashboard refresh')_
@@ -743,7 +743,7 @@
      PHASE 11 — FRONTEND FIXES
      ============================================================ -->
 
-- [ ] 13. Fix all frontend type errors, API URL mismatches, and missing modules
+- [-] 13. Fix all frontend type errors, API URL mismatches, and missing modules
 
   - [ ] 13.1 Fix `UserManagement.tsx` missing `User` import
     - Add `import type { User } from '@/lib/types'` (or equivalent) to `frontend/src/pages/UserManagement.tsx`

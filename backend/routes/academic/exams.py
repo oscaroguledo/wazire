@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import base64
+import io
 import uuid
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Optional
-from fastapi import APIRouter, Depends, status, Request, Response as FastAPIResponse
+from typing import Optional, List
+from fastapi import APIRouter, Depends, status, Request, Response as FastAPIResponse, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from core.database import get_db
 from core.utils.response import Response
@@ -20,6 +22,7 @@ from models.account.users import UserRole
 from models.academic.enrollment import EnrollmentStatus
 from models.academic.course import Course
 from models.academic.enrollment import Enrollment
+from models.academic.submission import Submission
 
 router = APIRouter(prefix="/exams", tags=["exams"])
 
@@ -76,12 +79,12 @@ async def list_exams(
     service = ExamService(db)
     """List exams with offset/limit pagination and optional course/status/year filter."""
     tenant_id = _tenant(current_user)
-    
+
     # For lecturers, only show exams they teach (via course) or created
     lecturer_id = None
     if current_user.role == UserRole.LECTURER:
         lecturer_id = current_user.id
-    
+
     # For students, get their enrolled course IDs
     student_course_ids = None
     if current_user.role == UserRole.STUDENT:
@@ -100,7 +103,7 @@ async def list_exams(
                 page=page, per_page=per_page, total=0,
                 request=request,
             )
-    
+
     # Calculate offset from page
     offset = (page - 1) * per_page
 
@@ -145,6 +148,79 @@ async def get_exam_years(
         message="Exam years retrieved",
         data=years,
         request=request
+    )
+
+
+@router.get("/{exam_id}/results")
+async def get_exam_results(
+    exam_id: uuid.UUID,
+    request: Request,
+    page: int = 1,
+    per_page: int = 50,
+    current_user: UserRead = Depends(require_lecturer_or_admin(get_token_service())),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return all submission results for an exam.
+
+    Scoped to the requesting user's tenant. Restricted to lecturers and admins.
+    Returns: student_id, latest_score, status, graded_at, submitted_at for each submission.
+    """
+    service = ExamService(db)
+    tenant_id = _tenant(current_user)
+
+    # Verify the exam exists and belongs to the tenant
+    exam = await service.get(exam_id, tenant_id)
+    if not exam:
+        return Response(
+            success=False,
+            error="Exam not found",
+            request=request,
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    offset = (page - 1) * per_page
+
+    # Base filter: submissions for this exam
+    base_filter = [Submission.exam_id == exam_id]
+    if tenant_id:
+        base_filter.append(Submission.tenant_id == tenant_id)
+
+    # Count total
+    count_result = await db.execute(
+        select(func.count()).select_from(Submission).where(*base_filter)
+    )
+    total = int(count_result.scalar_one())
+
+    # Paginated query
+    stmt = (
+        select(Submission)
+        .where(*base_filter)
+        .order_by(Submission.created_at.desc())
+        .offset(offset)
+        .limit(per_page)
+    )
+    result = await db.execute(stmt)
+    submissions = result.scalars().all()
+
+    data = [
+        {
+            "student_id": str(s.student_id),
+            "latest_score": str(s.latest_score) if s.latest_score is not None else None,
+            "status": s.status.value if s.status else None,
+            "graded_at": s.graded_at.isoformat() if s.graded_at else None,
+            "submitted_at": s.submitted_at.isoformat() if s.submitted_at else None,
+        }
+        for s in submissions
+    ]
+
+    return Response(
+        success=True,
+        message="Exam results retrieved",
+        data=data,
+        page=page,
+        per_page=per_page,
+        total=total,
+        request=request,
     )
 
 
@@ -226,6 +302,133 @@ async def update_exam(
     return Response(success=True, message="Exam updated", data=updated.to_dict(), request=request)
 
 
+@router.post("/{exam_id}/scan", status_code=status.HTTP_202_ACCEPTED)
+async def scan_exam_answer_sheet(
+    exam_id: uuid.UUID,
+    request: Request,
+    pages: List[UploadFile] = File(..., description="One or more answer sheet image files"),
+    student_id: Optional[uuid.UUID] = None,
+    current_user: UserRead = Depends(require_lecturer_or_admin(get_token_service())),
+    db: AsyncSession = Depends(get_db),
+):
+    """Accept multipart image upload of a student's answer sheet and extract answers.
+
+    For small batches (≤ 5 pages): performs synchronous extraction and returns
+    the structured answers immediately.
+
+    For large batches (> 5 pages): emits a PARSE_AND_CREATE Kafka event for
+    async extraction and returns HTTP 202 Accepted.
+
+    Returns extracted answers as structured JSON keyed by question number.
+    """
+    service = ExamService(db)
+    tenant_id = _tenant(current_user)
+
+    # Verify the exam exists and belongs to the tenant
+    exam = await service.get(exam_id, tenant_id)
+    if not exam:
+        return Response(
+            success=False,
+            error="Exam not found",
+            request=request,
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    if not pages:
+        return Response(
+            success=False,
+            error="No image files provided",
+            request=request,
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Read and base64-encode uploaded images
+    b64_pages: List[str] = []
+    for upload in pages:
+        content = await upload.read()
+        b64_pages.append(base64.b64encode(content).decode("utf-8"))
+
+    SYNC_PAGE_LIMIT = 5
+
+    if len(b64_pages) > SYNC_PAGE_LIMIT:
+        # Large batch: emit Kafka event for async extraction
+        from core.utils.kafka.manager import kafka_manager
+        await kafka_manager.emit(
+            "PARSE_AND_CREATE",
+            {
+                "pages": b64_pages,
+                "exam_id": str(exam_id),
+                "tenant_id": str(tenant_id) if tenant_id else None,
+                "mark_per_question": None,
+                "industry": "general",
+            },
+            partition_key=str(tenant_id) if tenant_id else None,
+        )
+        return Response(
+            success=True,
+            message=f"Answer sheet extraction queued for {len(b64_pages)} pages. Results will be available shortly.",
+            data={"exam_id": str(exam_id), "pages_queued": len(b64_pages)},
+            request=request,
+            status_code=status.HTTP_202_ACCEPTED,
+        )
+
+    # Small batch: synchronous extraction via AnswerSheetExtractor
+    from services.engine.answer_sheet_extractor import AnswerSheetParser
+    from models.academic.question import Question, QuestionType
+    from sqlalchemy import exists
+    from models.academic.question import QuestionExams
+
+    # Load questions for this exam to build the question index
+    q_stmt = select(Question).where(
+        exists().where(
+            QuestionExams.question_id == Question.id,
+            QuestionExams.exam_id == exam_id,
+        )
+    )
+    q_result = await db.execute(q_stmt)
+    questions = q_result.scalars().all()
+
+    question_index = [
+        {
+            "number": q.number,
+            "qtype": q.qtype.value if hasattr(q.qtype, "value") else q.qtype,
+            "options": q.get_options() if q.qtype == QuestionType.MULTIPLE_CHOICE else [],
+        }
+        for q in questions
+    ]
+
+    try:
+        parser = AnswerSheetParser()
+        extracted = parser.parse(pages=b64_pages, question_index=question_index)
+    except RuntimeError as exc:
+        return Response(
+            success=False,
+            error=str(exc),
+            request=request,
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    # Map question numbers → question IDs for the response
+    number_to_id = {q.number: str(q.id) for q in questions}
+    structured = {
+        number_to_id.get(str(num), str(num)): answer
+        for num, answer in extracted.items()
+    }
+
+    return Response(
+        success=True,
+        message=f"Answer sheet extracted from {len(b64_pages)} page(s)",
+        data={
+            "exam_id": str(exam_id),
+            "student_id": str(student_id) if student_id else None,
+            "answers": structured,
+            "raw_by_number": extracted,
+        },
+        request=request,
+        status_code=status.HTTP_202_ACCEPTED,
+    )
+
+
 @router.delete("/{exam_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_exam(
     exam_id: uuid.UUID,
@@ -237,12 +440,12 @@ async def delete_exam(
     exam = await service.get(exam_id, _tenant(current_user))
     if not exam:
         return Response(success=False, error="Exam not found", request=request, status_code=status.HTTP_404_NOT_FOUND)
-    
+
     # Store course info before deletion for dashboard refresh
     course_id = exam.course_id
-    
+
     await service.delete(exam)
-    
+
     # Refresh lecturer dashboard — await so publish failures are observable
     if course_id:
         course_stmt = select(Course).where(Course.id == course_id)
@@ -250,5 +453,5 @@ async def delete_exam(
         course = course_result.scalar_one_or_none()
         if course and course.lecturer_id:
             await emit_refresh_dashboard(str(course.lecturer_id))
-    
+
     return Response(success=True, message="Exam deleted", request=request, status_code=status.HTTP_204_NO_CONTENT)

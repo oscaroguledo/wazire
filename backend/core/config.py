@@ -53,6 +53,13 @@ class Settings(BaseModel):
     # Secret used to validate incoming payment provider webhooks (HMAC-SHA256)
     PAYMENT_WEBHOOK_SECRET: Optional[SecretStr] = None
 
+    # Payment gateway credentials
+    # Paystack: used for transaction initialization and webhook verification
+    PAYSTACK_SECRET_KEY: Optional[str] = None
+    # Monnify: used for transaction initialization and webhook verification
+    MONNIFY_API_KEY: Optional[str] = None
+    MONNIFY_SECRET_KEY: Optional[str] = None
+
     # Kafka settings
     KAFKA_BOOTSTRAP_SERVERS: Optional[str] = None
     KAFKA_TOPIC_PREFIX: Optional[str] = None
@@ -221,6 +228,9 @@ def get_settings(force_reload: bool = False) -> Settings:
             BREVO_SENDER_NAME=os.getenv("BREVO_SENDER_NAME", _defaults.BREVO_SENDER_NAME),
             BREVO_SENDER_EMAIL=os.getenv("BREVO_SENDER_EMAIL", _defaults.BREVO_SENDER_EMAIL),
             PAYMENT_WEBHOOK_SECRET=SecretStr(os.getenv("PAYMENT_WEBHOOK_SECRET")) if os.getenv("PAYMENT_WEBHOOK_SECRET") else _defaults.PAYMENT_WEBHOOK_SECRET,
+            PAYSTACK_SECRET_KEY=os.getenv("PAYSTACK_SECRET_KEY", _defaults.PAYSTACK_SECRET_KEY),
+            MONNIFY_API_KEY=os.getenv("MONNIFY_API_KEY", _defaults.MONNIFY_API_KEY),
+            MONNIFY_SECRET_KEY=os.getenv("MONNIFY_SECRET_KEY", _defaults.MONNIFY_SECRET_KEY),
         )
         
         # Validate configuration

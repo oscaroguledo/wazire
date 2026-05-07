@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from fastapi import APIRouter, Depends, status, Request
 from typing import Optional
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
@@ -12,7 +13,8 @@ from core.middleware.auth import get_token_service, create_auth_dependency, requ
 from services.academic.courses import CourseService
 from schemas.academic.course import CourseCreate, CourseUpdate
 from schemas.account.users import UserRead
-from models.account.users import UserRole
+from models.account.users import UserRole, User
+from models.academic.enrollment import Enrollment, EnrollmentStatus
 from tasks.submission import emit_refresh_dashboard
 
 router = APIRouter(prefix="/courses", tags=["courses"])
@@ -136,6 +138,79 @@ async def update_course(
         await emit_refresh_dashboard(str(updated.lecturer_id))
     
     return Response(success=True, message="Course updated", data=updated.to_dict(), request=request)
+
+
+@router.get("/{course_id}/students")
+async def get_course_students(
+    course_id: uuid.UUID,
+    request: Request,
+    page: int = 1,
+    per_page: int = 50,
+    current_user: UserRead = Depends(require_lecturer_or_admin(get_token_service())),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return all students enrolled in a course.
+
+    Scoped to the requesting user's tenant. Restricted to admins and lecturers.
+    Returns: student_id, first_name, last_name, enrollment.status for each enrolled student.
+    """
+    service = CourseService(db)
+    tenant_id = current_user.tenant_id
+
+    # Verify the course exists and belongs to the tenant
+    course = await service.get(course_id, tenant_id)
+    if not course:
+        return Response(
+            success=False,
+            error="Course not found",
+            request=request,
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    offset = (page - 1) * per_page
+
+    # Base filter: enrollments for this course scoped to tenant
+    base_filter = [Enrollment.course_id == course_id]
+    if tenant_id:
+        base_filter.append(Enrollment.tenant_id == tenant_id)
+
+    # Count total enrolled students
+    count_result = await db.execute(
+        select(func.count()).select_from(Enrollment).where(*base_filter)
+    )
+    total = int(count_result.scalar_one())
+
+    # Paginated query joining User for name fields
+    stmt = (
+        select(Enrollment, User)
+        .join(User, User.id == Enrollment.student_id)
+        .where(*base_filter)
+        .order_by(User.last_name, User.first_name)
+        .offset(offset)
+        .limit(per_page)
+    )
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    data = [
+        {
+            "student_id": str(enrollment.student_id),
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "enrollment_status": enrollment.status.value if enrollment.status else None,
+        }
+        for enrollment, user in rows
+    ]
+
+    return Response(
+        success=True,
+        message="Course students retrieved",
+        data=data,
+        page=page,
+        per_page=per_page,
+        total=total,
+        request=request,
+    )
 
 
 @router.delete("/{course_id}", status_code=status.HTTP_204_NO_CONTENT)
