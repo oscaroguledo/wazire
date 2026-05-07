@@ -25,7 +25,7 @@ router = APIRouter(prefix="/exams", tags=["exams"])
 
 
 def _tenant(user: UserRead):
-    return None if user.role == UserRole.SUPERADMIN.value else user.tenant_id
+    return None if user.role == UserRole.SUPERADMIN else user.tenant_id
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
@@ -79,12 +79,12 @@ async def list_exams(
     
     # For lecturers, only show exams they teach (via course) or created
     lecturer_id = None
-    if current_user.role == UserRole.LECTURER.value:
+    if current_user.role == UserRole.LECTURER:
         lecturer_id = current_user.id
     
     # For students, get their enrolled course IDs
     student_course_ids = None
-    if current_user.role == UserRole.STUDENT.value:
+    if current_user.role == UserRole.STUDENT:
         enrollment_stmt = select(Enrollment.course_id).where(
             Enrollment.student_id == current_user.id,
             Enrollment.status.in_([EnrollmentStatus.ACTIVE.value, EnrollmentStatus.COMPLETED.value])
