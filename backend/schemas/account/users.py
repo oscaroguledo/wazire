@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from core.utils.validation import ValidationMixin, EmailValidationMixin, PasswordValidationMixin
+from models.account.users import UserRole
 
 
 class UserBase(ValidationMixin, EmailValidationMixin):
@@ -41,7 +42,7 @@ class UserBase(ValidationMixin, EmailValidationMixin):
 
 class UserCreate(UserBase, PasswordValidationMixin):
     password: str
-    role: Optional[str] = "student"
+    role: Optional[UserRole] = UserRole.STUDENT
     tenant_id: Optional[UUID] = None
     institution_id: Optional[str] = None  # Matric number / Reg No
 
@@ -49,11 +50,16 @@ class UserCreate(UserBase, PasswordValidationMixin):
     @classmethod
     def validate_role(cls, v):
         """Validate user role."""
-        if v is not None:
-            valid_roles = ['student', 'lecturer', 'admin', 'superadmin']
-            if v.lower() not in valid_roles:
-                raise ValueError(f'Invalid role. Must be one of: {", ".join(valid_roles)}')
-        return v
+        if v is None:
+            return v
+        # Accept either UserRole or string inputs (case-insensitive)
+        if isinstance(v, UserRole):
+            return v
+        try:
+            return UserRole(str(v).lower())
+        except ValueError:
+            valid_roles = [r.value for r in UserRole]
+            raise ValueError(f'Invalid role. Must be one of: {", ".join(valid_roles)}')
 
 
 class UserUpdate(BaseModel):
@@ -88,7 +94,7 @@ class UserUpdate(BaseModel):
 
 class UserRead(UserBase):
     id: UUID
-    role: str
+    role: UserRole
     is_active: bool
     tenant_id: Optional[UUID]
     tenant_name: Optional[str] = None
@@ -100,10 +106,12 @@ class UserRead(UserBase):
     @field_validator('role', mode='before')
     @classmethod
     def normalize_role(cls, v):
-        """Normalize role to lowercase string regardless of enum or string input."""
-        if hasattr(v, 'value'):
-            return v.value.lower()
-        return str(v).lower()
+        """Normalize role to `UserRole` regardless of enum or string input."""
+        if v is None:
+            return v
+        if isinstance(v, UserRole):
+            return v
+        return UserRole(str(v).lower())
 
     @model_validator(mode='before')
     @classmethod
