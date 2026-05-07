@@ -44,7 +44,7 @@ async def create_question(
 ):
     service = QuestionService(db)
     # Questions may optionally include a tenant_id; non-admins cannot set a tenant different from their own
-    if current_user.role != UserRole.ADMIN.value:
+    if current_user.role != UserRole.ADMIN:
         # enforce non-admins cannot set tenant_id
         if getattr(question_in, "tenant_id", None):
             # ignore provided tenant_id and use user's tenant if present
@@ -151,7 +151,7 @@ async def delete_question(
     db: AsyncSession = Depends(get_db),
 ):
     service = QuestionService(db)
-    tenant_id = None if current_user.role == "admin" else current_user.tenant_id
+    tenant_id = None if current_user.role == UserRole.ADMIN else current_user.tenant_id
     q = await service.get(question_id, tenant_id=tenant_id)
     if not q:
         return Response(success=False, error="Question not found", request=request, status_code=status.HTTP_404_NOT_FOUND)
@@ -180,7 +180,7 @@ async def upload_exam_paper(
     if not body.pages:
         return Response(success=False, error="No pages provided", request=request, status_code=status.HTTP_400_BAD_REQUEST)
 
-    tenant_id = None if current_user.role == UserRole.ADMIN.value else str(current_user.tenant_id)
+    tenant_id = None if current_user.role == UserRole.ADMIN else str(current_user.tenant_id)
 
     # Enqueue exam parsing and question-creation to Celery worker
     parse_and_create_task.delay(body.pages, body.industry.value, str(body.exam_id), body.mark_per_question, tenant_id)
