@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tenant deleted</title>
+    <style>
+      body { margin:0; padding:0; background:#f8fafc; font-family: Inter, Arial, sans-serif; }
+      .card { max-width:600px; margin:1.125rem auto; background:#fff; border-radius:0.5rem; border:1px solid #e6eef8; overflow:hidden }
+      .card-head { background:#ef4444; color:#fff; padding:1.125rem; text-align:center }
+      .card-body { padding:1.125rem; color:#0f172a }
+      .card-footer { padding:0.875rem; color:#64748b; font-size:13px; text-align:center }
+      @media (max-width:420px) { .card { margin:0.75rem } }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="card-head">
+        <strong>Tenant removed</strong>
+      </div>
+      <div class="card-body">
+        <p>The tenant <strong>{tenant_name}</strong> has been removed from our system.</p>
+        <p>If this was unexpected, please contact support immediately.</p>
+      </div>
+      <div class="card-footer">© {year} Wazire</div>
+    </div>
+  </body>
+</html>

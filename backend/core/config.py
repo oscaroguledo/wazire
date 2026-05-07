@@ -35,6 +35,10 @@ class Settings(BaseModel):
     GROQ_API_KEYS: Optional[str] = None
 
     # Kafka settings
+    # Brevo (Sendinblue) transactional email settings
+    BREVO_API_KEY: Optional[SecretStr] = None
+    BREVO_SENDER_NAME: Optional[str] = "Wazire"
+    BREVO_SENDER_EMAIL: Optional[str] = None
 
     # Kafka settings
     KAFKA_BOOTSTRAP_SERVERS: Optional[str] = None
@@ -46,6 +50,9 @@ class Settings(BaseModel):
     # Scheduler intervals (minutes) for the internal scheduler that publishes Kafka events
     SCHEDULER_EXAM_STATUS_UPDATE_INTERVAL: Optional[int] = None
     SCHEDULER_EMAIL_SEND_INTERVAL: Optional[int] = None
+            BREVO_API_KEY=SecretStr(os.getenv("BREVO_API_KEY")) if os.getenv("BREVO_API_KEY") else _defaults.BREVO_API_KEY,
+            BREVO_SENDER_NAME=os.getenv("BREVO_SENDER_NAME", _defaults.BREVO_SENDER_NAME),
+            BREVO_SENDER_EMAIL=os.getenv("BREVO_SENDER_EMAIL", _defaults.BREVO_SENDER_EMAIL),
 
     def cors_origins_list(self) -> List[str]:
         if isinstance(self.CORS_ORIGINS, str):
@@ -128,6 +135,9 @@ class Settings(BaseModel):
         if self.ENV == "production":
             if not self.GROQ_API_KEYS:
                 errors.append("GROQ_API_KEYS must be set in production environment")
+            # Warn / require BREVO in production if email sending is enabled by app logic
+            if not self.BREVO_API_KEY or (self.BREVO_SENDER_EMAIL is None):
+                errors.append("BREVO_API_KEY and BREVO_SENDER_EMAIL must be set in production for transactional emails")
         
         # Validate ACCESS_TOKEN_EXPIRE_SECONDS
         if self.ACCESS_TOKEN_EXPIRE_SECONDS < 60:
