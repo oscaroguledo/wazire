@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import ForeignKey, JSON, Index, func, DateTime
+from sqlalchemy import ForeignKey, JSON, Index, func, DateTime, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import UUID
 from core.database import Base
@@ -31,6 +31,7 @@ class StudentAnswer(Base):
         Index("ix_student_answers_student_question", "student_id", "question_id"),
         Index("ix_student_answers_tenant_exam", "tenant_id", "exam_id"),
         Index("ix_student_answers_tenant_semester", "tenant_id", "semester_id"),
+        UniqueConstraint("student_id", "exam_id", "question_id", name="uq_student_answer_student_exam_question"),
         {"schema": "academic"},
     )
 

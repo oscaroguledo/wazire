@@ -13,7 +13,7 @@ from core.utils.logger import logger
 from core.middleware.rate_limit import limiter, rate_limit_exceeded_handler
 from core.middleware.error_handler import setup_error_handlers
 from slowapi.errors import RateLimitExceeded
-from core.utils.kafka import producer_service, consumer_service
+from core.utils.kafka import producer_service
 
 settings = get_settings()
 
@@ -35,9 +35,10 @@ async def lifespan(app: FastAPI):
 	except Exception:
 		logger.exception("Failed to start Kafka producer")
 
-	
+	# Yield to enter the application runtime — FastAPI serves requests from here
+	yield
 
-	# Shutdown actions
+	# Shutdown actions (run only when the application is stopping)
 	logger.info("Stopping Kafka producer...")
 	
 	try:

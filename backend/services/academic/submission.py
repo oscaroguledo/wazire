@@ -60,7 +60,7 @@ class SubmissionService:
             submission = SubmissionModel(
                 student_id=student_id,
                 exam_id=exam_id,
-                attempts_count=0,
+                attempts=0,
             )
             self.db.add(submission)
             await self.db.flush()
@@ -82,20 +82,17 @@ class SubmissionService:
             answers = await sa_service.answers_map_for_student_exam(student_id, exam_id)
 
         # Use exam's max_attempts for validation
-        if exam.max_attempts is not None and submission.attempts_count >= exam.max_attempts:
+        if exam.max_attempts is not None and submission.attempts >= exam.max_attempts:
             raise ValueError(f"Maximum attempts ({exam.max_attempts}) reached")
 
-        attempt_number = submission.attempts_count + 1
+        attempt_number = submission.attempts + 1
         # Save attempt immediately — answers will be stored separately in StudentAnswer rows
         attempt = SubmissionAttemptModel(
             submission_id=submission.id,
-            attempt_number=attempt_number,
             score=None,
-            scan_pages=scan_pages or [],
-            graded_at=None,
         )
         self.db.add(attempt)
-        submission.attempts_count = attempt_number
+        submission.attempts = attempt_number
         self.db.add(submission)
 
         await self.db.commit()
@@ -241,19 +238,15 @@ class SubmissionService:
                 "submission": {
                     "id": str(submission.id),
                     "latest_score": str(submission.latest_score) if submission.latest_score is not None else None,
-                    "attempts_count": submission.attempts_count,
-                    "max_attempts": submission.max_attempts,
+                    "attempts": submission.attempts,
                     "graded_at": submission.graded_at.isoformat() if submission.graded_at else None,
                     "created_at": submission.created_at.isoformat() if submission.created_at else None,
                 },
                 "attempts": [
                     {
                         "id": str(a.id),
-                        "attempt_number": a.attempt_number,
                         "score": str(a.score) if a.score is not None else None,
-                        # answers removed: stored separately in student_answers
-                        "scan_pages": a.scan_pages or [],
-                        "graded_at": a.graded_at.isoformat() if a.graded_at else None,
+                        "created_at": a.created_at.isoformat() if a.created_at else None,
                     }
                     for a in attempts
                 ],
@@ -326,7 +319,7 @@ class SubmissionService:
             submission = SubmissionModel(
                 student_id=student_id,
                 exam_id=exam_id,
-                attempts_count=0,
+                attempts=0,
             )
             self.db.add(submission)
             await self.db.commit()
@@ -413,7 +406,7 @@ class SubmissionService:
 
     async def grade_attempt_background(self, attempt_id: str, exam_id: str) -> None:
         """Grade an attempt in the background (used by background worker / Kafka)."""
-        async with get_db() as db:
+        async for db in get_db():
             attempt = (await db.execute(
                 select(SubmissionAttemptModel).where(
                     SubmissionAttemptModel.id == UUID(attempt_id)

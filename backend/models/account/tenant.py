@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
+from typing import Optional
 from sqlalchemy import String, Index, func, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import UUID
@@ -45,6 +46,8 @@ class Tenant(Base):
 	is_active: Mapped[bool] = mapped_column(default=True, comment="Tenant enabled flag")
 	is_deleted: Mapped[bool] = mapped_column(default=False, comment="Tenant deleted flag")
 	deleted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True, comment="Soft delete timestamp")
+	start_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, comment="Tenant contract start date")
+	end_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, comment="Tenant contract end date")
 	created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 	updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 	created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("account.users.id", ondelete="SET NULL"), nullable=True, comment="FK: user who created this record")

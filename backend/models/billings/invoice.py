@@ -12,6 +12,13 @@ from core.database import Base
 from uuid_utils import uuid7
 
 
+class InvoiceStatus(str, Enum):
+    PENDING = "pending"
+    PAID = "paid"
+    OVERDUE = "overdue"
+    CANCELLED = "cancelled"
+
+
 class Invoice(Base):
     """Invoice model for billing history.
     
@@ -42,6 +49,7 @@ class Invoice(Base):
     student_count: Mapped[int] = mapped_column(Integer, nullable=False, comment="Number of students billed")
     amount_per_student: Mapped[int] = mapped_column(Integer, nullable=False, default=2000, comment="Amount per student in NGN")
     total_amount: Mapped[int] = mapped_column(Integer, nullable=False, comment="Total invoice amount")
+    status: Mapped[InvoiceStatus] = mapped_column(SAEnum(InvoiceStatus, name="invoice_status_enum", create_type=True), nullable=False, default=InvoiceStatus.PENDING, comment="Invoice status: pending|paid|overdue|cancelled")
     
     # Audit fields
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), comment="Creation timestamp (timezone-aware)")

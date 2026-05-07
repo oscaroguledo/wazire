@@ -25,35 +25,35 @@ services:
           cpus: '0.5'
           memory: 512M
 
-    pgbouncer:
-      image: edoburu/pgbouncer:1.17.0
-      restart: unless-stopped
-      container_name: wazire-pgbouncer
-      env_file:
-        - ./backend/.env
-      ports:
-        - "${PGBOUNCER_PORT:-6432}:6432"
-      volumes:
-        - ./backend/pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
-        - ./backend/pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt:ro
-      depends_on:
-        postgres:
-          condition: service_healthy
-      healthcheck:
-        test: ["CMD-SHELL", "pg_isready -h postgres -p ${POSTGRES_PORT:-5432} -U ${POSTGRES_USER:-wazire} -d ${POSTGRES_DB:-wazire}"]
-        interval: 10s
-        timeout: 5s
-        retries: 5
-      networks:
-        - wazire-network
-      deploy:
-        resources:
-          limits:
-            cpus: '1.0'
-            memory: 256M
-          reservations:
-            cpus: '0.25'
-            memory: 64M
+  pgbouncer:
+    image: edoburu/pgbouncer:1.17.0
+    restart: unless-stopped
+    container_name: wazire-pgbouncer
+    env_file:
+      - ./backend/.env
+    ports:
+      - "${PGBOUNCER_PORT:-6432}:6432"
+    volumes:
+      - ./backend/pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+      - ./backend/pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h postgres -p ${POSTGRES_PORT:-5432} -U ${POSTGRES_USER:-wazire} -d ${POSTGRES_DB:-wazire}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - wazire-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 64M
 
   redis:
     image: redis:7-alpine
@@ -193,32 +193,32 @@ services:
           cpus: '0.25'
           memory: 64M
 
-    # Scheduler: periodic task publisher using `backend/scheduler.py`.
-    # Run as a single instance; scale only if you understand the scheduler's semantics.
-    scheduler:
-      build:
-        context: ./backend
-        dockerfile: Dockerfile
-      restart: unless-stopped
-      env_file:
-        - ./backend/.env
-      depends_on:
-        pgbouncer:
-          condition: service_healthy
-        redis:
-          condition: service_healthy
-      command: ["python", "scheduler.py"]
-      networks:
-        - wazire-network
-      deploy:
-        replicas: 1
-        resources:
-          limits:
-            cpus: '0.5'
-            memory: 128M
-          reservations:
-            cpus: '0.1'
-            memory: 32M
+  # Scheduler: periodic task publisher using `backend/scheduler.py`.
+  # Run as a single instance; scale only if you understand the scheduler's semantics.
+  scheduler:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["python", "scheduler.py"]
+    networks:
+      - wazire-network
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 32M
 
 networks:
   wazire-network:

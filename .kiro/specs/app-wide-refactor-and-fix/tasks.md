@@ -27,7 +27,7 @@
   - Mark task complete when tests are written, run, and failures are documented
   - _Requirements: 1.1, 1.4, 1.6, 1.7, 1.9, 1.10, 1.12, 1.13, 1.22, 1.30, 1.52_
 
-- [-] 2. Write preservation property tests (BEFORE implementing fix)
+- [x] 2. Write preservation property tests (BEFORE implementing fix)
   - **Property 2: Preservation** - All Currently Working Paths Unchanged
   - **IMPORTANT**: Follow observation-first methodology
   - Observe: `POST /api/v1/auth/login` with valid credentials returns `AuthResponse` with `user` and `tokens` on unfixed code
@@ -50,9 +50,9 @@
      PHASE 1 — CRITICAL BACKEND CRASHES (unblock the app)
      ============================================================ -->
 
-- [ ] 3. Fix critical backend crashes that prevent the app from starting or running
+- [-] 3. Fix critical backend crashes that prevent the app from starting or running
 
-  - [ ] 3.1 Fix lifespan yield in `backend/main.py`
+  - [x] 3.1 Fix lifespan yield in `backend/main.py`
     - Add `yield` statement inside the `@asynccontextmanager async def lifespan(app)` function after all startup tasks complete
     - Ensure shutdown code (producer stop, etc.) is placed after the `yield`
     - _Bug_Condition: isBugCondition(input) where input.target = 'lifespan' AND defectPresent('no yield')_
@@ -60,7 +60,7 @@
     - _Preservation: all existing router registrations and startup tasks continue to run unchanged (3.1, 3.10)_
     - _Requirements: 2.1, 3.1_
 
-  - [ ] 3.2 Remove unused `consumer_service` import from `backend/main.py`
+  - [x] 3.2 Remove unused `consumer_service` import from `backend/main.py`
     - Change `from core.utils.kafka import producer_service, consumer_service` to `from core.utils.kafka import producer_service`
     - Remove any reference to `consumer_service` in `main.py`
     - _Bug_Condition: isBugCondition(input) where input.target = 'main.py consumer_service import'_
@@ -68,7 +68,7 @@
     - _Preservation: producer_service lifespan start/stop continues unchanged (3.10, 3.40)_
     - _Requirements: 2.3, 2.40_
 
-  - [ ] 3.3 Fix `backend/models/__init__.py` broken imports
+  - [x] 3.3 Fix `backend/models/__init__.py` broken imports
     - Remove `from models.account.oauth import OAuth` (file does not exist)
     - Remove `PaymentMethodDetails` from `from models.billings.paymentmethod import ...` (class does not exist)
     - Retain all other model imports and `__all__` entries unchanged
@@ -77,7 +77,7 @@
     - _Preservation: all other model imports in __all__ continue unchanged (3.36)_
     - _Requirements: 2.4, 2.47, 3.36_
 
-  - [ ] 3.4 Add missing `Invoice.status` column to `backend/models/billings/invoice.py`
+  - [x] 3.4 Add missing `Invoice.status` column to `backend/models/billings/invoice.py`
     - Define `InvoiceStatus` enum: `pending`, `paid`, `overdue`, `cancelled`
     - Add `status: Mapped[InvoiceStatus]` column with `default=InvoiceStatus.PENDING`, `nullable=False`
     - Ensure `to_dict()` and `__repr__()` reference `self.status.value` correctly
@@ -86,7 +86,7 @@
     - _Preservation: all existing invoice fields (id, tenant_id, semester_id, description, student_count, amount_per_student, total_amount, created_at, updated_at) unchanged (3.33)_
     - _Requirements: 2.9, 2.44, 3.33_
 
-  - [ ] 3.5 Add missing `BillingPlan.is_active` column to `backend/models/billings/plan.py`
+  - [x] 3.5 Add missing `BillingPlan.is_active` column to `backend/models/billings/plan.py`
     - Add `is_active: Mapped[bool]` column with `default=True`, `nullable=False`
     - Ensure `to_dict()` references `self.is_active` correctly
     - _Bug_Condition: isBugCondition(input) where input.target = 'BillingPlan.to_dict' AND defectPresent('missing is_active column')_
@@ -94,7 +94,7 @@
     - _Preservation: all existing billing plan fields unchanged (3.34)_
     - _Requirements: 2.10, 2.45, 3.34_
 
-  - [ ] 3.6 Add missing `Tenant.start_date` and `Tenant.end_date` columns to `backend/models/account/tenant.py`
+  - [x] 3.6 Add missing `Tenant.start_date` and `Tenant.end_date` columns to `backend/models/account/tenant.py`
     - Add `start_date: Mapped[Optional[datetime]]` with `DateTime(timezone=True)`, nullable
     - Add `end_date: Mapped[Optional[datetime]]` with `DateTime(timezone=True)`, nullable
     - _Bug_Condition: isBugCondition(input) where input.target = 'Tenant.start_date' AND defectPresent('missing mapped columns')_
@@ -102,7 +102,7 @@
     - _Preservation: all existing tenant fields unchanged (3.35)_
     - _Requirements: 2.11, 2.46, 3.35_
 
-  - [ ] 3.7 Fix `SubmissionService` field name mismatches in `backend/services/academic/submission.py`
+  - [x] 3.7 Fix `SubmissionService` field name mismatches in `backend/services/academic/submission.py`
     - Replace `attempts_count=0` with `attempts=0` in `SubmissionModel` constructor calls
     - Remove `attempt_number` and `scan_pages` from `SubmissionAttemptModel` constructor calls
     - _Bug_Condition: isBugCondition(input) where input.target = 'SubmissionService' AND (wrongField('attempts_count') OR nonExistentField('attempt_number') OR nonExistentField('scan_pages'))_
@@ -110,21 +110,21 @@
     - _Preservation: submission creation flow continues to create Submission and SubmissionAttempt records (3.17)_
     - _Requirements: 2.7, 2.8_
 
-  - [ ] 3.8 Fix `get_db()` usage in `grade_attempt_background`
+  - [x] 3.8 Fix `get_db()` usage in `grade_attempt_background`
     - Replace `async with get_db() as db:` with the async generator pattern: `async for db in get_db(): ...`
     - _Bug_Condition: isBugCondition(input) where input.target = 'SubmissionService.grade_attempt_background' AND defectPresent('get_db() used as async context manager')_
     - _Expected_Behavior: grade_attempt_background obtains a DB session without AttributeError: __aenter___
     - _Preservation: grading logic and GRADE_SUBMISSION_ATTEMPT handler continue to function (3.32)_
     - _Requirements: 2.6_
 
-  - [ ] 3.9 Add `apscheduler` to `backend/requirements.txt`
+  - [x] 3.9 Add `apscheduler` to `backend/requirements.txt`
     - Add `apscheduler` at a pinned version compatible with the existing scheduler code
     - _Bug_Condition: isBugCondition(input) where input.target = 'scheduler.py' AND defectPresent('missing apscheduler dependency')_
     - _Expected_Behavior: scheduler.py imports and runs without ModuleNotFoundError_
     - _Preservation: all other pinned dependencies unchanged (3.56)_
     - _Requirements: 2.5_
 
-  - [ ] 3.10 Fix `register` endpoint missing `request` parameter in `backend/routes/account/user.py`
+  - [x] 3.10 Fix `register` endpoint missing `request` parameter in `backend/routes/account/user.py`
     - Add `request: Request` as a function parameter to the `register` handler
     - Import `Request` from `fastapi` if not already imported
     - _Bug_Condition: isBugCondition(input) where input.target = 'register' AND defectPresent('missing request parameter')_
@@ -132,7 +132,7 @@
     - _Preservation: all other register logic (user creation, token return) unchanged_
     - _Requirements: 2.2_
 
-  - [ ] 3.11 Verify bug condition exploration test now passes
+  - [x] 3.11 Verify bug condition exploration test now passes
     - **Property 1: Expected Behavior** - Critical Backend & Infrastructure Defects
     - **IMPORTANT**: Re-run the SAME test from task 1 — do NOT write a new test
     - The test from task 1 encodes the expected behavior
@@ -141,7 +141,7 @@
     - **EXPECTED OUTCOME**: Test PASSES (confirms bugs are fixed)
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 2.11_
 
-  - [ ] 3.12 Verify preservation tests still pass
+  - [x] 3.12 Verify preservation tests still pass
     - **Property 2: Preservation** - All Currently Working Paths Unchanged
     - **IMPORTANT**: Re-run the SAME tests from task 2 — do NOT write new tests
     - Run preservation property tests from step 2

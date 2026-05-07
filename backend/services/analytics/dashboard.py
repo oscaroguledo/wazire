@@ -54,9 +54,6 @@ class DashboardService:
                 graded_submissions=0,
                 active_courses=0,
             )
-            self.db.add(dashboard)
-            await self.db.commit()
-            await self.db.refresh(dashboard)
             create_time = (time.time() - create_start) * 1000
             logger.debug(f"[DASHBOARD] Create time: {create_time:.2f}ms")
         
@@ -85,9 +82,6 @@ class DashboardService:
                 total_graded_submissions=0,
                 total_pending_submissions=0,
             )
-            self.db.add(dashboard)
-            await self.db.commit()
-            await self.db.refresh(dashboard)
         
         return dashboard
     
@@ -170,8 +164,5 @@ class DashboardService:
                 missed_exams=0,
                 upcoming_exams=0,
             )
-            self.db.add(dashboard)
-            await self.db.commit()
-            await self.db.refresh(dashboard)
 
         return dashboard

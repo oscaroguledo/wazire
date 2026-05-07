@@ -42,6 +42,9 @@ class BillingPlan(Base):
     # Features (stored as comma-separated string, matching Billing.tsx features array)
     features: Mapped[str] = mapped_column(String(2000), nullable=False, default="Unlimited students,Unlimited lecturers,Unlimited AI grading,Priority support,Analytics & reports,Paper exam scanning,Custom branding,API access,Mobile-friendly exams", comment="Comma-separated list of features")
     
+    # Active flag
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, comment="Whether this billing plan is currently active")
+    
     # Audit fields
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), comment="Creation timestamp (timezone-aware)")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), comment="Last update timestamp (timezone-aware)")

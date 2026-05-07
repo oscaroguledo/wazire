@@ -8,6 +8,7 @@ from core.database import get_db
 from core.utils.response import Response
 from core.utils.token import TokenService
 from core.middleware.auth import get_token_service, create_auth_dependency, require_lecturer_or_admin
+from core.utils.kafka import producer_service
 from services.academic.answer import AnswerService
 from services.academic.student_answer import StudentAnswerService
 from schemas.academic.answer import AnswerCreate
@@ -17,7 +18,7 @@ from schemas.account.users import UserRead
 router = APIRouter(prefix="/answers", tags=["answers"])
 
 
-@router.put("/{question_id}")
+@router.patch("/{question_id}")
 async def upsert_answer(
     question_id: uuid.UUID,
     body: AnswerCreate,
@@ -30,6 +31,18 @@ async def upsert_answer(
         sa = await service.upsert(current_user.id, body.exam_id, question_id, body.answer)
     except ValueError as e:
         return Response(success=False, error=str(e), request=request, status_code=status.HTTP_400_BAD_REQUEST)
+
+    # Emit Kafka event so the answer is buffered and processed asynchronously
+    await producer_service.publish_safe(
+        topic="tenant-tasks",
+        event="UPSERT_STUDENT_ANSWER",
+        data={
+            "student_id": str(current_user.id),
+            "exam_id": str(body.exam_id),
+            "question_id": str(question_id),
+            "answer": body.answer,
+        },
+    )
 
     return Response(success=True, message="Answer saved", data=sa.to_dict(), request=request)
 

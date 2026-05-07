@@ -6,12 +6,11 @@ This prevents circular dependency errors when models reference each other.
 # Import account models first (base models)
 from models.account.users import User
 from models.account.tenant import Tenant
-from models.account.oauth import OAuth
 
 # Import billing models (depend on account models)
 from models.billings.invoice import Invoice
 from models.billings.usage import CurrentUsage
-from models.billings.paymentmethod import PaymentMethod, PaymentMethodDetails
+from models.billings.paymentmethod import PaymentMethod
 
 # Import academic models (depend on account models)
 from models.academic.course import Course
@@ -27,11 +26,9 @@ from models.analytics.dashboard import LecturerDashboard, AdminDashboard, Studen
 __all__ = [
     'User',
     'Tenant',
-    'OAuth',
     'Invoice',
     'CurrentUsage',
     'PaymentMethod',
-    'PaymentMethodDetails',
     'Course',
     'Enrollment',
     'Exam',
