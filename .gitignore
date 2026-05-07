@@ -72,3 +72,8 @@ secrets/
 *.pem
 *.key
 credentials.json
+
+# Coverage reports
+frontend/coverage/
+backend/coverage.xml
+backend/.coverage
