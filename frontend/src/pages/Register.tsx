@@ -12,7 +12,7 @@ import { UserRole } from '@/lib/types'
 export function Register() {
   const navigate = useNavigate()
   const { register: authRegister } = useAuth()
-  const [form, setForm] = useState({ first_name: '', last_name: '', email: '', password: '', confirm: '' })
+  const [form, setForm] = useState({ first_name: '', last_name: '', email: '', password: '', confirm: '', role: 'admin' as UserRole })
   const [showPw, setShowPw]       = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [agree, setAgree]         = useState(false)
@@ -41,8 +41,10 @@ export function Register() {
     if (Object.keys(errs).length) { setErrors(errs); return }
     setLoading(true)
     try {
-      await authRegister(`${form.first_name} ${form.last_name}`, form.email, form.password, 'admin' as UserRole)
-      navigate('/institutions/create')
+      await authRegister(`${form.first_name} ${form.last_name}`, form.email, form.password, form.role as UserRole)
+      // Admins are expected to create an institution first
+      if (form.role === 'admin') navigate('/institutions/create')
+      else navigate('/dashboard')
     } catch (err: any) {
       setErrors({ general: err.message?.includes('Email already') ? 'Email already registered.' : (err.message || 'Registration failed.') })
     } finally {
@@ -87,8 +89,20 @@ export function Register() {
             <span className="text-xl font-bold text-[var(--color-text-primary)]">Wazire</span>
           </div>
 
-          <h2 className="text-2xl font-bold text-[var(--color-text-primary)] mb-1">Create admin account</h2>
-          <p className="text-sm text-[var(--color-text-muted)] mb-8">Register to manage your institution</p>
+          <h2 className="text-2xl font-bold text-[var(--color-text-primary)] mb-1">Create account</h2>
+          <p className="text-sm text-[var(--color-text-muted)] mb-4">Register as a student, lecturer or admin</p>
+
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1.5">Account type</label>
+            <div className="flex gap-3">
+              {['student', 'lecturer', 'admin'].map(r => (
+                <label key={r} className={`inline-flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer ${form.role === r ? 'border-[var(--color-accent-coral-400)] bg-[rgba(255,183,170,0.06)]' : 'border-transparent bg-[var(--color-bg-main)]'}`}>
+                  <input type="radio" name="role" value={r} checked={form.role === r} onChange={e => set('role', (e.target as HTMLInputElement).value)} />
+                  <span className="capitalize text-sm">{r}</span>
+                </label>
+              ))}
+            </div>
+          </div>
 
           {errors.general && (
             <div className="mb-5 p-3 rounded-lg bg-[var(--color-error-100)] border border-[var(--color-error-100)] flex items-center gap-2 text-sm text-[var(--color-error-600)]">
