@@ -9,10 +9,10 @@ import Checkbox from '@/components/Checkbox'
 import { useAuth } from '@/contexts/AuthContext'
 import { UserRole } from '@/lib/types'
 
-export function Register() {
+export function Register({ defaultRole, hideRoleSelector }: { defaultRole?: UserRole; hideRoleSelector?: boolean } = {}) {
   const navigate = useNavigate()
   const { register: authRegister } = useAuth()
-  const [form, setForm] = useState({ first_name: '', last_name: '', email: '', password: '', confirm: '', role: 'admin' as UserRole })
+  const [form, setForm] = useState({ first_name: '', last_name: '', email: '', password: '', confirm: '', role: (defaultRole ?? 'admin') as UserRole })
   const [showPw, setShowPw]       = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [agree, setAgree]         = useState(false)
@@ -94,14 +94,16 @@ export function Register() {
 
           <div className="mb-6">
             <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1.5">Account type</label>
-            <div className="flex gap-3">
-              {['student', 'lecturer', 'admin'].map(r => (
-                <label key={r} className={`inline-flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer ${form.role === r ? 'border-[var(--color-accent-coral-400)] bg-[rgba(255,183,170,0.06)]' : 'border-transparent bg-[var(--color-bg-main)]'}`}>
-                  <input type="radio" name="role" value={r} checked={form.role === r} onChange={e => set('role', (e.target as HTMLInputElement).value)} />
-                  <span className="capitalize text-sm">{r}</span>
-                </label>
-              ))}
-            </div>
+            {!hideRoleSelector && (
+              <div className="flex gap-3">
+                {['student', 'lecturer', 'admin'].map(r => (
+                  <label key={r} className={`inline-flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer ${form.role === r ? 'border-[var(--color-accent-coral-400)] bg-[rgba(255,183,170,0.06)]' : 'border-transparent bg-[var(--color-bg-main)]'}`}>
+                    <input type="radio" name="role" value={r} checked={form.role === r} onChange={e => set('role', (e.target as HTMLInputElement).value)} />
+                    <span className="capitalize text-sm">{r}</span>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
 
           {errors.general && (

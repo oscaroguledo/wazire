@@ -7,6 +7,10 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { Layout } from './components/Layout';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
+import StudentRegister from './pages/registers/StudentRegister';
+import LecturerRegister from './pages/registers/LecturerRegister';
+import AdminRegister from './pages/registers/AdminRegister';
+import SuperadminRegister from './pages/registers/SuperadminRegister';
 import { Dashboard } from './pages/Dashboard';
 import { Courses } from './pages/Courses';
 import { CourseDetail } from './pages/CourseDetail';
@@ -81,6 +85,10 @@ function AppRoutes() {
       <Route
         path="/register"
         element={isAuthenticated ? <Navigate to="/dashboard" /> : <Register />} />
+      <Route path="/register/student" element={isAuthenticated ? <Navigate to="/dashboard" /> : <StudentRegister />} />
+      <Route path="/register/lecturer" element={isAuthenticated ? <Navigate to="/dashboard" /> : <LecturerRegister />} />
+      <Route path="/register/admin" element={isAuthenticated ? <Navigate to="/dashboard" /> : <AdminRegister />} />
+      <Route path="/register/superadmin" element={isAuthenticated ? <Navigate to="/dashboard" /> : <SuperadminRegister />} />
       
       {/* Standalone tenant creation page - no Layout wrapper */}
       <Route

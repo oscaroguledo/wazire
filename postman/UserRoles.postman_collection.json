@@ -1,0 +1,69 @@
+{
+  "info": {
+    "name": "Wazire - User Roles",
+    "_postman_id": "wazire-user-roles",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Register Student",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"first_name\": \"Jane\",\n  \"last_name\": \"Student\",\n  \"email\": \"jane.student@example.com\",\n  \"password\": \"supersecret123\",\n  \"role\": \"student\"\n}"
+        },
+        "url": { "raw": "{{API_URL}}/auth/register", "host": ["{{API_URL}}"], "path": ["auth","register"] }
+      }
+    },
+    {
+      "name": "Register Lecturer",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"first_name\": \"Dr\",\n  \"last_name\": \"Lecturer\",\n  \"email\": \"dr.lecturer@example.com\",\n  \"password\": \"supersecret123\",\n  \"role\": \"lecturer\"\n}"
+        },
+        "url": { "raw": "{{API_URL}}/auth/register", "host": ["{{API_URL}}"], "path": ["auth","register"] }
+      }
+    },
+    {
+      "name": "Register Admin",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"first_name\": \"Alice\",\n  \"last_name\": \"Admin\",\n  \"email\": \"alice.admin@example.com\",\n  \"password\": \"supersecret123\",\n  \"role\": \"admin\"\n}"
+        },
+        "url": { "raw": "{{API_URL}}/auth/register", "host": ["{{API_URL}}"], "path": ["auth","register"] }
+      }
+    },
+    {
+      "name": "Register Superadmin",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"first_name\": \"Root\",\n  \"last_name\": \"Super\",\n  \"email\": \"root@example.com\",\n  \"password\": \"supersecret123\",\n  \"role\": \"superadmin\"\n}"
+        },
+        "url": { "raw": "{{API_URL}}/auth/register", "host": ["{{API_URL}}"], "path": ["auth","register"] }
+      }
+    },
+    {
+      "name": "Login",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"alice.admin@example.com\",\n  \"password\": \"supersecret123\"\n}"
+        },
+        "url": { "raw": "{{API_URL}}/auth/login", "host": ["{{API_URL}}"], "path": ["auth","login"] }
+      }
+    }
+  ]
+}
