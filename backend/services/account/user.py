@@ -198,8 +198,8 @@ class UserService:
             if not user or not user.is_active:
                 return None
 
-            role_str = user.role.value.lower() if hasattr(user.role, "value") else str(user.role).lower()
-            if role_str not in ("admin", "superadmin"):
+            # Prefer enum comparison where possible
+            if getattr(user, 'role', None) not in (UserRole.ADMIN, UserRole.SUPERADMIN):
                 if not token_tenant or str(token_tenant) != str(user.tenant_id):
                     return None
 
