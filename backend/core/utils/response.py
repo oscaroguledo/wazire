@@ -83,4 +83,12 @@ class Response:
         if sc == status.HTTP_204_NO_CONTENT:
             return StarletteResponse(status_code=sc)
 
-        return JSONResponse(status_code=sc, content={k: v for k, v in payload.items() if v is not None})
+        # Always include "data" key when it was explicitly passed (even as None/null),
+        # so the frontend envelope handler can distinguish "no data" from "missing field".
+        # We use a sentinel to detect whether data was explicitly provided.
+        final: Dict[str, Any] = {k: v for k, v in payload.items() if v is not None}
+        # Re-add data as null if it was explicitly set to None (not just omitted)
+        if "data" not in final and data is None and success:
+            final["data"] = None
+
+        return JSONResponse(status_code=sc, content=final)

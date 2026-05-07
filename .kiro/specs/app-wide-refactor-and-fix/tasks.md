@@ -743,29 +743,29 @@
      PHASE 11 — FRONTEND FIXES
      ============================================================ -->
 
-- [-] 13. Fix all frontend type errors, API URL mismatches, and missing modules
+- [x] 13. Fix all frontend type errors, API URL mismatches, and missing modules
 
-  - [ ] 13.1 Fix `UserManagement.tsx` missing `User` import
+  - [x] 13.1 Fix `UserManagement.tsx` missing `User` import
     - Add `import type { User } from '@/lib/types'` (or equivalent) to `frontend/src/pages/UserManagement.tsx`
     - _Bug_Condition: isBugCondition(input) where input.target = 'UserManagement.tsx' AND missingImport('User')_
     - _Expected_Behavior: UserManagement.tsx compiles without TypeScript errors_
     - _Preservation: UserManagement page continues to fetch and display paginated user list (3.13)_
     - _Requirements: 2.15, 3.13_
 
-  - [ ] 13.2 Add `superadmin` to `UserRole` type in `frontend/src/lib/types.ts`
+  - [x] 13.2 Add `superadmin` to `UserRole` type in `frontend/src/lib/types.ts`
     - Add `'superadmin'` to the `UserRole` union type
     - _Bug_Condition: isBugCondition(input) where input.target = 'UserRole type' AND typeMismatch('missing superadmin')_
     - _Expected_Behavior: UserRole includes 'superadmin'; no TypeScript errors for superadmin users_
     - _Requirements: 2.16_
 
-  - [ ] 13.3 Fix `AuthContext.register()` token storage
+  - [x] 13.3 Fix `AuthContext.register()` token storage
     - After auto-login following registration: call `localStorage.setItem(TOKEN_KEY, accessToken)` to store the access token
     - _Bug_Condition: isBugCondition(input) where input.target = 'AuthContext.register' AND defectPresent('token not stored in localStorage')_
     - _Expected_Behavior: user is authenticated immediately after registration; token stored in localStorage_
     - _Preservation: login, logout, and token refresh flows unchanged (3.11)_
     - _Requirements: 2.17_
 
-  - [ ] 13.4 Fix all API URL mismatches in `auth.ts`, `tenant.ts`, `enrollment.ts`, `dashboard.ts`
+  - [x] 13.4 Fix all API URL mismatches in `auth.ts`, `tenant.ts`, `enrollment.ts`, `dashboard.ts`
     - `auth.ts`: change `listUsers()` → `/api/v1/account/users`, `getUser()` → `/api/v1/account/users/{id}`, `updateUser()` → `/api/v1/account/users/{id}`, `deleteUser()` → `/api/v1/account/users/{id}`
     - `tenant.ts`: change all tenant URLs from `/tenants/` to `/api/v1/account/tenants/`
     - `enrollment.ts`: change `/academic/enrollment/` (singular) to `/academic/enrollments/` (plural)
@@ -774,20 +774,20 @@
     - _Expected_Behavior: all API calls reach correct backend routes; no 404s_
     - _Requirements: 2.59–2.67_
 
-  - [ ] 13.5 Fix `answer.ts` `upsertAnswer`: change PUT to PATCH
+  - [x] 13.5 Fix `answer.ts` `upsertAnswer`: change PUT to PATCH
     - In `frontend/src/apis/answer.ts`: change `client.put(...)` to `client.patch(...)` in `upsertAnswer()`
     - _Bug_Condition: isBugCondition(input) where input.target = 'answer.ts' AND wrongMethod('PUT instead of PATCH')_
     - _Expected_Behavior: answer upsert uses PATCH; matches backend route handler_
     - _Requirements: 2.65_
 
-  - [ ] 13.6 Remove `getAdminStats()` from `auth.ts`
+  - [x] 13.6 Remove `getAdminStats()` from `auth.ts`
     - Remove the `getAdminStats()` function from `frontend/src/apis/auth.ts` (endpoint does not exist on backend)
     - Update any component that calls `getAdminStats()` to use the analytics dashboard endpoint instead
     - _Bug_Condition: isBugCondition(input) where input.target = 'auth.ts getAdminStats' AND wrongURL('/auth/admin/stats does not exist')_
     - _Expected_Behavior: no calls to non-existent /auth/admin/stats endpoint_
     - _Requirements: 2.66_
 
-  - [ ] 13.7 Fix all TypeScript type mismatches in `frontend/src/lib/types.ts`
+  - [x] 13.7 Fix all TypeScript type mismatches in `frontend/src/lib/types.ts`
     - `Submission`: rename `attempts_count` → `attempts`; add `submitted_at: string | null`
     - `SubmissionAttempt`: remove `attempt_number` and `scan_pages` fields; use `id` as attempt number
     - `AdminDashboard` and `StudentDashboard`: rename `total_graded_submissions`/`total_pending_submissions` → `graded_submissions`/`pending_submissions`; add `active_courses` and `completed_courses` to `StudentDashboard`
@@ -801,16 +801,16 @@
     - _Preservation: components using existing correct fields continue to work (3.47–3.55)_
     - _Requirements: 2.68–2.86, 3.47–3.55_
 
-  - [ ] 13.8 Create `frontend/src/apis/billing.ts`
+  - [x] 13.8 Create `frontend/src/apis/billing.ts`
     - Implement API functions for: `listInvoices`, `getInvoice`, `listBillingPlans`, `getBillingPlan`, `listPaymentMethods`, `getUsage`, `listSemesters`, `getSemester`
     - Use correct URLs under `/api/v1/billing/`
     - _Requirements: 2.56_
 
-  - [ ] 13.9 Create `frontend/src/apis/semester.ts`
+  - [x] 13.9 Create `frontend/src/apis/semester.ts`
     - Implement semester-specific API functions if separated from billing.ts
     - _Requirements: 2.56_
 
-  - [ ] 13.10 Fix `QuestionCreate` field names in `frontend/src/apis/exam.ts`
+  - [x] 13.10 Fix `QuestionCreate` field names in `frontend/src/apis/exam.ts`
     - Rename `question_text` → `text`, `question_type` → `qtype`, `marks` → `mark` in `QuestionCreate` interface
     - Apply same corrections to `QuestionUpdate` interface
     - _Bug_Condition: isBugCondition(input) where input.target = 'exam.ts QuestionCreate' AND typeMismatch('wrong field names')_
@@ -818,7 +818,7 @@
     - _Preservation: QuestionUpdate interface updated consistently (3.54)_
     - _Requirements: 2.84, 3.54_
 
-  - [ ] 13.11 Fix `listQuestions` to pass `exam_id` filter
+  - [x] 13.11 Fix `listQuestions` to pass `exam_id` filter
     - In `frontend/src/apis/exam.ts`: update `listQuestions(examId, params?)` to include `exam_id: examId` in the query params object
     - _Bug_Condition: isBugCondition(input) where input.target = 'exam.ts listQuestions' AND defectPresent('exam_id not passed as query param')_
     - _Expected_Behavior: listQuestions sends exam_id as query parameter; returns questions for the correct exam_

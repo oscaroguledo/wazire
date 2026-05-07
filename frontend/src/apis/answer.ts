@@ -17,7 +17,8 @@ export async function upsertAnswer(questionId: string, payload: StudentAnswerCre
   if (!questionId) throw new ApiError('Question ID is required', 400)
 
   try {
-    const response = await client.put<ApiResponse<StudentAnswerRead>>(`/academic/answers/${questionId}`, payload)
+    // 13.5: Changed from client.put to client.patch to match backend PATCH route
+    const response = await client.patch<ApiResponse<StudentAnswerRead>>(`/academic/answers/${questionId}`, payload)
     return handleEnvelope<StudentAnswerRead>(response)
   } catch (error) {
     if (error instanceof ApiError) throw error

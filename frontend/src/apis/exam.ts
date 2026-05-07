@@ -17,23 +17,25 @@ export interface Answer {
   updated_at: string
 }
 
+// 13.10: Renamed question_text → text, question_type → qtype, marks → mark to match backend schema
 export interface QuestionCreate {
-  question_text: string
-  question_type: 'multiple_choice' | 'theory' | 'fill_in_blanks'
+  text: string
+  qtype: 'multiple_choice' | 'theory' | 'fill_in_blanks'
   options?: string[]
   correct_answer?: string | string[]
-  marks: number
+  mark: number
   order?: number
   images?: string[]  // array of base64 encoded images
   industry?: string
 }
 
+// 13.10: Updated QuestionUpdate consistently with QuestionCreate field names
 export interface QuestionUpdate {
-  question_text?: string
-  question_type?: 'multiple_choice' | 'theory' | 'fill_in_blanks'
+  text?: string
+  qtype?: 'multiple_choice' | 'theory' | 'fill_in_blanks'
   options?: string[]
   correct_answer?: string | string[]
-  marks?: number
+  mark?: number
   order?: number
   images?: string[]  // array of base64 encoded images
   industry?: string
@@ -326,7 +328,7 @@ export async function getExamYears(): Promise<number[]> {
 
 /**
  * List questions for an exam
- * Matches backend GET /academic/exams/{exam_id}/questions endpoint
+ * Matches backend GET /academic/questions endpoint with exam_id filter
  */
 export async function listQuestions(examId: string, params?: QuestionListParams): Promise<QuestionListResponse> {
   if (!examId) {
@@ -334,7 +336,9 @@ export async function listQuestions(examId: string, params?: QuestionListParams)
   }
 
   try {
+    // 13.11: Include exam_id as a query parameter so the backend filters by exam
     const requestParams = {
+      exam_id: examId,
       page: params?.page || 1,
       per_page: params?.per_page || config.DEFAULT_PAGE_SIZE,
       search: params?.search,
@@ -408,8 +412,8 @@ export async function createQuestion(examId: string, questionData: QuestionCreat
   if (!examId) {
     throw new ApiError('Exam ID is required', 400)
   }
-  if (!questionData.question_text || !questionData.question_type || !questionData.marks) {
-    throw new ApiError('Question text, type, and marks are required', 400)
+  if (!questionData.text || !questionData.qtype || !questionData.mark) {
+    throw new ApiError('Question text, type, and mark are required', 400)
   }
 
   try {

@@ -90,6 +90,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!rawUser) {
       throw new Error('Invalid login response after registration')
     }
+    // 13.3: Store access token in localStorage so user is authenticated immediately after registration
+    const tokens = (rawData as { tokens?: { access_token: string; refresh_token: string } }).tokens
+    if (tokens?.access_token) {
+      localStorage.setItem(TOKEN_KEY, tokens.access_token)
+      if (tokens.refresh_token) {
+        localStorage.setItem('refresh_token', tokens.refresh_token)
+      }
+    }
     setUser(rawUser)
   }
 

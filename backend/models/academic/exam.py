@@ -98,6 +98,7 @@ class Exam(Base):
             "passing_marks": self.passing_marks,
             "status": self.status.value if self.status else None,
             "max_attempts": self.max_attempts,
+            "course_id": str(self.course_id) if self.course_id else None,
             "tenant_id": str(self.tenant_id),
             "semester_id": str(self.semester_id) if self.semester_id else None,
             "created_by": str(self.created_by) if self.created_by else None,

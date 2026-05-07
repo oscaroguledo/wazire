@@ -42,7 +42,7 @@ async def _enrich_submission(s, db) -> dict:
     # Compute status based on graded_at and latest_score
     if s.graded_at and s.latest_score is not None:
         data['status'] = SubmissionStatus.GRADED.value
-    elif s.attempts_count > 0:
+    elif s.attempts > 0:
         data['status'] = SubmissionStatus.SUBMITTED.value
     else:
         data['status'] = SubmissionStatus.PENDING.value
@@ -149,7 +149,7 @@ async def start_submission(
         return Response(success=False, error="No tenant assigned to your account", request=request, status_code=status.HTTP_403_FORBIDDEN)
 
     try:
-        submission = await service.create_submission(body.exam_id, current_user.id)
+        submission = await service.create_submission(body.exam_id, current_user.id, current_user.tenant_id)
     except ValueError as e:
         return Response(success=False, error=str(e), request=request, status_code=status.HTTP_400_BAD_REQUEST)
 

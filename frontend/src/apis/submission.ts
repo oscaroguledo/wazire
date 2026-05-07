@@ -245,15 +245,18 @@ export async function updateSubmission(submissionId: string, submissionData: Sub
 
 /**
  * Get current user's submission for a specific exam
+ * Returns null if no submission exists yet (student hasn't started the exam)
  * Matches backend GET /academic/submissions/mine?exam_id= endpoint
  */
-export async function getMySubmission(examId?: string): Promise<Submission> {
+export async function getMySubmission(examId?: string): Promise<Submission | null> {
   try {
     const params = examId ? { exam_id: examId } : {}
     const response = await client.get<ApiResponse<Submission>>('/academic/submissions/mine', { params })
-    return handleEnvelope<Submission>(response)
+    return handleEnvelope<Submission | null>(response)
   } catch (error) {
     if (error instanceof ApiError) {
+      // 404 means no submission yet — return null instead of throwing
+      if (error.status === 404) return null
       throw error
     }
     
@@ -265,7 +268,7 @@ export async function getMySubmission(examId?: string): Promise<Submission> {
         throw new ApiError('Access denied to view this submission', 403)
       }
       if (error.message.includes('404') || error.message.includes('Not Found')) {
-        throw new ApiError('Submission not found for this exam', 404)
+        return null
       }
     }
     

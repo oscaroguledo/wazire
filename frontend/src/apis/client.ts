@@ -130,12 +130,12 @@ export function handleEnvelope<T>(resp: AxiosResponse<ApiResponse<T>>): T {
     throw new Error(message)
   }
   
-  // Allow null/undefined data for successful responses (e.g., no submission found)
+  // Allow null data for successful responses (e.g., no submission found yet)
   if (body.data === undefined) {
     throw new Error('API response missing data field')
   }
   
-  return body.data
+  return body.data as T
 }
 
 /**

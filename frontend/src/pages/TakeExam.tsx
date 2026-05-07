@@ -70,14 +70,15 @@ export function TakeExam() {
         setExam(examData || null);
         setQuestions(qs?.items || []);
 
-        // Check for existing submission
+        // Check for existing submission — must await before computing timer
+        let submission: any = null;
         try {
-          const submission = await submissionApi.getMySubmission(id as string);
+          submission = await submissionApi.getMySubmission(id as string);
           if (submission) {
             setExistingSubmission(submission);
           }
         } catch (subError) {
-          // No existing submission found
+          // No existing submission found — that's fine
           setExistingSubmission(null);
         }
 
@@ -103,20 +104,30 @@ export function TakeExam() {
           console.log('No saved answers found');
         }
 
-        // set timer if exam has duration
-        if (examData?.duration_hours || examData?.duration_minutes) {
-          const totalHours = (examData.duration_hours || 0) + (examData.duration_minutes || 0) / 60;
-          setTotalDuration(totalHours * 3600);
-          
-          // Calculate remaining time based on submission start time if exists
-          if (existingSubmission && existingSubmission.created_at) {
-            const startTime = new Date(existingSubmission.created_at).getTime();
-            const currentTime = Date.now();
-            const elapsedSeconds = (currentTime - startTime) / 1000;
-            const remaining = Math.max(0, totalHours * 3600 - elapsedSeconds);
+        // Compute total duration in whole seconds
+        const totalSecs = Math.round(
+          ((examData?.duration_hours || 0) * 3600) +
+          ((examData?.duration_minutes || 0) * 60)
+        );
+        setTotalDuration(totalSecs);
+
+        if (totalSecs > 0) {
+          // Prefer backend end_time for authoritative deadline (prevents client-clock cheating)
+          if (examData?.end_time) {
+            const deadline = new Date(examData.end_time).getTime();
+            deadlineRef.current = deadline;
+            const remaining = Math.max(0, Math.round((deadline - Date.now()) / 1000));
             setTimeRemaining(remaining);
+          } else if (submission?.created_at) {
+            // Fall back to submission start time + total duration
+            const startMs = new Date(submission.created_at).getTime();
+            const deadline = startMs + totalSecs * 1000;
+            deadlineRef.current = deadline;
+            const elapsedSecs = Math.round((Date.now() - startMs) / 1000);
+            setTimeRemaining(Math.max(0, totalSecs - elapsedSecs));
           } else {
-            setTimeRemaining(totalHours * 3600);
+            deadlineRef.current = null;
+            setTimeRemaining(totalSecs);
           }
         }
       } catch (e: unknown) {
@@ -132,6 +143,8 @@ export function TakeExam() {
 
   const pendingRef = useRef<Record<string, unknown>>({});
   const processingRef = useRef(false);
+  // Deadline ref: absolute ms timestamp when the exam ends — used to re-sync timer on each tick
+  const deadlineRef = useRef<number | null>(null);
 
   const persistPending = useCallback(() => {
     if (!id) return;
@@ -242,18 +255,22 @@ export function TakeExam() {
     }
   }, [id, submitting, answers, navigate]);
 
-  // Timer effect
+  // Timer effect — counts down in whole seconds, re-syncs against wall-clock deadline on each tick
   useEffect(() => {
     if (!examStarted || timeRemaining <= 0) return;
 
     const timer = setInterval(() => {
-      setTimeRemaining((prev) => {
-        if (prev <= 1) {
-          // Auto-submit when time runs out
+      setTimeRemaining(() => {
+        // If we have an authoritative deadline, re-sync from wall clock (handles tab sleep / drift)
+        const next = deadlineRef.current !== null
+          ? Math.max(0, Math.round((deadlineRef.current - Date.now()) / 1000))
+          : Math.max(0, timeRemaining - 1);
+
+        if (next <= 0) {
           void handleSubmitExam();
           return 0;
         }
-        return prev - 1;
+        return next;
       });
     }, 1000);
 
@@ -327,7 +344,7 @@ export function TakeExam() {
 
   if (!examStarted) {
     // Show submitted message only if submission has attempts (actually submitted)
-    if (existingSubmission && existingSubmission.attempts_count > 0) {
+    if (existingSubmission && existingSubmission.attempts > 0) {
       return (
         <div className="min-h-screen bg-[var(--color-bg-primary)] p-6">
           <div className="max-w-2xl mx-auto">
@@ -457,7 +474,7 @@ export function TakeExam() {
                 <div className="bg-[var(--color-primary-50)] rounded-xl p-3 border border-[var(--color-primary-200)]">
                   <Icon as={Clock} size={18} className="text-[var(--color-primary-600)] mb-1" />
                   <p className="text-xs text-[var(--color-primary-600)] font-medium">Duration</p>
-                  <p className="text-lg font-bold text-[var(--color-primary-900)]">{formatDuration(exam.duration || 0)}</p>
+                  <p className="text-lg font-bold text-[var(--color-primary-900)]">{formatDuration(parseFloat(`${exam.duration_hours || 0}.${String(exam.duration_minutes || 0).padStart(2, '0')}`) )}</p>
                 </div>
 
                 <div className={`rounded-xl p-3 border transition-all duration-300 ${exam.start_time && new Date(exam.start_time).getTime() - Date.now() > 0 && new Date(exam.start_time).getTime() - Date.now() <= 30 * 60 * 1000 ? 'bg-[var(--color-error-50)] border-[var(--color-error-200)] animate-pulse' : 'bg-[var(--color-info-50)] border-[var(--color-info-200)]'}`}>
@@ -542,9 +559,10 @@ export function TakeExam() {
   const currentQuestion = questions[currentQuestionIndex];
   const progress = questions.length > 0 ? ((currentQuestionIndex + 1) / questions.length) * 100 : 0;
   const formatTime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
+    const s = Math.max(0, Math.floor(seconds));
+    const hours = Math.floor(s / 3600);
+    const mins = Math.floor((s % 3600) / 60);
+    const secs = s % 60;
     return `${hours > 0 ? hours + ':' : ''}${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 

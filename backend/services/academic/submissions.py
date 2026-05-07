@@ -72,6 +72,7 @@ class SubmissionService:
             submission = SubmissionModel(
                 student_id=student_id,
                 exam_id=exam_id,
+                tenant_id=tenant_id if tenant_id is not None else exam.tenant_id,
                 attempts=0,
             )
             self.db.add(submission)
@@ -323,18 +324,27 @@ class SubmissionService:
             )
         )).scalar_one_or_none()
 
-    async def create_submission(self, exam_id: UUID, student_id: UUID) -> SubmissionModel:
+    async def create_submission(self, exam_id: UUID, student_id: UUID, tenant_id: Optional[UUID] = None) -> SubmissionModel:
         """Create or return an existing Submission record without adding an attempt.
 
         This is used when the student clicks "Start Exam" — we want a Submission
-        row to exist (attempts_count stays 0) but not create an Attempt until
+        row to exist (attempts stays 0) but not create an Attempt until
         the student actually submits their answers.
         """
         submission = await self._get_by_student_exam(student_id, exam_id)
         if submission is None:
+            # Resolve tenant_id from the exam if not supplied
+            effective_tenant_id = tenant_id
+            if effective_tenant_id is None:
+                exam = (await self.db.execute(
+                    select(ExamModel).where(ExamModel.id == exam_id)
+                )).scalar_one_or_none()
+                if exam:
+                    effective_tenant_id = exam.tenant_id
             submission = SubmissionModel(
                 student_id=student_id,
                 exam_id=exam_id,
+                tenant_id=effective_tenant_id,
                 attempts=0,
             )
             self.db.add(submission)

@@ -58,9 +58,10 @@ function extractMessage(error: unknown, fallback: string): string {
   return fallback
 }
 
+// 13.4: Updated enrollment URLs from /academic/enrollment/ (singular) to /academic/enrollments/ (plural)
 export async function listEnrollment(params: EnrollmentListParams = {}): Promise<EnrollmentListResponse> {
   try {
-    const response = await client.get(`/academic/enrollment/`, { params })
+    const response = await client.get(`/academic/enrollments/`, { params })
     return handlePaginatedEnvelope<Enrollment>(response)
   } catch (error) {
     throw new ApiError(extractMessage(error, 'Failed to fetch enrollments'))
@@ -69,7 +70,7 @@ export async function listEnrollment(params: EnrollmentListParams = {}): Promise
 
 export async function getEnrollment(id: string): Promise<Enrollment> {
   try {
-    const response = await client.get(`/academic/enrollment/${id}`)
+    const response = await client.get(`/academic/enrollments/${id}`)
     return handleEnvelope<Enrollment>(response)
   } catch (error) {
     throw new ApiError(extractMessage(error, 'Failed to fetch enrollment'))
@@ -78,7 +79,7 @@ export async function getEnrollment(id: string): Promise<Enrollment> {
 
 export async function enrollStudent(data: EnrollmentCreate): Promise<Enrollment> {
   try {
-    const response = await client.post(`/academic/enrollment/`, data)
+    const response = await client.post(`/academic/enrollments/`, data)
     return handleEnvelope<Enrollment>(response)
   } catch (error) {
     throw new ApiError(extractMessage(error, 'Failed to enroll student'))
@@ -87,7 +88,7 @@ export async function enrollStudent(data: EnrollmentCreate): Promise<Enrollment>
 
 export async function updateEnrollment(id: string, data: EnrollmentUpdate): Promise<Enrollment> {
   try {
-    const response = await client.put(`/academic/enrollment/${id}`, data)
+    const response = await client.put(`/academic/enrollments/${id}`, data)
     return handleEnvelope<Enrollment>(response)
   } catch (error) {
     throw new ApiError(extractMessage(error, 'Failed to update enrollment'))
@@ -96,7 +97,7 @@ export async function updateEnrollment(id: string, data: EnrollmentUpdate): Prom
 
 export async function removeEnrollment(id: string): Promise<void> {
   try {
-    await client.delete(`/academic/enrollment/${id}`)
+    await client.delete(`/academic/enrollments/${id}`)
   } catch (error) {
     throw new ApiError(extractMessage(error, 'Failed to remove enrollment'))
   }
@@ -116,7 +117,7 @@ export async function getLecturerEnrollment(lecturerId: string, params: Omit<Enr
 
 export async function bulkEnroll(enrollments: EnrollmentCreate[]): Promise<Enrollment[]> {
   try {
-    const response = await client.post(`/academic/enrollment/bulk`, { enrollments })
+    const response = await client.post(`/academic/enrollments/bulk`, { enrollments })
     return handleEnvelope<Enrollment[]>(response)
   } catch (error) {
     throw new ApiError(extractMessage(error, 'Failed to bulk enroll students'))
@@ -125,7 +126,7 @@ export async function bulkEnroll(enrollments: EnrollmentCreate[]): Promise<Enrol
 
 export async function checkEnrollment(studentId: string, courseId: string): Promise<EnrollmentCheckResponse> {
   try {
-    const response = await client.get(`/academic/enrollment/check`, {
+    const response = await client.get(`/academic/enrollments/check`, {
       params: { student_id: studentId, course_id: courseId }
     })
     return handleEnvelope<EnrollmentCheckResponse>(response)

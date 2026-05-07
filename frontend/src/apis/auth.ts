@@ -151,65 +151,6 @@ export async function me(): Promise<User> {
 }
 
 /**
- * Get admin statistics (admin only)
- * Uses existing user management system
- */
-export async function getAdminStats(): Promise<{
-  total_users: number;
-  student_users: number;
-  lecturer_users: number;
-  admin_users: number;
-  total_courses: number;
-  total_exams: number;
-  total_submissions: number;
-  total_tenants: number;
-  active_users: number;
-  pending_approvals: number;
-}> {
-  try {
-    const response = await client.get<ApiResponse<{
-      total_users: number;
-      student_users: number;
-      lecturer_users: number;
-      admin_users: number;
-      total_courses: number;
-      total_exams: number;
-      total_submissions: number;
-      total_tenants: number;
-      active_users: number;
-      pending_approvals: number;
-    }>>('/auth/admin/stats')
-    return response.data.data ?? {
-      total_users: 0,
-      student_users: 0,
-      lecturer_users: 0,
-      admin_users: 0,
-      total_courses: 0,
-      total_exams: 0,
-      total_submissions: 0,
-      total_tenants: 0,
-      active_users: 0,
-      pending_approvals: 0
-    }
-  } catch (error) {
-    console.error('Failed to fetch admin stats:', error)
-    // Return default stats if API fails
-    return {
-      total_users: 0,
-      student_users: 0,
-      lecturer_users: 0,
-      admin_users: 0,
-      total_courses: 0,
-      total_exams: 0,
-      total_submissions: 0,
-      total_tenants: 0,
-      active_users: 0,
-      pending_approvals: 0
-    }
-  }
-}
-
-/**
  * Update current user profile
  * Matches backend PUT /auth/me endpoint
  */
@@ -235,7 +176,7 @@ export async function updateMe(payload: Partial<Omit<User, 'id' | 'created_at' |
 
 /**
  * List users (admin only)
- * Matches backend GET /auth/ endpoint (keyset pagination)
+ * Matches backend GET /account/users endpoint
  */
 export async function listUsers(params?: UserListParams): Promise<UserListResponse> {
   try {
@@ -245,7 +186,7 @@ export async function listUsers(params?: UserListParams): Promise<UserListRespon
     }
     if (params?.tenant_id) requestParams.tenant_id = params.tenant_id
 
-    const response = await client.get<ApiResponse<User[]>>('/auth/', { params: requestParams })
+    const response = await client.get<ApiResponse<User[]>>('/account/users', { params: requestParams })
     return handlePaginatedEnvelope<User>(response)
   } catch (error) {
     handleApiError(error, 'List users')
@@ -254,13 +195,13 @@ export async function listUsers(params?: UserListParams): Promise<UserListRespon
 
 /**
  * Get user by ID (admin only)
- * Matches backend GET /auth/{user_id} endpoint
+ * Matches backend GET /account/users/{user_id} endpoint
  */
 export async function getUser(userId: string): Promise<User> {
   validateRequiredId(userId, 'User ID')
 
   try {
-    const response = await client.get<ApiResponse<User>>(`/auth/${userId}`)
+    const response = await client.get<ApiResponse<User>>(`/account/users/${userId}`)
     return handleEnvelope<User>(response)
   } catch (error) {
     handleApiError(error, 'Get user')
@@ -269,14 +210,14 @@ export async function getUser(userId: string): Promise<User> {
 
 /**
  * Update user (admin only)
- * Matches backend PUT /auth/{user_id} endpoint
+ * Matches backend PUT /account/users/{user_id} endpoint
  */
 export async function updateUser(userId: string, payload: Partial<Omit<User, 'id' | 'created_at' | 'updated_at'>>): Promise<User> {
   validateRequiredId(userId, 'User ID')
   validateUpdatePayload(payload)
 
   try {
-    const response = await client.put<ApiResponse<User>>(`/auth/${userId}`, payload)
+    const response = await client.put<ApiResponse<User>>(`/account/users/${userId}`, payload)
     return handleEnvelope<User>(response)
   } catch (error) {
     handleApiError(error, 'Update user')
@@ -285,13 +226,13 @@ export async function updateUser(userId: string, payload: Partial<Omit<User, 'id
 
 /**
  * Delete user (admin only)
- * Matches backend DELETE /auth/{user_id} endpoint
+ * Matches backend DELETE /account/users/{user_id} endpoint
  */
 export async function deleteUser(userId: string): Promise<void> {
   validateRequiredId(userId, 'User ID')
 
   try {
-    const response = await client.delete<ApiResponse<void>>(`/auth/${userId}`)
+    const response = await client.delete<ApiResponse<void>>(`/account/users/${userId}`)
     handleEnvelope<void>(response)
   } catch (error) {
     handleApiError(error, 'Delete user')

@@ -38,9 +38,10 @@ export async function getLecturerDashboard(lecturerId: string): Promise<Lecturer
   }
 }
 
-export async function getAdminDashboard(adminId: string): Promise<AdminDashboard> {
+// 13.4: Changed getAdminDashboard to accept tenantId (not adminId) per backend route /analytics/dashboard/admin/{tenantId}
+export async function getAdminDashboard(tenantId: string): Promise<AdminDashboard> {
   try {
-    const response = await client.get(`/analytics/dashboard/admin/${adminId}`)
+    const response = await client.get(`/analytics/dashboard/admin/${tenantId}`)
     return handleEnvelope<AdminDashboard>(response)
   } catch (error) {
     throw new ApiError(extractMessage(error, 'Failed to fetch admin dashboard'))
