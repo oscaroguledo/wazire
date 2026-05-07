@@ -101,10 +101,11 @@ async def submit_exam(
         return Response(success=False, error=str(e), request=request, status_code=status.HTTP_400_BAD_REQUEST)
 
     # Grade in background via Kafka worker — await so failures are observable
-    await emit_grade_attempt(str(attempt.id), str(body.exam_id))
+    await emit_grade_attempt(str(attempt.id), str(body.exam_id), tenant_id=str(current_user.tenant_id) if current_user.tenant_id else None)
 
     # Refresh dashboards after submission — await so failures are observable
-    await emit_refresh_dashboard(str(current_user.id))
+    tenant_id_str = str(current_user.tenant_id) if current_user.tenant_id else None
+    await emit_refresh_dashboard(str(current_user.id), tenant_id=tenant_id_str)
     # Get exam to find lecturer for background refresh
     exam_stmt = select(Exam).where(Exam.id == body.exam_id)
     exam_result = await service.db.execute(exam_stmt)
@@ -115,7 +116,7 @@ async def submit_exam(
         course_result = await service.db.execute(course_stmt)
         course = course_result.scalar_one_or_none()
         if course and course.lecturer_id:
-            await emit_refresh_dashboard(str(course.lecturer_id))
+            await emit_refresh_dashboard(str(course.lecturer_id), tenant_id=tenant_id_str)
 
     print(f"[log] Student {current_user.id} submitted exam {body.exam_id}, attempt #{attempt.attempt_number}")
 
@@ -422,10 +423,11 @@ async def scan_answer_sheet(
         return Response(success=False, error=str(e), request=request, status_code=status.HTTP_400_BAD_REQUEST)
 
     # Grade scanned attempt in background via Kafka worker — await so failures are observable
-    await emit_grade_attempt(str(attempt.id), str(body.exam_id))
+    await emit_grade_attempt(str(attempt.id), str(body.exam_id), tenant_id=str(current_user.tenant_id) if current_user.tenant_id else None)
 
     # Refresh dashboards after scan submission — await so failures are observable
-    await emit_refresh_dashboard(str(body.student_id))
+    scan_tenant_id_str = str(current_user.tenant_id) if current_user.tenant_id else None
+    await emit_refresh_dashboard(str(body.student_id), tenant_id=scan_tenant_id_str)
     # Get exam to find lecturer for background refresh
     exam_stmt = select(Exam).where(Exam.id == body.exam_id)
     exam_result = await db.execute(exam_stmt)
@@ -436,7 +438,7 @@ async def scan_answer_sheet(
         course_result = await db.execute(course_stmt)
         course = course_result.scalar_one_or_none()
         if course and course.lecturer_id:
-            await emit_refresh_dashboard(str(course.lecturer_id))
+            await emit_refresh_dashboard(str(course.lecturer_id), tenant_id=scan_tenant_id_str)
 
     return Response(
         success=True,

@@ -89,7 +89,9 @@ class SubmissionService:
         # Save attempt immediately — answers will be stored separately in StudentAnswer rows
         attempt = SubmissionAttemptModel(
             submission_id=submission.id,
+            attempt_number=attempt_number,
             score=None,
+            scan_pages=scan_pages if scan_pages else None,
         )
         self.db.add(attempt)
         submission.attempts = attempt_number

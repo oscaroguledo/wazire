@@ -1,53 +1,35 @@
+"""SimilarityGrader — grades student answers using Groq AI.
+
+Inherits from GroqEngineBase for shared client initialisation.
+Supports MCQ (direct compare), FITB (case-insensitive match), and
+theory (AI-graded via a single async Groq call wrapped in asyncio.to_thread).
+"""
+from __future__ import annotations
+
+import asyncio
 import json
+import random
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional, Tuple
 
-from core.config import get_settings
-from core.utils.key_balancer import get_balancer
+from .base import GroqEngineBase
 
-try:
-    from groq import Groq
-except Exception:
-    Groq = None
+# Retry configuration
+_MAX_RETRIES = 3
+_RETRY_DELAYS = [1.0, 2.0, 4.0]  # seconds
 
 
-class SimilarityGrader:
+class SimilarityGrader(GroqEngineBase):
     """Grades student answers for MCQ, FITB, and theory questions.
 
     MCQ        -- compares student_answer to mcq_answer directly. No AI.
     FITB       -- compares student_answer to fitb_answer (case-insensitive). No AI.
-    Theory     -- AI grades student_answer against question_text. No lecturer answer ever.
+    Theory     -- AI grades student_answer against question_text via a single
+                  non-blocking Groq call (asyncio.to_thread).
 
     All images must be passed as base64-encoded strings by the caller.
     Returns (score: Decimal 0.00-1.00, reason: str).
     """
-
-    def __init__(self, model: str = "meta-llama/llama-4-scout-17b-16e-instruct", api_key: Optional[str] = None):
-        self.model = model
-        self.client = None
-        if Groq is not None:
-            # Prefer caller-provided key, otherwise ask the balancer for a key.
-            key = api_key
-            if not key:
-                balancer = get_balancer()
-                try:
-                    # best key selection is async but we run it here synchronously via asyncio
-                    import asyncio
-                    key = asyncio.get_event_loop().run_until_complete(balancer.get_best_key())
-                except Exception:
-                    settings = get_settings()
-                    # Use first key from GROQ_API_KEYS as a final fallback
-                    key = None
-                    if getattr(settings, "GROQ_API_KEYS", None):
-                        try:
-                            key = settings.GROQ_API_KEYS.split(",")[0].strip()
-                        except Exception:
-                            key = None
-            if key:
-                try:
-                    self.client = Groq(api_key=key)
-                except Exception as e:
-                    print(f"SimilarityGrader: failed to create Groq client: {e}")
 
     async def grade(
         self,
@@ -69,34 +51,42 @@ class SimilarityGrader:
             Direct string comparison, no AI. reason is always "-".
 
         FITB (Fill-in-the-Blanks):
-            Pass fitb_answer (correct text answer) and optional fitb_variations (list of acceptable answers).
-            Case-insensitive exact match against fitb_answer or any variation. No AI. reason is always "-".
+            Pass fitb_answer (correct text answer) and optional fitb_variations.
+            Case-insensitive exact match. No AI. reason is always "-".
 
         Theory:
             Pass question_text. AI grades student_answer against the question only.
             question_image_b64 / student_image_b64 must be base64 strings if provided.
+            The Groq HTTP call is wrapped in asyncio.to_thread so the event loop
+            is never blocked.
         """
+        # ------------------------------------------------------------------ #
+        # MCQ — direct comparison, no AI                                       #
+        # ------------------------------------------------------------------ #
         if question_type == "multiple_choice":
             if not mcq_answer:
                 return Decimal("0.00"), "No MCQ answer provided"
             correct = student_answer.strip().lower() == mcq_answer.strip().lower()
             return (Decimal("1.00"), "-") if correct else (Decimal("0.00"), "-")
 
+        # ------------------------------------------------------------------ #
+        # FITB — case-insensitive exact match, no AI                           #
+        # ------------------------------------------------------------------ #
         if question_type == "fill_in_blanks":
             if not fitb_answer:
                 return Decimal("0.00"), "No FITB answer provided"
             student_clean = student_answer.strip().lower()
-            correct_clean = fitb_answer.strip().lower()
-            # Check exact match against main answer
-            if student_clean == correct_clean:
+            if student_clean == fitb_answer.strip().lower():
                 return Decimal("1.00"), "-"
-            # Check against acceptable variations
             if fitb_variations:
                 for variation in fitb_variations:
                     if student_clean == variation.strip().lower():
                         return Decimal("1.00"), "-"
             return Decimal("0.00"), "-"
 
+        # ------------------------------------------------------------------ #
+        # Theory — AI grading via Groq (non-blocking)                          #
+        # ------------------------------------------------------------------ #
         if self.client is None:
             return Decimal("0.00"), "Error: Groq client not available. Set GROQ_API_KEYS or pass api_key."
 
@@ -128,16 +118,35 @@ class SimilarityGrader:
             '{"score": 0.0, "reason": "Answer is entirely incorrect or irrelevant."}'
         )})
 
-        try:
-            chat = await self.client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": content}],
-                response_format={"type": "json_object"},
-                temperature=0.0,
-            )
-            res = json.loads(chat.choices[0].message.content)
-            score = Decimal(str(res.get("score", "0.0"))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-            score = max(Decimal("0.00"), min(Decimal("1.00"), score))
-            return score, res.get("reason", "No reason provided")
-        except Exception as e:
-            return Decimal("0.00"), f"Error: {str(e)}"
+        messages = [{"role": "user", "content": content}]
+
+        # Retry loop with exponential backoff
+        last_error: str = "Unknown error"
+        for attempt_num, delay in enumerate(zip(range(_MAX_RETRIES), _RETRY_DELAYS), start=1):
+            retry_idx, backoff = delay
+            try:
+                # Wrap the synchronous Groq call in asyncio.to_thread so the
+                # event loop is not blocked during the HTTP round-trip.
+                chat = await asyncio.to_thread(
+                    self.client.chat.completions.create,
+                    model=self.model,
+                    messages=messages,
+                    response_format={"type": "json_object"},
+                    temperature=0.0,
+                )
+                res = json.loads(chat.choices[0].message.content)
+                score = Decimal(str(res.get("score", "0.0"))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                score = max(Decimal("0.00"), min(Decimal("1.00"), score))
+                return score, res.get("reason", "No reason provided")
+
+            except Exception as e:
+                err_str = str(e)
+                last_error = err_str
+                # Do not retry on permanent errors (invalid API key, auth failures)
+                if "invalid_api_key" in err_str.lower() or "authentication" in err_str.lower():
+                    break
+                # Retry on 429 (rate limit) or transient errors
+                if retry_idx < _MAX_RETRIES - 1:
+                    await asyncio.sleep(backoff)
+
+        return Decimal("0.00"), f"Error: {last_error}"

@@ -92,20 +92,26 @@ class SubmissionAttempt(Base):
         {"schema": "academic"},
     )
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1, nullable=False, autoincrement=True, comment="Auto-incrementing ID which also serves as attempt number")
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     submission_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("academic.submissions.id", ondelete="CASCADE"), nullable=False, comment="FK to submission")
+    attempt_number: Mapped[int] = mapped_column(Integer, nullable=False, comment="1-based attempt number for this submission")
     score: Mapped[Optional[float]] = mapped_column(Decimal(5, 2), nullable=True)
+    scan_pages: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True, comment="List of scanned page URLs for offline exams")
     grading_started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, default=None, comment="UTC moment when grading began for this attempt")
+    graded_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     def __repr__(self) -> str:
-        return f"<SubmissionAttempt(id={self.id}, submission_id={self.submission_id}, score={self.score})>"
+        return f"<SubmissionAttempt(id={self.id}, submission_id={self.submission_id}, attempt_number={self.attempt_number}, score={self.score})>"
 
     def to_dict(self) -> dict:
         return {
-            "id": self.id,
+            "id": str(self.id),
             "submission_id": str(self.submission_id),
+            "attempt_number": self.attempt_number,
             "score": str(self.score) if self.score is not None else None,
+            "scan_pages": self.scan_pages,
             "grading_started_at": self.grading_started_at.isoformat() if self.grading_started_at else None,
+            "graded_at": self.graded_at.isoformat() if self.graded_at else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }

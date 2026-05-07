@@ -2,26 +2,20 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from sqlalchemy import select
 
 from core.database import get_db
-from core.utils.kafka import producer_service
 from core.utils.logger import logger
 from models.account.users import User, UserRole
+from models.academic.submission import SubmissionAttempt
+from sqlalchemy import select
+from uuid import UUID
+
+from .utils import with_db
 
 TOPIC = "tenant-tasks"
-
-
-async def _get_db_session():
-    """Yield a single async DB session and close it after use."""
-    gen = get_db()
-    db = await gen.__anext__()
-    try:
-        yield db
-    finally:
-        await gen.aclose()
 
 
 async def handle_grade_submission_attempt(data: Dict[str, Any]) -> None:
@@ -41,16 +35,11 @@ async def handle_grade_submission_attempt(data: Dict[str, Any]) -> None:
         logger.warning("GRADE_SUBMISSION_ATTEMPT: missing attempt_id or exam_id — data=%s", data)
         return
 
-    from .utils import with_db
 
     async def _check_idempotency(db) -> bool:
         """Return True if the attempt is already graded (score is set)."""
-        from models.academic.submission import SubmissionAttempt
-        from sqlalchemy import select
-        from uuid import UUID
-
         attempt = (await db.execute(
-            select(SubmissionAttempt).where(SubmissionAttempt.id == int(attempt_id))
+            select(SubmissionAttempt).where(SubmissionAttempt.id == UUID(attempt_id))
         )).scalar_one_or_none()
         if attempt is None:
             return False  # Not found — let the main handler log the warning
@@ -70,7 +59,6 @@ async def handle_grade_submission_attempt(data: Dict[str, Any]) -> None:
             "GRADE_SUBMISSION_ATTEMPT: attempt %s already graded — skipping redelivery (idempotent)",
             attempt_id,
         )
-        # Return without raising so the consumer commits the offset cleanly
         return
 
     async def _run(db):
@@ -131,13 +119,18 @@ async def handle_refresh_dashboard(data: Dict[str, Any]) -> None:
         raise
 
 
-async def emit_refresh_dashboard(user_id: str) -> None:
-    """Emit a REFRESH_DASHBOARD Kafka event and await the publish.
+async def emit_refresh_dashboard(user_id: str, tenant_id: Optional[str] = None) -> None:
+    """Emit a REFRESH_DASHBOARD Kafka event with tenant_id as partition key.
 
     Awaiting ensures failures are observable and logged rather than silently
     dropped by a fire-and-forget ``asyncio.ensure_future`` call.
     """
-    success = await producer_service.publish_safe(TOPIC, "REFRESH_DASHBOARD", {"user_id": user_id})
+    from core.utils.kafka.manager import kafka_manager
+    success = await kafka_manager.emit(
+        "REFRESH_DASHBOARD",
+        {"user_id": user_id},
+        partition_key=tenant_id,
+    )
     if not success:
         logger.error(
             "emit_refresh_dashboard: failed to publish REFRESH_DASHBOARD for user=%s — "
@@ -146,14 +139,18 @@ async def emit_refresh_dashboard(user_id: str) -> None:
         )
 
 
-async def emit_grade_attempt(attempt_id: str, exam_id: str) -> None:
-    """Emit a GRADE_SUBMISSION_ATTEMPT Kafka event and await the publish.
+async def emit_grade_attempt(attempt_id: str, exam_id: str, tenant_id: Optional[str] = None) -> None:
+    """Emit a GRADE_SUBMISSION_ATTEMPT Kafka event with tenant_id as partition key.
 
-    Awaiting ensures failures are observable and logged rather than silently
-    dropped by a fire-and-forget ``asyncio.ensure_future`` call.
+    Using tenant_id as the partition key ensures all grading events for a tenant
+    are routed to the same partition and worker replica, making per-tenant
+    asyncio.Semaphore effective across the worker fleet.
     """
-    success = await producer_service.publish_safe(
-        TOPIC, "GRADE_SUBMISSION_ATTEMPT", {"attempt_id": attempt_id, "exam_id": exam_id}
+    from core.utils.kafka.manager import kafka_manager
+    success = await kafka_manager.emit(
+        "GRADE_SUBMISSION_ATTEMPT",
+        {"attempt_id": attempt_id, "exam_id": exam_id},
+        partition_key=tenant_id,
     )
     if not success:
         logger.error(

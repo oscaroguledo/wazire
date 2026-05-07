@@ -44,7 +44,7 @@ async def upsert_answer(
             "answer": body.answer,
             "tenant_id": tenant_id,
         },
-        partition_key=tenant_id,
+        partition_key=str(current_user.id),  # student_id as partition key for UPSERT_STUDENT_ANSWER
     )
 
     if not ok:

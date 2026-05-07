@@ -537,16 +537,16 @@
      PHASE 8 — ADVANCED AI GRADING ENGINE
      ============================================================ -->
 
-- [ ] 10. Refactor and harden the AI grading engine: correct imports, batch grading, key rotation, throttling, and bulk DB writes
+- [x] 10. Refactor and harden the AI grading engine: correct imports, batch grading, key rotation, throttling, and bulk DB writes
 
-  - [ ] 10.1 Fix Groq import: `from groq.client import Groq as GroqClient`
+  - [x] 10.1 Fix Groq import: `from groq.client import Groq as GroqClient`
     - In `backend/services/engine/base.py`, `similarity_grader.py`, and `answer_grader.py`: change primary import to `from groq.client import Groq as GroqClient` with fallback `from groq import Groq`
     - Use `GroqClient` consistently across all engine files
     - _Bug_Condition: isBugCondition(input) where input.target = 'grading engine' AND defectPresent('from groq import Groq fails in some environments')_
     - _Expected_Behavior: Groq client imports successfully in all deployment environments_
     - _Requirements: 2.143_
 
-  - [ ] 10.2 Refactor `QuestionAnswerer` and `SimilarityGrader` to inherit from `GroqEngineBase`
+  - [x] 10.2 Refactor `QuestionAnswerer` and `SimilarityGrader` to inherit from `GroqEngineBase`
     - Both classes inherit from `GroqEngineBase` in `backend/services/engine/base.py`
     - Delegate client initialisation to `GroqEngineBase._init_client()`
     - Remove duplicated initialisation code from each subclass
@@ -555,7 +555,7 @@
     - _Preservation: public method signatures (grade(), answer_question(), process()) unchanged (3.78)_
     - _Requirements: 2.124, 3.78_
 
-  - [ ] 10.3 Fix `SimilarityGrader.grade()` async/sync mismatch using `asyncio.to_thread`
+  - [x] 10.3 Fix `SimilarityGrader.grade()` async/sync mismatch using `asyncio.to_thread`
     - Wrap `self.client.chat.completions.create(...)` in `await asyncio.to_thread(...)` inside `SimilarityGrader.grade()`
     - Ensure the method remains `async def` and is non-blocking
     - _Bug_Condition: isBugCondition(input) where input.target = 'SimilarityGrader.grade' AND defectPresent('await on synchronous return value')_
@@ -563,14 +563,14 @@
     - _Preservation: MCQ and FITB grading branches continue to execute synchronously inline (3.77)_
     - _Requirements: 2.122, 3.77_
 
-  - [ ] 10.4 Fix `QuestionAnswerer` blocking event loop using `asyncio.to_thread`
+  - [x] 10.4 Fix `QuestionAnswerer` blocking event loop using `asyncio.to_thread`
     - Wrap blocking Groq HTTP call in `asyncio.to_thread()` inside `QuestionAnswerer.answer_question()`
     - _Bug_Condition: isBugCondition(input) where input.target = 'QuestionAnswerer.answer_question' AND defectPresent('blocking Groq call on event loop')_
     - _Expected_Behavior: QuestionAnswerer.answer_question() is non-blocking_
     - _Preservation: return type and error contract unchanged (3.79)_
     - _Requirements: 2.123_
 
-  - [ ] 10.5 Implement `GroqKeyRotator` with Redis-backed cross-process cooldown
+  - [x] 10.5 Implement `GroqKeyRotator` with Redis-backed cross-process cooldown
     - Upgrade `backend/core/key_balancer.py` to `GroqKeyRotator` class
     - Read up to 4 keys from `GROQ_API_KEY_1`…`GROQ_API_KEY_4`
     - Store cooldown state in Redis: `groq:key_cooldown:{index}` with TTL = `retry_after_seconds`
@@ -582,7 +582,7 @@
     - _Preservation: round-robin key selection order and 429-backoff behaviour preserved (3.95)_
     - _Requirements: 2.144, 2.152, 2.153, 3.89, 3.95_
 
-  - [ ] 10.6 Implement batch grading — all theory questions in one Groq call per submission
+  - [x] 10.6 Implement batch grading — all theory questions in one Groq call per submission
     - In `SubmissionService.grade_attempt_background()`: collect all theory questions for the submission
     - Build a single batch prompt requesting structured JSON response keyed by `question_id`
     - Make one Groq API call for all theory questions; parse JSON response per question
@@ -592,18 +592,18 @@
     - _Preservation: MCQ/FITB grading unchanged; error-result contract unchanged (3.88)_
     - _Requirements: 2.142, 3.88_
 
-  - [ ] 10.7 Add retry logic with exponential backoff (3 attempts: 1s, 2s, 4s)
+  - [x] 10.7 Add retry logic with exponential backoff (3 attempts: 1s, 2s, 4s)
     - In `SimilarityGrader.grade()` and `QuestionAnswerer.answer_question()`: retry on 429 or transient error up to 3 times with 1s, 2s, 4s delays
     - Do not retry on permanent errors (invalid API key)
     - On exhausted retries: return `(Decimal("0.00"), "Error: ...")` / `{"answer": "Error: ...", "confidence": 0.0}`
     - _Requirements: 2.125, 3.79_
 
-  - [ ] 10.8 Add jitter between consecutive Groq API calls (0.1–0.5s)
+  - [x] 10.8 Add jitter between consecutive Groq API calls (0.1–0.5s)
     - In the grading worker: after processing each submission's Groq call, apply `await asyncio.sleep(random.uniform(0.1, 0.5))` before the next submission's call
     - Jitter applied between submissions, not between questions within a single batch
     - _Requirements: 2.145, 3.93_
 
-  - [ ] 10.9 Implement per-tenant `asyncio.Semaphore` (`GRADING_CONCURRENCY_PER_TENANT`)
+  - [x] 10.9 Implement per-tenant `asyncio.Semaphore` (`GRADING_CONCURRENCY_PER_TENANT`)
     - In `backend/tasks/submission.py`: maintain a module-level dict `_tenant_semaphores: Dict[str, asyncio.Semaphore]`
     - Create semaphore on first use per tenant; default max = 2; configurable via `GRADING_CONCURRENCY_PER_TENANT` env var
     - Acquire semaphore before starting grading; release after completion
@@ -612,7 +612,7 @@
     - _Preservation: grading logic unchanged; semaphore wraps handler invocation (3.90)_
     - _Requirements: 2.146, 3.90_
 
-  - [ ] 10.10 Implement bulk DB writes: `insert().values([...])` for grade results
+  - [x] 10.10 Implement bulk DB writes: `insert().values([...])` for grade results
     - Replace per-row `session.add()` loop with `session.execute(insert(StudentAnswer).values([...]))` bulk insert
     - Use `ON CONFLICT DO UPDATE` in the bulk insert to remain idempotent
     - Replace row-by-row `SubmissionAttempt` score updates with a single `UPDATE ... WHERE id IN (...)`
@@ -621,20 +621,20 @@
     - _Preservation: final set of rows written identical to per-row approach; UniqueConstraint enforced (3.94)_
     - _Requirements: 2.150, 2.151, 3.94_
 
-  - [ ] 10.11 Add `GRADING_BATCH_SIZE` and `DB_WRITE_BATCH_SIZE` env vars to config
+  - [x] 10.11 Add `GRADING_BATCH_SIZE` and `DB_WRITE_BATCH_SIZE` env vars to config
     - Add `GRADING_BATCH_SIZE: int = 20` and `DB_WRITE_BATCH_SIZE: int = 500` to `backend/core/config.py`
     - Use these values in the grading batch logic and bulk DB write logic
     - _Requirements: 2.156_
 
-  - [ ] 10.12 Set `Submission.status = grading_in_progress` at grading start
+  - [x] 10.12 Set `Submission.status = grading_in_progress` at grading start
     - At the start of `grade_attempt_background()` (after idempotency check): set `submission.status = SubmissionStatus.GRADING_IN_PROGRESS`
     - _Requirements: 2.147_
 
-  - [ ] 10.13 Set `SubmissionAttempt.grading_started_at` at grading start
+  - [x] 10.13 Set `SubmissionAttempt.grading_started_at` at grading start
     - At the start of `grade_attempt_background()`: set `attempt.grading_started_at = datetime.now(timezone.utc)`
     - _Requirements: 2.148_
 
-  - [ ] 10.14 Kafka partition by `tenant_id` for `GRADE_SUBMISSION_ATTEMPT` events
+  - [x] 10.14 Kafka partition by `tenant_id` for `GRADE_SUBMISSION_ATTEMPT` events
     - When emitting `GRADE_SUBMISSION_ATTEMPT`: pass `partition_key=tenant_id` to `KafkaManager.emit()`
     - Also use `student_id` as partition key for `UPSERT_STUDENT_ANSWER` and `tenant_id` for `REFRESH_DASHBOARD`
     - _Bug_Condition: isBugCondition(input) where input.target = 'GRADE_SUBMISSION_ATTEMPT Kafka message' AND defectPresent('no partition key, random distribution')_
@@ -647,7 +647,7 @@
      PHASE 9 — BILLING & PAYMENT INTEGRATION
      ============================================================ -->
 
-- [ ] 11. Implement billing routes, services, payment gateway integration, and webhook handlers
+- [-] 11. Implement billing routes, services, payment gateway integration, and webhook handlers
 
   - [ ] 11.1 Create billing routes and services (invoices, plans, payment_methods, usage, semesters)
     - Create `backend/routes/billing/__init__.py`, `invoices.py`, `billing_plans.py`, `payment_methods.py`, `usage.py`, `semesters.py`, `webhooks.py`

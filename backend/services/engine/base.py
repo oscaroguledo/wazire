@@ -4,12 +4,16 @@ from __future__ import annotations
 from typing import Optional
 
 from core.config import get_settings
-from core.utils.key_balancer import get_balancer
+from core.utils.key_balancer import get_rotator
 
+# Try the preferred import path first; fall back to the top-level package.
 try:
-    from groq import Groq
+    from groq.client import Groq as GroqClient
 except Exception:
-    Groq = None
+    try:
+        from groq import Groq as GroqClient
+    except Exception:
+        GroqClient = None
 
 
 class GroqEngineBase:
@@ -39,26 +43,18 @@ class GroqEngineBase:
         self._init_client()
     
     def _init_client(self) -> None:
-        """Initialize Groq client."""
-        if Groq is None:
+        """Initialize Groq client using GroqKeyRotator for cross-process key selection."""
+        if GroqClient is None:
             return
-            
+
         key = self._api_key
         if not key:
-            balancer = get_balancer()
+            rotator = get_rotator()
             try:
                 import asyncio
-                key = asyncio.get_event_loop().run_until_complete(balancer.get_best_key())
-                # Final fallback: use first entry from GROQ_API_KEYS if present
-                if not key:
-                    settings = get_settings()
-                    key = None
-                    if getattr(settings, "GROQ_API_KEYS", None):
-                        try:
-                            key = settings.GROQ_API_KEYS.split(",")[0].strip()
-                        except Exception:
-                            key = None
+                key = asyncio.get_event_loop().run_until_complete(rotator.get_key())
             except Exception:
+                # Fallback: first key from settings
                 settings = get_settings()
                 key = None
                 if getattr(settings, "GROQ_API_KEYS", None):
@@ -66,10 +62,10 @@ class GroqEngineBase:
                         key = settings.GROQ_API_KEYS.split(",")[0].strip()
                     except Exception:
                         key = None
-            
+
         if key:
             try:
-                self.client = Groq(api_key=key)
+                self.client = GroqClient(api_key=key)
             except Exception as e:
                 print(f"{self.__class__.__name__}: failed to create Groq client: {e}")
         else:
