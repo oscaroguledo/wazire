@@ -115,31 +115,35 @@ export interface Enrollment {
   updated_at: string;
 }
 
-export type QuestionType = 'multiple_choice' | 'theory';
+export type QuestionType = 'multiple_choice' | 'theory' | 'fill_in_blanks';
 
 export interface Question {
   id: string;
   number: string;
   text: string;
   rules: string | null;
-  images: string[];
+  images: string[] | null;
   parent_id: string | null;
   tenant_id: string | null;
+  semester_id: string | null;
   industry: string | null;
-  qtype: string | null;
+  qtype: QuestionType | null;
   options: any | null;
-  parsed_options: {label: string;text: string;}[];
-  exams: {id: string}[];
+  parsed_options: {label: string; text: string;}[] | null;
+  exam_ids: string[] | null;
   mark: number | null;
   answer: any | null;
+  answer_id: string | null;
   created_at: string;
   updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
   // Frontend-only fields
-  answer_id?: string;
   correct_answer?: string;
+  exams?: {id: string}[];
 }
 
-// 13.7: Replaced course: Course | null with course_id: string | null; added end_time; removed student_id
+// 13.7: Aligned with backend Exam model and ExamRead schema
 export interface Exam {
   id: string;
   title: string;
@@ -148,20 +152,20 @@ export interface Exam {
   duration_minutes: number;
   total_marks: number | null;
   passing_marks: number | null;
-  status: 'not_started' | 'in_progress' | 'finished';
+  status: 'not_started' | 'in_progress' | 'finished' | 'draft';
   max_attempts: number;
   start_time: string | null;
   end_time: string | null;
   course_id: string | null;
-  lecturer: User | null;
   tenant_id: string | null;
+  semester_id: string | null;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
   updated_at: string;
-  question_count: number;
-  submission_count: number;
-  // Frontend-only fields
+  // Frontend-only computed fields
+  question_count?: number;
+  submission_count?: number;
   questions?: Question[];
 }
 

@@ -17,28 +17,36 @@ export interface Answer {
   updated_at: string
 }
 
-// 13.10: Renamed question_text → text, question_type → qtype, marks → mark to match backend schema
+// Aligned with backend QuestionCreate schema
 export interface QuestionCreate {
+  number: string
   text: string
   qtype: 'multiple_choice' | 'theory' | 'fill_in_blanks'
-  options?: string[]
-  correct_answer?: string | string[]
-  mark: number
-  order?: number
-  images?: string[]  // array of base64 encoded images
-  industry?: string
+  industry: string
+  options?: any
+  answer?: any
+  mark?: number
+  images?: string[]
+  exam_ids?: string[]
+  rules?: string
+  parent_id?: string
+  tenant_id?: string
 }
 
-// 13.10: Updated QuestionUpdate consistently with QuestionCreate field names
+// Aligned with backend QuestionUpdate schema
 export interface QuestionUpdate {
+  number?: string
   text?: string
   qtype?: 'multiple_choice' | 'theory' | 'fill_in_blanks'
-  options?: string[]
-  correct_answer?: string | string[]
-  mark?: number
-  order?: number
-  images?: string[]  // array of base64 encoded images
   industry?: string
+  options?: any
+  answer?: any
+  mark?: number
+  images?: string[]
+  exam_ids?: string[]
+  rules?: string
+  parent_id?: string
+  tenant_id?: string
 }
 
 export interface QuestionListParams {
@@ -67,11 +75,12 @@ export interface ExamCreate {
   duration_minutes?: number
   total_marks?: number
   passing_marks?: number
-  status?: string
+  status?: 'not_started' | 'in_progress' | 'finished' | 'draft'
   start_time?: string
   max_attempts?: number
   course_id?: string
   tenant_id?: string
+  semester_id?: string
 }
 
 export interface ExamUpdate {
@@ -81,11 +90,12 @@ export interface ExamUpdate {
   duration_minutes?: number
   total_marks?: number
   passing_marks?: number
-  status?: string
+  status?: 'not_started' | 'in_progress' | 'finished' | 'draft'
   start_time?: string
   max_attempts?: number
   course_id?: string
   tenant_id?: string
+  semester_id?: string
 }
 
 export interface ExamListParams {

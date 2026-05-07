@@ -864,12 +864,12 @@
     - Create `frontend/vitest.config.ts` with `coverage.provider = 'v8'` and `coverage.thresholds = { lines: 90, branches: 90 }`
     - _Requirements: 2.88, 2.92_
 
-  - [-] 15.3 Set up MSW mock handlers (`frontend/src/mocks/`)
+  - [x] 15.3 Set up MSW mock handlers (`frontend/src/mocks/`)
     - Create `frontend/src/mocks/handlers.ts` with MSW handlers for all backend API endpoints
     - Create `frontend/src/mocks/server.ts` for Node.js test environment setup
     - _Requirements: 2.100_
 
-  - [ ] 15.4 Write backend unit tests (services, task handlers, model methods, utilities, KafkaManager, GroqKeyRotator)
+  - [-] 15.4 Write backend unit tests (services, task handlers, model methods, utilities, KafkaManager, GroqKeyRotator)
     - Create `backend/tests/unit/services/` mirroring service module structure
     - Every public service method: happy path + at least one error/edge case (mocked DB, Redis, Kafka)
     - Every Kafka task handler: invoked directly with mock payload; assert service calls and Kafka emissions
