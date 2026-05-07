@@ -327,7 +327,7 @@
     - _Preservation: existing Kafka event handlers continue to function (3.22)_
     - _Requirements: 2.26_
 
-  - [-] 6.5 Implement dispatcher pattern — `HANDLERS` dict per tasks module
+  - [x] 6.5 Implement dispatcher pattern — `HANDLERS` dict per tasks module
     - Add `HANDLERS: Dict[str, Handler]` dict to each `backend/tasks/` module (`exam.py`, `submission.py`, `question.py`, `email.py`)
     - Update `KafkaConsumerService._load_handlers()` to iterate over task modules and merge their `HANDLERS` dicts
     - Make `KAFKA_CONSUMER_GROUP_ID` configurable via environment variable (default `"wazire-worker"`)
@@ -336,7 +336,7 @@
     - _Preservation: all existing handlers (GRADE_SUBMISSION_ATTEMPT, REFRESH_DASHBOARD, etc.) continue to function (3.22, 3.23)_
     - _Requirements: 2.27, 2.42, 3.22, 3.23_
 
-  - [ ] 6.6 Fix OLAP/OLTP separation — make dashboard GET endpoints read-only
+  - [x] 6.6 Fix OLAP/OLTP separation — make dashboard GET endpoints read-only
     - Remove `get_or_create_*` inline DB writes from all dashboard GET route handlers
     - If no dashboard row exists, return HTTP 404 or empty-metrics response — do NOT create a row inline
     - Move `compute_admin_stats()` aggregation logic to the `REFRESH_DASHBOARD` worker handler
@@ -345,7 +345,7 @@
     - _Preservation: dashboard response shape unchanged (3.39)_
     - _Requirements: 2.52, 2.53, 3.39_
 
-  - [ ] 6.7 Fix `DashboardService` wrong column queries
+  - [x] 6.7 Fix `DashboardService` wrong column queries
     - Fix `get_or_create_admin_dashboard()`: use `graded_submissions` and `pending_submissions` (not `total_graded_submissions`/`total_pending_submissions`); query by `tenant_id` not `admin_id`
     - Fix `get_or_create_student_dashboard()`: use `graded_submissions` and `pending_submissions`; add `active_courses=0` and `completed_courses=0` to constructor
     - Fix `get_or_create_lecturer_dashboard()`: ensure `tenant_id` is included in constructor
@@ -354,14 +354,14 @@
     - _Preservation: to_dict() output shape unchanged (3.42)_
     - _Requirements: 2.57, 2.58, 3.42, 3.76_
 
-  - [ ] 6.8 Fix `require_admin_or_superadmin` import in analytics routes
+  - [x] 6.8 Fix `require_admin_or_superadmin` import in analytics routes
     - Replace broken import with the correct auth helper from `core.middleware.auth`
     - Define `require_admin_or_superadmin` in `core.middleware.auth` if it does not exist
     - _Bug_Condition: isBugCondition(input) where input.target = 'analytics routes' AND defectPresent('broken require_admin_or_superadmin import')_
     - _Expected_Behavior: analytics routes load without ImportError at startup_
     - _Requirements: 2.121_
 
-  - [ ] 6.9 Fix CORS, DEBUG, and LOG_LEVEL production settings in `backend/core/config.py`
+  - [-] 6.9 Fix CORS, DEBUG, and LOG_LEVEL production settings in `backend/core/config.py`
     - Set CORS allowed origins to `FRONTEND_ORIGIN` env var (not `*`)
     - Set `DEBUG` default to `False`; only `True` when `DEBUG=true` in environment
     - Read `LOG_LEVEL` from environment variable (default `"INFO"`)

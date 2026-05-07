@@ -34,6 +34,12 @@ class Settings(BaseModel):
 
     GROQ_API_KEYS: Optional[str] = None
 
+    # Logging
+    LOG_LEVEL: str = "INFO"
+
+    # Frontend origin for CORS (production-safe; overrides CORS_ORIGINS when set)
+    FRONTEND_ORIGIN: Optional[str] = None
+
     # Kafka settings
     # Brevo (Sendinblue) transactional email settings
     BREVO_API_KEY: Optional[SecretStr] = None
@@ -193,6 +199,8 @@ def get_settings(force_reload: bool = False) -> Settings:
             CORS_ORIGINS=_parse_list(os.getenv("CORS_ORIGINS"), _defaults.CORS_ORIGINS),
             REQUEST_ID_HEADERS=os.getenv("REQUEST_ID_HEADERS", _defaults.REQUEST_ID_HEADERS),
             GROQ_API_KEYS=os.getenv("GROQ_API_KEYS", _defaults.GROQ_API_KEYS),
+            LOG_LEVEL=os.getenv("LOG_LEVEL", _defaults.LOG_LEVEL).upper(),
+            FRONTEND_ORIGIN=os.getenv("FRONTEND_ORIGIN", _defaults.FRONTEND_ORIGIN),
             KAFKA_BOOTSTRAP_SERVERS=os.getenv("KAFKA_BOOTSTRAP_SERVERS", _defaults.KAFKA_BOOTSTRAP_SERVERS),
             KAFKA_TOPIC_PREFIX=os.getenv("KAFKA_TOPIC_PREFIX", _defaults.KAFKA_TOPIC_PREFIX),
             KAFKA_USERNAME=os.getenv("KAFKA_USERNAME", _defaults.KAFKA_USERNAME),

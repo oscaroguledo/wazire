@@ -18,6 +18,11 @@ from core.kafka_manager import kafka_manager
 
 settings = get_settings()
 
+# Apply LOG_LEVEL from settings to the root logger and our app logger
+import logging as _logging
+_logging.basicConfig(level=getattr(_logging, settings.LOG_LEVEL, _logging.INFO))
+logger.setLevel(getattr(_logging, settings.LOG_LEVEL, _logging.INFO))
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 	"""Application lifespan: perform startup and graceful shutdown tasks.
@@ -72,17 +77,17 @@ app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
 
 # Configure CORS based on environment
-if settings.DEBUG:
+if settings.FRONTEND_ORIGIN:
+	# Explicit FRONTEND_ORIGIN env var takes precedence (production-safe)
+	allowed_origins = [settings.FRONTEND_ORIGIN]
+elif settings.DEBUG:
 	# Development: Allow all origins
 	allowed_origins = ["*"]
 else:
-	# Production: Restrict to specific domains
-	allowed_origins = [
+	# Production fallback: use CORS_ORIGINS list from settings
+	allowed_origins = settings.cors_origins_list() or [
 		"https://wazire.com",
 		"https://www.wazire.com",
-		"http://localhost:5173",
-		"http://localhost:5174",
-		# Add your production frontend domains here
 	]
 
 app.add_middleware(
