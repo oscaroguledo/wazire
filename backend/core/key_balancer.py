@@ -20,7 +20,7 @@ class KeyBalancer:
 
     def __init__(self):
         settings = get_settings()
-        raw = os.getenv("GROQ_API_KEYS")
+        raw = settings.GROQ_API_KEYS
         if raw:
             self.keys: List[str] = [k.strip() for k in raw.split(",") if k.strip()]
         else:
