@@ -41,11 +41,11 @@ async def create_exam(
 
     # Set tenant_id based on user role
     tenant_id = _tenant(current_user)
-    if not tenant_id and current_user.role not in (UserRole.ADMIN.value, UserRole.SUPERADMIN.value):
+    if not tenant_id and current_user.role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
         return Response(success=False, error="No tenant assigned to your account", request=request, status_code=status.HTTP_403_FORBIDDEN)
 
     # Override tenant_id if provided in payload for admins
-    if exam_data.tenant_id and current_user.role in (UserRole.ADMIN.value, UserRole.SUPERADMIN.value):
+    if exam_data.tenant_id and current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN):
         tenant_id = exam_data.tenant_id
 
     # course_id can be None for standalone exams
