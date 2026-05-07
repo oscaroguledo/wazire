@@ -3,6 +3,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional, Tuple
 
 from core.config import get_settings
+from core.key_balancer import get_balancer
 
 try:
     from groq import Groq
@@ -35,7 +36,13 @@ class SimilarityGrader:
                     key = asyncio.get_event_loop().run_until_complete(balancer.get_best_key())
                 except Exception:
                     settings = get_settings()
-                    key = settings.GROQ_API_KEY
+                    # Use first key from GROQ_API_KEYS as a final fallback
+                    key = None
+                    if getattr(settings, "GROQ_API_KEYS", None):
+                        try:
+                            key = settings.GROQ_API_KEYS.split(",")[0].strip()
+                        except Exception:
+                            key = None
             if key:
                 try:
                     self.client = Groq(api_key=key)
@@ -91,7 +98,7 @@ class SimilarityGrader:
             return Decimal("0.00"), "-"
 
         if self.client is None:
-            return Decimal("0.00"), "Error: Groq client not available. Set GROQ_API_KEY or pass api_key."
+            return Decimal("0.00"), "Error: Groq client not available. Set GROQ_API_KEYS or pass api_key."
 
         content = [
             {"type": "text", "text": f"You are an expert {industry} grader."},

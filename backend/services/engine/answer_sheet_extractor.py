@@ -86,7 +86,7 @@ class AnswerSheetParser(GroqEngineBase):
             Dict mapping question number string → answer string (or None)
         """
         if self.client is None:
-            raise RuntimeError("Groq client not available. Set GROQ_API_KEY or pass api_key.")
+            raise RuntimeError("Groq client not available. Set GROQ_API_KEYS or pass api_key.")
 
         merged: Dict[str, Optional[str]] = {}
 

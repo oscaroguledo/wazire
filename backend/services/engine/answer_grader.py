@@ -19,6 +19,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import List, Dict, Any, Union, Optional
 
 from core.config import get_settings
+from core.key_balancer import get_balancer
 from models.academic.question import AnswerEnum
 
 # Make pandas optional so the module can be imported in environments
@@ -51,7 +52,7 @@ class QuestionAnswerer:
         
         Args:
             model: Groq model name for answer generation
-            api_key: Optional custom API key. Uses GROQ_API_KEY from config if not provided.
+            api_key: Optional custom API key. If not provided, the implementation will select a key from GROQ_API_KEYS via the KeyBalancer.
         """
         self.model = model
         self.client = None
@@ -63,8 +64,13 @@ class QuestionAnswerer:
         if Groq is not None:
             key = self._api_key
             if not key:
-                settings = get_settings()
-                key = settings.GROQ_API_KEY
+                balancer = get_balancer()
+                try:
+                    import asyncio
+                    key = asyncio.get_event_loop().run_until_complete(balancer.get_best_key())
+                except Exception:
+                    settings = get_settings()
+                        key = settings.GROQ_API_KEYS.split(",")[0].strip() if hasattr(settings, "GROQ_API_KEYS") else None
             if key:
                 try:
                     self.client = Groq(api_key=key)
@@ -72,7 +78,7 @@ class QuestionAnswerer:
                     print(f"QuestionAnswerer: failed to create Groq client: {e}")
                     self.client = None
             else:
-                print("Warning: GROQ_API_KEY not set; Groq client will not be available.")
+                print("Warning: GROQ_API_KEYS not set; Groq client will not be available.")
     
     def _get_image_b64(self, row: Dict[str, Any], key: str) -> Union[str, None]:
         """Return a base64 image string from row[key].

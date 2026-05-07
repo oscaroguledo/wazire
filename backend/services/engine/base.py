@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Optional
 
 from core.config import get_settings
+from core.key_balancer import get_balancer
 
 try:
     from groq import Groq
@@ -21,7 +22,7 @@ class GroqEngineBase:
     
     Args:
         model: Groq model name (default: meta-llama/llama-4-scout-17b-16e-instruct)
-        api_key: Optional custom API key. If not provided, uses GROQ_API_KEY from config.
+        api_key: Optional custom API key. If not provided, will use keys from GROQ_API_KEYS via the KeyBalancer.
     """
     
     DEFAULT_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
@@ -44,8 +45,19 @@ class GroqEngineBase:
             
         key = self._api_key
         if not key:
-            settings = get_settings()
-            key = settings.GROQ_API_KEY
+            balancer = get_balancer()
+            try:
+                import asyncio
+                key = asyncio.get_event_loop().run_until_complete(balancer.get_best_key())
+                # Final fallback: use first entry from GROQ_API_KEYS if present
+                if not key:
+                    settings = get_settings()
+                    key = None
+                    if getattr(settings, "GROQ_API_KEYS", None):
+                        try:
+                            key = settings.GROQ_API_KEYS.split(",")[0].strip()
+                        except Exception:
+                            key = None
             
         if key:
             try:
@@ -53,7 +65,7 @@ class GroqEngineBase:
             except Exception as e:
                 print(f"{self.__class__.__name__}: failed to create Groq client: {e}")
         else:
-            print(f"Warning: GROQ_API_KEY not set; {self.__class__.__name__} will not be available.")
+            print(f"Warning: GROQ_API_KEYS not set; {self.__class__.__name__} will not be available.")
     
     @staticmethod
     def clean_b64(image: str) -> str:

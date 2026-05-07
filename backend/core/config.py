@@ -32,7 +32,6 @@ class Settings(BaseModel):
     CORS_ORIGINS: List[str] = Field(default_factory=lambda: ["*"])
     REQUEST_ID_HEADERS: str = "X-Request-ID,X-Correlation-ID"
 
-    GROQ_API_KEY: Optional[str] = None
     GROQ_API_KEYS: Optional[str] = None
 
     # Kafka settings
@@ -174,7 +173,6 @@ def get_settings(force_reload: bool = False) -> Settings:
             ACCESS_TOKEN_EXPIRE_SECONDS=int(os.getenv("ACCESS_TOKEN_EXPIRE_SECONDS", str(_defaults.ACCESS_TOKEN_EXPIRE_SECONDS))),
             CORS_ORIGINS=_parse_list(os.getenv("CORS_ORIGINS"), _defaults.CORS_ORIGINS),
             REQUEST_ID_HEADERS=os.getenv("REQUEST_ID_HEADERS", _defaults.REQUEST_ID_HEADERS),
-            GROQ_API_KEY=os.getenv("GROQ_API_KEY", _defaults.GROQ_API_KEY),
             GROQ_API_KEYS=os.getenv("GROQ_API_KEYS", _defaults.GROQ_API_KEYS),
             KAFKA_BOOTSTRAP_SERVERS=os.getenv("KAFKA_BOOTSTRAP_SERVERS", _defaults.KAFKA_BOOTSTRAP_SERVERS),
             KAFKA_TOPIC_PREFIX=os.getenv("KAFKA_TOPIC_PREFIX", _defaults.KAFKA_TOPIC_PREFIX),

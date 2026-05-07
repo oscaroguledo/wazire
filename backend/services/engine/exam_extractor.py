@@ -99,7 +99,7 @@ class ExamParser(GroqEngineBase):
             List of dicts with keys matching QuestionCreate fields.
         """
         if self.client is None:
-            raise RuntimeError("Groq client not available. Set GROQ_API_KEY or pass api_key.")
+            raise RuntimeError("Groq client not available. Set GROQ_API_KEYS or pass api_key.")
 
         all_questions: List[Dict[str, Any]] = []
 
