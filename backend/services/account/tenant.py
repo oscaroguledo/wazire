@@ -11,6 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from models.account.tenant import Tenant
 from schemas.account.tenant import TenantCreate, TenantUpdate,TenantDelete
 from models.account.users import User
+from sqlalchemy.exc import IntegrityError
+import secrets
+import string
 
 class TenantService:
     def __init__(self, db: AsyncSession, token_service=None):
@@ -114,11 +117,26 @@ class TenantService:
             if domain and row.domain == domain:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Domain already exists")
         
+        # Generate a unique 6-character tenant_code (uppercase alphanumeric)
+        alphabet = string.ascii_uppercase + string.digits
+        max_attempts = 10
+        tenant_code = None
+        for attempt in range(max_attempts):
+            candidate = ''.join(secrets.choice(alphabet) for _ in range(6))
+            exists_q = select(Tenant.id).where(Tenant.tenant_code == candidate)
+            exists = (await self.db.execute(exists_q)).scalar_one_or_none()
+            if not exists:
+                tenant_code = candidate
+                break
+        if tenant_code is None:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to generate unique tenant code; please try again")
+
         # Create tenant
         tenant = Tenant(
             name=name,
             domain=domain,
             logo_url=tenant_in.logo_url,
+            tenant_code=tenant_code,
             is_active=True,
             created_by=tenant_in.created_by,
             updated_by=tenant_in.created_by,
@@ -131,11 +149,28 @@ class TenantService:
             for user in admin_users.scalars().all():
                 user.tenant_id = tenant.id
 
-        self.db.add(tenant)
-        await self.db.flush()           # catch DB errors before commit
-        await self.db.refresh(tenant)
-        await self.db.commit()
-        return tenant
+        # Try commit, retrying on unique constraint failure for tenant_code
+        attempts = 0
+        while True:
+            try:
+                self.db.add(tenant)
+                await self.db.flush()
+                await self.db.refresh(tenant)
+                await self.db.commit()
+                return tenant
+            except IntegrityError as e:
+                await self.db.rollback()
+                # If tenant_code caused a duplicate (race), try to generate a new one and retry
+                attempts += 1
+                if attempts >= max_attempts:
+                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create tenant due to tenant code collision; please retry")
+                # generate another candidate
+                candidate = ''.join(secrets.choice(alphabet) for _ in range(6))
+                exists_q = select(Tenant.id).where(Tenant.tenant_code == candidate)
+                exists = (await self.db.execute(exists_q)).scalar_one_or_none()
+                if exists:
+                    continue
+                tenant.tenant_code = candidate
 
     async def update(
         self,
