@@ -1,10 +1,12 @@
 """Kafka event handlers for question parsing and answer detection."""
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
+from uuid import UUID
 
-from core.utils.kafka import producer_service
 from core.utils.logger import logger
+from schemas.academic.question import QuestionCreate
+from models.academic.question import Industry
 
 TOPIC = "tenant-tasks"
 
@@ -56,7 +58,7 @@ async def detect_answer_background(db, question_id: str) -> None:
     logger.info("[question] Answer detected for question %s: %s", question_id, graded_label)
 
 
-async def parse_and_create_background(db, pages: list, industry: str, exam_id: str, mark_per_question: Optional[float], tenant_id: Optional[str]) -> None:
+async def parse_and_create_background(db, pages: list, industry: str, exam_id: str, mark_per_question: Optional[float], tenant_id: Optional[UUID]) -> None:
     """Parse exam pages and bulk-create questions using an existing DB session."""
     from services.engine.exam_extractor import ExamParser
     from services.academic.question import QuestionService
@@ -100,21 +102,22 @@ async def parse_and_create_background(db, pages: list, industry: str, exam_id: s
 
 
 def emit_detect_answer(question_id: str) -> None:
-    """Fire-and-forget answer detection event."""
+    """Schedule answer detection in-process using a DB session (no Kafka)."""
     import asyncio
+    from .utils import with_db
+
     asyncio.ensure_future(
-        producer_service.publish_safe(TOPIC, "DETECT_ANSWER", {"question_id": question_id})
+        with_db(detect_answer_background, question_id)
     )
 
 
-def emit_parse_and_create(pages: list, industry: str, exam_id: str, mark: float, tenant_id: str) -> None:
-    """Fire-and-forget parse-and-create event."""
+def emit_parse_and_create(pages: list, industry: str, exam_id: str, mark: float, tenant_id: Optional[UUID]) -> None:
+    """Schedule parse-and-create in-process using a DB session (no Kafka)."""
     import asyncio
+    from .utils import with_db
+
     asyncio.ensure_future(
-        producer_service.publish_safe(TOPIC, "PARSE_AND_CREATE", {
-            "pages": pages, "industry": industry,
-            "exam_id": exam_id, "mark_per_question": mark, "tenant_id": tenant_id,
-        })
+        with_db(parse_and_create_background, pages, industry, exam_id, mark, tenant_id)
     )
 
 
@@ -146,7 +149,13 @@ async def handle_parse_and_create(data: Dict[str, Any]) -> None:
     industry = data.get("industry")
     exam_id = data.get("exam_id")
     mark = data.get("mark_per_question")
-    tenant_id = data.get("tenant_id")
+    tenant_id_raw = data.get("tenant_id")
+    tenant_id = None
+    if tenant_id_raw:
+        try:
+            tenant_id = UUID(str(tenant_id_raw))
+        except Exception:
+            tenant_id = None
 
     if not pages or not exam_id:
         logger.warning("PARSE_AND_CREATE: missing pages or exam_id — data=%s", data)

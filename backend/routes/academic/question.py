@@ -181,7 +181,7 @@ async def upload_exam_paper(
     if not body.pages:
         return Response(success=False, error="No pages provided", request=request, status_code=status.HTTP_400_BAD_REQUEST)
 
-    tenant_id = None if current_user.role == UserRole.ADMIN else str(current_user.tenant_id)
+    tenant_id = None if current_user.role == UserRole.ADMIN else current_user.tenant_id
 
     # Enqueue exam parsing and question-creation to background worker
     from tasks.question import emit_parse_and_create
