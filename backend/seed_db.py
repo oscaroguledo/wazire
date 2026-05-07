@@ -1,16 +1,116 @@
 #!/usr/bin/env python3
 """
-Create test users, tenant, course, exam and questions for Wazire system
+Wazire seed script.
+
+Two modes of operation:
+  1. Superadmin bootstrap (direct DB, no HTTP):
+       python seed_db.py --superadmin
+     Creates a single superadmin user directly in the database.
+     Idempotent: skips creation if a superadmin already exists.
+
+  2. Full test-data seed (HTTP API):
+       python seed_db.py
+     Creates a demo tenant, lecturer, students, course, exam, and questions
+     via the running API server.  Requires the server to be up.
+
+Usage examples:
+  # Bootstrap superadmin first (run once, before starting the server):
+  python seed_db.py --superadmin
+
+  # Seed demo data (server must be running):
+  python seed_db.py
 """
 
+import asyncio
 import os
+import sys
 import requests
-import json
 import time
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 
 BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
+
+
+# ---------------------------------------------------------------------------
+# Superadmin bootstrap — direct DB, no HTTP
+# ---------------------------------------------------------------------------
+
+async def _create_superadmin_async():
+    """Create a superadmin user directly in the database.
+
+    Reads DATABASE_URL from the environment (or .env file).
+    Idempotent: if a user with role='superadmin' already exists the script
+    prints a message and exits without making any changes.
+
+    Environment variables (all optional — fall back to defaults):
+      SUPERADMIN_EMAIL     default: superadmin@wazire.app
+      SUPERADMIN_PASSWORD  default: SuperAdmin@2024!
+      SUPERADMIN_FIRST     default: Super
+      SUPERADMIN_LAST      default: Admin
+    """
+    from pathlib import Path
+    from dotenv import load_dotenv
+
+    # Load .env from the backend directory so DATABASE_URL is available
+    env_path = Path(__file__).parent / ".env"
+    load_dotenv(env_path)
+
+    # Import app modules *after* loading .env so settings are populated
+    from core.database import get_db
+    from core.utils.encryption import EncryptionService
+    from models.account.users import User, UserRole
+    from sqlalchemy import select
+
+    email = os.getenv("SUPERADMIN_EMAIL", "superadmin@wazire.app")
+    password = os.getenv("SUPERADMIN_PASSWORD", "SuperAdmin@2024!")
+    first_name = os.getenv("SUPERADMIN_FIRST", "Super")
+    last_name = os.getenv("SUPERADMIN_LAST", "Admin")
+
+    encryption = EncryptionService()
+
+    async for db in get_db():
+        # Idempotency check — skip if any superadmin already exists
+        existing = (
+            await db.execute(
+                select(User).where(User.role == UserRole.SUPERADMIN).limit(1)
+            )
+        ).scalar_one_or_none()
+
+        if existing:
+            print(f"ℹ️  Superadmin already exists: {existing.email} — skipping creation.")
+            return
+
+        hashed = encryption.hash_password(password)
+        superadmin = User(
+            first_name=first_name,
+            last_name=last_name,
+            email=email,
+            password=hashed,
+            role=UserRole.SUPERADMIN,
+            is_active=True,
+            is_locked=False,
+        )
+        db.add(superadmin)
+        await db.commit()
+        await db.refresh(superadmin)
+        break  # only need one iteration
+
+    print("✅ Superadmin created successfully.")
+    print(f"   Email   : {email}")
+    print(f"   Password: {password}")
+    print("   ⚠️  Change this password immediately after first login!")
+
+
+def create_superadmin():
+    """Entry point for superadmin bootstrap (synchronous wrapper)."""
+    print("=== 🔐 BOOTSTRAPPING SUPERADMIN USER ===\n")
+    asyncio.run(_create_superadmin_async())
+    print("\n=== DONE ===")
+
+
+# ---------------------------------------------------------------------------
+# Existing HTTP-based test-data seed helpers (unchanged)
+# ---------------------------------------------------------------------------
 
 def clear_database():
     """Clear all data from the database using direct SQL."""
@@ -612,4 +712,7 @@ def main():
     print("="*50)
 
 if __name__ == "__main__":
-    main()
+    if "--superadmin" in sys.argv:
+        create_superadmin()
+    else:
+        main()

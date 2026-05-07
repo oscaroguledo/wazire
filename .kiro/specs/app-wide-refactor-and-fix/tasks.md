@@ -295,7 +295,7 @@
      PHASE 4 — BACKEND ARCHITECTURE REFACTOR
      ============================================================ -->
 
-- [-] 6. Refactor backend architecture: rename files, implement KafkaManager, class-based Worker, dispatcher pattern, OLAP/OLTP separation, and production settings
+- [x] 6. Refactor backend architecture: rename files, implement KafkaManager, class-based Worker, dispatcher pattern, OLAP/OLTP separation, and production settings
 
   - [x] 6.1 Rename all route and service files from singular to plural nouns
     - Rename route files: `user.py`→`users.py`, `tenant.py`→`tenants.py`, `course.py`→`courses.py`, `exam.py`→`exams.py`, `question.py`→`questions.py`, `answer.py`→`answers.py`, `submission.py`→`submissions.py`
@@ -361,7 +361,7 @@
     - _Expected_Behavior: analytics routes load without ImportError at startup_
     - _Requirements: 2.121_
 
-  - [-] 6.9 Fix CORS, DEBUG, and LOG_LEVEL production settings in `backend/core/config.py`
+  - [x] 6.9 Fix CORS, DEBUG, and LOG_LEVEL production settings in `backend/core/config.py`
     - Set CORS allowed origins to `FRONTEND_ORIGIN` env var (not `*`)
     - Set `DEBUG` default to `False`; only `True` when `DEBUG=true` in environment
     - Read `LOG_LEVEL` from environment variable (default `"INFO"`)
@@ -376,9 +376,9 @@
      PHASE 5 — ONBOARDING & REGISTRATION FLOW
      ============================================================ -->
 
-- [ ] 7. Implement tenant join-code onboarding and fix the registration flow
+- [x] 7. Implement tenant join-code onboarding and fix the registration flow
 
-  - [ ] 7.1 Auto-generate `tenant_code` in `TenantService.create()`
+  - [x] 7.1 Auto-generate `tenant_code` in `TenantService.create()`
     - Implement `generate_tenant_code()` helper: 6-character uppercase alphanumeric string using `secrets.token_hex(3).upper()`
     - Retry on collision until a unique value is found
     - Store generated code on the `Tenant` record
@@ -387,7 +387,7 @@
     - _Preservation: all existing tenant service methods (update, delete, restore, list, get) unchanged (3.69)_
     - _Requirements: 2.104, 3.69_
 
-  - [ ] 7.2 Update registration endpoint: role validation and `tenant_code` lookup
+  - [x] 7.2 Update registration endpoint: role validation and `tenant_code` lookup
     - Add optional `tenant_code: str` field to `UserCreate` schema
     - In register handler: if `role=lecturer` or `role=student`, look up `Tenant` by `tenant_code`; set `user.tenant_id = tenant.id`; return HTTP 404 if no tenant found
     - Block `role=superadmin` registration via this endpoint (superadmin created via seed script only)
@@ -397,13 +397,13 @@
     - _Preservation: superadmin registration via seed script continues; existing registration flow for valid roles unchanged (3.67)_
     - _Requirements: 2.103, 3.67_
 
-  - [ ] 7.3 Implement superadmin seed script
+  - [x] 7.3 Implement superadmin seed script
     - Update or create `backend/seed_db.py` to create a superadmin user with `role=superadmin`
     - Script should be idempotent (skip if superadmin already exists)
     - Document usage in comments
     - _Requirements: 2.103_
 
-  - [ ] 7.4 Update `TenantRead` schema to include `tenant_code`
+  - [x] 7.4 Update `TenantRead` schema to include `tenant_code`
     - Add `tenant_code: str` to `TenantRead` Pydantic schema
     - Ensure `tenant_code` is returned in all tenant API responses
     - _Requirements: 2.102, 3.66_
@@ -413,7 +413,7 @@
      PHASE 6 — EXAM DATA FLOW ARCHITECTURE
      ============================================================ -->
 
-- [ ] 8. Implement the correct exam data flow: Redis preload, Kafka-buffered answer UPSERT, force-submit, and UTC timing
+- [-] 8. Implement the correct exam data flow: Redis preload, Kafka-buffered answer UPSERT, force-submit, and UTC timing
 
   - [ ] 8.1 Add `PRELOAD_QUESTIONS` scheduler job to `backend/scheduler.py`
     - Add a periodic job (every 1–5 minutes) that queries PostgreSQL for exams whose `start_time` is within the next ~15 minutes and whose `exam:{exam_id}:preloaded` Redis key is absent

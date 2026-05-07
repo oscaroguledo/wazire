@@ -75,7 +75,7 @@ class TenantRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     name: str
-    tenant_code: Optional[str] = None
+    tenant_code: str  # Always present — auto-generated on creation
     domain: Optional[str] = None
     logo_url: Optional[str] = None
     is_active: bool

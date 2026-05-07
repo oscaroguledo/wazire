@@ -30,10 +30,49 @@ async def register(
     db: AsyncSession = Depends(get_db),
     token_service: TokenService = Depends(get_token_service),
 ):
+    from sqlalchemy import select as sa_select
+    from models.account.tenant import Tenant
+
     encryption = EncryptionService()
     service = UserService(db, encryption=encryption, token_service=token_service)
+
+    # Block superadmin self-registration — superadmin is created via seed script only
+    if user_in.role == UserRole.SUPERADMIN:
+        return Response(
+            success=False,
+            error="Superadmin accounts cannot be created via this endpoint",
+            request=request,
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+
+    # Resolve tenant_id: explicit query param takes precedence, then tenant_code lookup
     if tenant_id:
         user_in.tenant_id = tenant_id
+    elif user_in.tenant_code and user_in.role in (UserRole.LECTURER, UserRole.STUDENT):
+        result = await db.execute(
+            sa_select(Tenant).where(
+                Tenant.tenant_code == user_in.tenant_code.strip().upper(),
+                Tenant.is_deleted.is_(False),
+                Tenant.is_active.is_(True),
+            )
+        )
+        tenant = result.scalar_one_or_none()
+        if not tenant:
+            return Response(
+                success=False,
+                error="Invalid or expired tenant code",
+                request=request,
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+        user_in.tenant_id = tenant.id
+    elif user_in.role in (UserRole.LECTURER, UserRole.STUDENT) and not user_in.tenant_id:
+        return Response(
+            success=False,
+            error="A tenant_code is required for lecturer and student registration",
+            request=request,
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
     if await service.get(email=user_in.email):
         return Response(success=False, error="Email already registered", request=request, status_code=status.HTTP_400_BAD_REQUEST)
     user = await service.create(user_in)

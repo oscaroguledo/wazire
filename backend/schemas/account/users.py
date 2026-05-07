@@ -44,6 +44,7 @@ class UserCreate(UserBase, PasswordValidationMixin):
     password: str
     role: Optional[UserRole] = UserRole.STUDENT
     tenant_id: Optional[UUID] = None
+    tenant_code: Optional[str] = None  # Join code for lecturer/student self-registration
     institution_id: Optional[str] = None  # Matric number / Reg No
 
     @field_validator('role')
