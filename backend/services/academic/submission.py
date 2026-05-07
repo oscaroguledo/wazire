@@ -19,6 +19,8 @@ from models.academic.question import Question as QuestionModel, Answer as Answer
 from models.academic.student_answer import StudentAnswer as StudentAnswerModel
 from services.academic.student_answer import StudentAnswerService
 from services.engine.similarity_grader import SimilarityGrader
+from core.database import get_db
+from tasks.submission import emit_refresh_dashboard
 from models.account.users import User as UserModel
 
 
@@ -411,8 +413,6 @@ class SubmissionService:
 
     async def grade_attempt_background(self, attempt_id: str, exam_id: str) -> None:
         """Grade an attempt in the background (used by background worker / Kafka)."""
-        from core.database import get_db
-
         async with get_db() as db:
             attempt = (await db.execute(
                 select(SubmissionAttemptModel).where(
@@ -459,7 +459,6 @@ class SubmissionService:
             
             # Refresh dashboards after grading
             if submission:
-                from tasks.submission import emit_refresh_dashboard
                 emit_refresh_dashboard(str(submission.student_id))
                 # Get exam to find lecturer for dashboard refresh
                 exam_result = await db.execute(select(ExamModel).where(ExamModel.id == UUID(exam_id)))

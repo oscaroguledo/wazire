@@ -802,3 +802,223 @@ The following bug conditions document the missing tenant join-code mechanism tha
 3.71 WHEN the Paystack and Monnify webhook handler routes are added under `/api/v1/billing/webhooks/` THEN all existing billing routes (`/api/v1/billing/invoices`, `/api/v1/billing/semesters`, `/api/v1/billing/billing_plans`, `/api/v1/billing/payment_methods`, `/api/v1/billing/usage`) SHALL CONTINUE TO be served at their existing paths without modification; the webhook routes are additive
 
 3.72 WHEN `PaymentGatewayService` and the `INITIATE_BILLING` Kafka handler are added THEN the existing worker event handlers (`GRADE_SUBMISSION_ATTEMPT`, `REFRESH_DASHBOARD`, `PRELOAD_QUESTIONS`, `UPSERT_STUDENT_ANSWER`, `FORCE_SUBMIT_EXAM`, `DETECT_ANSWER`, `PARSE_AND_CREATE`, `SEND_EMAIL`, `UPDATE_EXAM_STATUS`) SHALL CONTINUE TO function as currently implemented; the new handler is additive and does not modify any existing handler's logic or registration
+
+
+---
+
+## Role Hierarchy Clarification
+
+**The correct role hierarchy:**
+
+- `superadmin` = the app owner (Oscar, the developer). There is only ever one superadmin. They have platform-level access: can see all tenants, manage billing globally, access any tenant's data. This role is NOT part of the self-registration flow — it is seeded directly in the database.
+- `admin` = a school administrator. They self-register (no tenant_code required) and create their school's tenant during or immediately after registration. They manage lecturers and students within their tenant. They are the ones who share the 6-letter tenant_code with their staff and students.
+- `lecturer` = a staff member at a school. They self-register using the school's 6-letter tenant_code. They create courses, exams, questions, enroll students.
+- `student` = a learner at a school. They self-register using the school's 6-letter tenant_code. They take exams.
+
+### Current Behavior (Defect) — Role Hierarchy Clarification
+
+1.111 WHEN the onboarding flow documented in section 1.102–1.104 is followed THEN it incorrectly states that "superadmin registers → creates the tenant"; the correct flow is that `admin` (role=admin) self-registers without a tenant_code, then creates their tenant; the registration endpoint and TenantService must support admin-initiated tenant creation, not superadmin-initiated
+
+1.112 WHEN the `UserRole` enum in `backend/models/account/users.py` is inspected THEN it defines `SUPERADMIN = "superadmin"` but there is no seeding mechanism, no guard preventing self-registration as superadmin, and no documentation that this role is reserved for the app owner only; any user could theoretically register with `role=superadmin` via the API
+
+1.113 WHEN the registration endpoint processes a request THEN it has no role-based access control on the `role` field: a malicious user could POST `{"role": "superadmin"}` or `{"role": "admin"}` and gain elevated privileges; the endpoint does not restrict which roles can be self-registered
+
+### Expected Behavior (Correct) — Role Hierarchy Clarification
+
+2.111 WHEN `POST /api/v1/auth/register` is called with `role=admin` THEN the handler SHALL create the user with `role=admin` and `tenant_id=None` (admin creates their tenant separately via `POST /api/v1/account/tenants/`); no `tenant_code` is required for admin registration; the admin then creates their tenant and the system links them as the tenant's owner
+
+2.112 WHEN `POST /api/v1/auth/register` is called THEN the `role` field SHALL only accept `admin`, `lecturer`, or `student` as self-registerable values; `superadmin` SHALL be explicitly rejected with HTTP 403 ("Superadmin accounts cannot be self-registered"); the superadmin account SHALL only be created via a protected seed script or CLI command that requires direct database/server access
+
+2.113 WHEN `POST /api/v1/auth/register` is called with `role=lecturer` or `role=student` THEN `tenant_code` SHALL be required (HTTP 422 if missing); WHEN called with `role=admin` THEN `tenant_code` SHALL be optional and ignored (admin creates their own tenant); this distinction SHALL be enforced at the schema validation layer
+
+### Unchanged Behavior (Regression Prevention) — Role Hierarchy Clarification
+
+3.73 WHEN the registration endpoint is updated to reject `role=superadmin` self-registration THEN all existing `role=admin`, `role=lecturer`, and `role=student` registration flows SHALL CONTINUE TO work without modification; only the superadmin path is blocked
+
+3.74 WHEN the superadmin seeding mechanism is implemented THEN the `UserRole.SUPERADMIN` enum value SHALL CONTINUE TO exist in the model and be usable for authorization checks (e.g. `if user.role == UserRole.SUPERADMIN`) throughout the codebase; the enum value is not removed, only its self-registration path is blocked
+
+3.75 WHEN admin registration no longer requires a tenant_code THEN the lecturer and student registration flows that DO require tenant_code (per requirement 2.103) SHALL CONTINUE TO enforce tenant_code as required; the change only relaxes the requirement for admin, not for lecturer or student
+
+
+---
+
+## Analytics, AI Grading Engine & Remaining Functionality
+
+### Current Behavior (Defect) — Analytics Dashboard
+
+1.114 WHEN `DashboardService.get_or_create_admin_dashboard()` is called THEN it crashes with `AttributeError` because it queries `AdminDashboard.admin_id` but the `AdminDashboard` model has no `admin_id` column — the model is keyed by `tenant_id` (one dashboard per tenant)
+
+1.115 WHEN `DashboardService.get_or_create_lecturer_dashboard()` creates a new `LecturerDashboard` row THEN it crashes with an `IntegrityError` because `tenant_id` is a non-nullable FK on the `LecturerDashboard` model but the service never passes `tenant_id` to the constructor
+
+1.116 WHEN the route `GET /dashboard/admin/{admin_id}` is called THEN it passes `admin_id` (a user UUID) to `get_or_create_admin_dashboard()`, but the `AdminDashboard` model is keyed by `tenant_id`; the wrong ID is used to look up the dashboard, returning no record or the wrong record
+
+1.117 WHEN `SimilarityGrader.grade()` is called for a theory question THEN it raises `TypeError: object NoneType can't be used in 'await' expression` because the method is defined as `async def` and calls `await self.client.chat.completions.create(...)`, but the Groq Python SDK's `chat.completions.create` is synchronous and does not return an awaitable
+
+1.118 WHEN `QuestionAnswerer` and `SimilarityGrader` are instantiated THEN each creates its own independent Groq client; there is no shared client or connection pool, so every grading call allocates a new client instance, wasting resources and potentially exhausting connection limits under load
+
+1.119 WHEN the `REFRESH_DASHBOARD` Kafka event handler runs THEN it calls `DashboardService.get_or_create_*` methods which use inline `get_or_create` logic rather than a proper `upsert_metrics` pattern that computes fresh metrics from OLTP tables and writes them to the analytics tables; stale or zero-value dashboards can be created without reflecting actual platform data
+
+1.120 WHEN the `REFRESH_DASHBOARD` Kafka event handler runs THEN it only refreshes admin and student dashboards; no `LecturerDashboard` refresh logic exists in the worker, so lecturer dashboard metrics are never recomputed after grading or enrollment changes
+
+1.121 WHEN the analytics routes are loaded THEN they import `require_admin_or_superadmin` from `core.middleware.auth`, but this function does not exist in that module; the import raises `ImportError` at startup, making all analytics routes unavailable
+
+### Current Behavior (Defect) — AI Grading Engine
+
+1.122 WHEN `SimilarityGrader.grade()` is called for a theory question THEN the `async def` method calls the synchronous Groq SDK method without `asyncio.to_thread()`, blocking the event loop and raising a `TypeError` on the `await` expression (see also 1.117)
+
+1.123 WHEN `QuestionAnswerer.answer_question()` is called from an async task handler THEN it runs synchronously in the event loop; because it makes a blocking Groq HTTP call, it blocks the entire asyncio event loop for the duration of the API call, degrading throughput for all concurrent tasks
+
+1.124 WHEN `QuestionAnswerer` or `SimilarityGrader` is instantiated THEN neither class inherits from `GroqEngineBase`, despite that base class existing in `backend/services/engine/base.py` specifically to provide shared client initialization; both classes duplicate the client initialization logic independently
+
+1.125 WHEN the Groq API returns a rate-limit error (HTTP 429) or a transient error during grading THEN neither `SimilarityGrader` nor `QuestionAnswerer` has any retry logic; the grading call fails permanently with no retry, and the submission is marked with score=0 and an error reason
+
+1.126 WHEN `SimilarityGrader` or `QuestionAnswerer` is used and `GROQ_API_KEY` is not set in the environment THEN grading silently returns `score=0` with a generic error message instead of raising a clear configuration error; misconfigured deployments produce silent zero-score results with no operator alert
+
+### Current Behavior (Defect) — Missing Functionality
+
+1.127 WHEN a lecturer needs to review all student scores for a specific exam THEN no `GET /api/v1/academic/exams/{exam_id}/results` endpoint exists; there is no way to retrieve all submission scores for a given exam in a single request
+
+1.128 WHEN an admin or lecturer needs to list all students enrolled in a specific course THEN no `GET /api/v1/academic/courses/{course_id}/students` endpoint exists; enrolled students can only be discovered by iterating all enrollments
+
+1.129 WHEN a student needs to see all exams available to them based on their enrollments THEN no `GET /api/v1/academic/students/{student_id}/exams` endpoint exists; there is no way to retrieve the set of exams a student is eligible to take in a single request
+
+1.130 WHEN a lecturer or admin wants to upload a scanned answer sheet image and extract student answers THEN `exam_extractor.py` and `answer_sheet_extractor.py` engine services exist in `backend/services/engine/` but are not connected to any route or Kafka task handler; paper exam scanning is implemented in the engine layer but has no API endpoint or worker integration, making the feature entirely inaccessible
+
+---
+
+### Expected Behavior (Correct) — Analytics Dashboard
+
+2.114 WHEN `DashboardService.get_or_create_admin_dashboard()` is called THEN it SHALL query `AdminDashboard.tenant_id` (not `admin_id`) to look up the dashboard, and SHALL create a new row keyed by `tenant_id` if none exists; the method signature SHALL accept `tenant_id: uuid.UUID` as its primary lookup parameter
+
+2.115 WHEN `DashboardService.get_or_create_lecturer_dashboard()` creates a new `LecturerDashboard` row THEN it SHALL pass `tenant_id` to the constructor alongside `lecturer_id`, satisfying the non-nullable FK constraint on the model
+
+2.116 WHEN the route `GET /dashboard/admin/{admin_id}` is called THEN it SHALL resolve the requesting user's `tenant_id` from the authenticated session and pass `tenant_id` to `get_or_create_admin_dashboard()` instead of passing the `admin_id` path parameter, so the correct tenant-scoped dashboard is returned
+
+2.117 WHEN `SimilarityGrader.grade()` is called for a theory question THEN it SHALL call the synchronous Groq SDK method via `asyncio.to_thread(self.client.chat.completions.create, ...)` so that the blocking HTTP call runs in a thread pool without blocking the event loop and without misusing `await` on a non-awaitable
+
+2.118 WHEN `QuestionAnswerer` and `SimilarityGrader` are instantiated THEN they SHALL share a single Groq client instance (e.g. injected via constructor or provided by a module-level singleton) rather than each creating their own; this eliminates redundant client allocation and allows connection reuse across grading calls
+
+2.119 WHEN the `REFRESH_DASHBOARD` Kafka event handler runs THEN it SHALL call a dedicated `upsert_metrics` method (or equivalent) on `DashboardService` that computes fresh aggregate metrics from OLTP tables (`users`, `courses`, `exams`, `submissions`, `enrollments`) and writes them to the analytics tables via `INSERT ... ON CONFLICT DO UPDATE`, ensuring dashboard data always reflects current platform state
+
+2.120 WHEN the `REFRESH_DASHBOARD` Kafka event handler runs THEN it SHALL also refresh `LecturerDashboard` metrics for the affected lecturer (identified from the event payload), computing `total_courses`, `total_students`, `total_exams`, `pending_submissions`, and `graded_submissions` from OLTP tables and upserting the result into `analytics.lecturer_dashboard`
+
+2.121 WHEN the analytics routes are loaded THEN the import of `require_admin_or_superadmin` SHALL be replaced with the correct auth helper that exists in `core.middleware.auth` (e.g. `require_admin` or a newly defined `require_admin_or_superadmin` function); the import SHALL resolve without error so that analytics routes are available at startup
+
+### Expected Behavior (Correct) — AI Grading Engine
+
+2.122 WHEN `SimilarityGrader.grade()` performs a theory grading call THEN it SHALL wrap the synchronous `self.client.chat.completions.create(...)` call in `await asyncio.to_thread(...)` so the call is non-blocking and the method can remain `async def` without misusing `await` on a synchronous return value
+
+2.123 WHEN `QuestionAnswerer.answer_question()` is called from an async task handler THEN the blocking Groq HTTP call SHALL be dispatched via `asyncio.to_thread()` (or the method SHALL be made async and use `asyncio.to_thread` internally) so that the event loop is not blocked during the API call
+
+2.124 WHEN `QuestionAnswerer` and `SimilarityGrader` are defined THEN both classes SHALL inherit from `GroqEngineBase` in `backend/services/engine/base.py`, delegating client initialization to the base class `_init_client()` method and removing the duplicated initialization code from each subclass
+
+2.125 WHEN the Groq API returns a rate-limit (429) or transient error during a grading call THEN `SimilarityGrader.grade()` and `QuestionAnswerer.answer_question()` SHALL retry the call with exponential backoff (e.g. up to 3 attempts with 1s, 2s, 4s delays) before returning a failure result; permanent errors (e.g. invalid API key) SHALL not be retried
+
+2.126 WHEN `SimilarityGrader` or `QuestionAnswerer` is instantiated and `GROQ_API_KEY` is not set THEN the constructor SHALL raise a clear `ConfigurationError` (or equivalent) with the message "GROQ_API_KEY is not configured" rather than silently setting `self.client = None` and returning zero scores; callers SHALL be able to catch this error and surface it as an operator alert
+
+### Expected Behavior (Correct) — Missing Functionality
+
+2.127 WHEN a lecturer calls `GET /api/v1/academic/exams/{exam_id}/results` THEN the endpoint SHALL return a list of all `Submission` records for that exam, including `student_id`, `latest_score`, `status`, `graded_at`, and `submitted_at`, scoped to the requesting user's tenant; access SHALL be restricted to lecturers and admins
+
+2.128 WHEN an admin or lecturer calls `GET /api/v1/academic/courses/{course_id}/students` THEN the endpoint SHALL return a list of all users enrolled in that course via the `Enrollment` table, including `student_id`, `user.first_name`, `user.last_name`, and `enrollment.status`, scoped to the requesting user's tenant
+
+2.129 WHEN a student calls `GET /api/v1/academic/students/{student_id}/exams` THEN the endpoint SHALL return a list of all exams belonging to courses the student is enrolled in, including `exam.id`, `exam.title`, `exam.start_time`, `exam.end_time`, `exam.status`, and `exam.duration`, scoped to the student's tenant; students SHALL only be able to query their own `student_id`
+
+2.130 WHEN a lecturer or admin uploads a scanned answer sheet image THEN a `POST /api/v1/academic/exams/{exam_id}/scan` endpoint SHALL exist that accepts a multipart image upload, passes it to `AnswerSheetExtractor` (in `backend/services/engine/answer_sheet_extractor.py`), and returns the extracted answers as a structured JSON response; the endpoint SHALL also be wired to a Kafka task handler so that extraction can be performed asynchronously for large batches
+
+---
+
+### Unchanged Behavior (Regression Prevention) — Analytics, AI Grading Engine & Remaining Functionality
+
+3.76 WHEN `DashboardService` is updated to query by `tenant_id` instead of `admin_id` THEN the `get_or_create_lecturer_dashboard()` and `get_or_create_student_dashboard()` methods SHALL CONTINUE TO query by `lecturer_id` and `student_id` respectively, as those models are correctly keyed by user ID
+
+3.77 WHEN `SimilarityGrader.grade()` is updated to use `asyncio.to_thread()` for the Groq call THEN the MCQ and FITB grading branches (which perform no I/O) SHALL CONTINUE TO execute synchronously inline without any thread dispatch, preserving their current low-latency behaviour
+
+3.78 WHEN `QuestionAnswerer` and `SimilarityGrader` are refactored to inherit from `GroqEngineBase` THEN their public method signatures (`grade()`, `answer_question()`, `process()`) SHALL CONTINUE TO accept the same parameters and return the same types as currently defined; no caller changes SHALL be required
+
+3.79 WHEN retry logic is added to `SimilarityGrader` and `QuestionAnswerer` THEN the final return type on exhausted retries SHALL CONTINUE TO be `(Decimal("0.00"), "Error: ...")` for `grade()` and `{"answer": "Error: ...", "confidence": 0.0, ...}` for `answer_question()`, preserving the existing error-result contract expected by `SubmissionService`
+
+3.80 WHEN the `REFRESH_DASHBOARD` worker handler is updated to include lecturer dashboard refresh THEN the existing admin and student dashboard refresh logic SHALL CONTINUE TO function as currently implemented; the lecturer refresh is additive and SHALL NOT alter the admin or student refresh paths
+
+3.81 WHEN the new read-only endpoints (`/exams/{exam_id}/results`, `/courses/{course_id}/students`, `/students/{student_id}/exams`) are added THEN all existing academic endpoints (`/courses`, `/exams`, `/questions`, `/answers`, `/submissions`, `/enrollments`) SHALL CONTINUE TO be served at their existing paths without modification; the new endpoints are purely additive
+
+3.82 WHEN the `POST /api/v1/academic/exams/{exam_id}/scan` endpoint is added THEN the existing exam CRUD endpoints (`GET`, `POST`, `PUT`, `DELETE` on `/academic/exams/`) SHALL CONTINUE TO function without modification; the scan endpoint is additive and does not alter any existing exam route handler
+
+
+---
+
+## Production Readiness, Nginx & Deployment
+
+The following bug conditions document the absence of a production-grade nginx reverse proxy, incomplete production readiness posture, and the lack of a disciplined Git/CI commit and PR workflow.
+
+### Current Behavior (Defect) — Nginx as Reverse Proxy and Load Balancer
+
+1.131 WHEN `docker-compose.yml` is inspected THEN no `nginx` service exists; there is no single entry point for all inbound traffic, so the backend and frontend are each exposed directly on host ports with no reverse proxy in front of them
+
+1.132 WHEN the `backend` service is defined in `docker-compose.yml` THEN it exposes host port `${BACKEND_PORT:-8000}:8000` directly; the backend API is reachable from outside the Docker network without going through any reverse proxy, violating the requirement that all traffic must flow through nginx
+
+1.133 WHEN the `frontend` service is defined in `docker-compose.yml` THEN it exposes host port `${FRONTEND_PORT:-5173}:5173` and runs `npm run dev` (a Vite development server); there is no nginx container that serves the compiled frontend static assets, and the frontend is not built into a production bundle
+
+1.134 WHEN an nginx configuration file is needed THEN none exists in the repository; there is no `nginx/nginx.conf` (or equivalent) that configures reverse proxy to the backend upstream at `/api/v1/`, static file serving for the frontend build output, WebSocket upgrade headers, gzip compression, cache headers for static assets, rate limiting, or SSL termination
+
+1.135 WHEN the frontend `Dockerfile` is executed THEN it runs `CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]`; it does not build static assets with `npm run build` and does not produce a `/app/dist` output directory that nginx can serve; the image is unsuitable for any production or staging deployment
+
+### Current Behavior (Defect) — Production Readiness Checklist
+
+1.136 WHEN the backend is started in the Docker container THEN `CMD uvicorn main:app --host 0.0.0.0 --port 8000` runs `uvicorn` directly as a single-process server; `gunicorn` with `uvicorn` workers is not used, so the backend cannot take advantage of multiple CPU cores and has no process supervisor to restart crashed workers
+
+1.137 WHEN `GET /health` is called on the backend THEN no such endpoint exists; there is no health check route that verifies DB, Redis, and Kafka connectivity and returns a structured JSON response; nginx and orchestrators cannot probe backend liveness or readiness
+
+1.138 WHEN `backend/.env.example` and `frontend/.env.example` are inspected THEN they may be missing recently added variables (e.g. `GROQ_API_KEY`, `PAYSTACK_SECRET_KEY`, `MONNIFY_API_KEY`, `MONNIFY_SECRET_KEY`, `KAFKA_CONSUMER_GROUP_ID`, `LOG_LEVEL`, `DEBUG`); developers cloning the repository cannot determine the full set of required environment variables from the example files alone
+
+1.139 WHEN the backend application handles CORS THEN the allowed origins may be set to `*` (wildcard) or not restricted to the frontend origin; in production this allows any origin to make credentialed requests to the API, violating the principle of least privilege; additionally the `DEBUG` flag may default to `True` and `LOG_LEVEL` may not be configurable via environment variable
+
+### Current Behavior (Defect) — GitHub Push After Each Implementation Step
+
+1.140 WHEN implementation tasks are completed THEN changes are not committed and pushed after each task; there is no documented commit discipline, no conventional commits format enforced, and no branch strategy defined for the fix work
+
+1.141 WHEN code is pushed to the repository THEN no GitHub Actions CI workflow exists (see also 1.91) and no branch protection rule requires CI to pass before a PR can be merged; the `main` branch can receive broken code without any automated gate
+
+---
+
+### Expected Behavior (Correct) — Nginx as Reverse Proxy and Load Balancer
+
+2.131 WHEN `docker-compose.yml` is updated THEN an `nginx` service SHALL be added as the sole entry point for all external traffic; nginx SHALL listen on host ports 80 (HTTP) and 443 (HTTPS) and SHALL be the only service with host-port bindings visible outside the Docker network; all other services (backend, frontend build output) SHALL communicate only over the internal `wazire-network`
+
+2.132 WHEN nginx receives a request matching `/api/v1/` THEN it SHALL reverse-proxy the request to the `backend` upstream (e.g. `http://backend:8000`); the nginx configuration SHALL support load balancing across multiple backend replicas using the `upstream` block so that `docker compose up --scale backend=N` distributes traffic automatically
+
+2.133 WHEN nginx serves the application THEN the nginx configuration SHALL include: (a) `proxy_set_header Upgrade $http_upgrade` and `proxy_set_header Connection "upgrade"` for WebSocket upgrade support on `/ws/` paths; (b) `gzip on` with `gzip_types text/plain application/json application/javascript text/css`; (c) `Cache-Control: public, max-age=31536000, immutable` for hashed static assets under `/assets/`; (d) a rate-limiting zone (e.g. `limit_req_zone $binary_remote_addr zone=api:10m rate=30r/s`) applied to the `/api/v1/` location; (e) SSL termination using a certificate path configurable via environment variable (`SSL_CERT_PATH`, `SSL_KEY_PATH`), defaulting to a self-signed certificate for local development
+
+2.134 WHEN the frontend Docker image is built THEN the `frontend/Dockerfile` SHALL use a multi-stage build: stage 1 (`builder`) SHALL run `npm ci` and `npm run build` to produce the `/app/dist` static asset directory; stage 2 SHALL copy only the `/app/dist` output to a location that the nginx container can mount or COPY from; the final frontend image SHALL NOT run any Node.js process — static files are served exclusively by the nginx container
+
+2.135 WHEN the `backend` service is defined in `docker-compose.yml` THEN the `ports` mapping (`${BACKEND_PORT:-8000}:8000`) SHALL be removed; the backend SHALL only be reachable via the nginx upstream on the internal Docker network, with no direct host-port exposure
+
+### Expected Behavior (Correct) — Production Readiness Checklist
+
+2.136 WHEN the backend Docker container starts in production THEN the `CMD` in `backend/Dockerfile` SHALL be `gunicorn main:app -k uvicorn.workers.UvicornWorker --workers ${GUNICORN_WORKERS:-4} --bind 0.0.0.0:8000`; `gunicorn` SHALL be added to `backend/requirements.txt`; the number of workers SHALL be configurable via the `GUNICORN_WORKERS` environment variable
+
+2.137 WHEN `GET /health` is called on the backend THEN the endpoint SHALL return HTTP 200 with a JSON body `{"status": "ok", "db": "ok"|"error", "redis": "ok"|"error", "kafka": "ok"|"error"}` after probing each dependency; if any dependency probe fails the response SHALL still return HTTP 200 (so nginx health checks do not remove the backend from the upstream pool for transient issues) but SHALL set the failing component's value to `"error"`; nginx SHALL be configured with a `health_check` directive (or equivalent `proxy_next_upstream` logic) using this endpoint
+
+2.138 WHEN `backend/.env.example` and `frontend/.env.example` are reviewed THEN they SHALL contain every environment variable required by the application, including all secrets (`DB_PASSWORD`, `JWT_SECRET`, `GROQ_API_KEY`, `PAYSTACK_SECRET_KEY`, `MONNIFY_API_KEY`, `MONNIFY_SECRET_KEY`, `REDIS_PASSWORD`), all feature flags (`DEBUG`, `LOG_LEVEL`, `GUNICORN_WORKERS`, `KAFKA_CONSUMER_GROUP_ID`), and all service URLs (`DATABASE_URL`, `REDIS_URL`, `KAFKA_BOOTSTRAP_SERVERS`); each variable SHALL have a comment explaining its purpose and an example value; no secret value SHALL be committed — only placeholder strings (e.g. `your-secret-here`)
+
+2.139 WHEN the backend application starts in production THEN CORS SHALL be configured to allow only the origin specified by the `FRONTEND_ORIGIN` environment variable (e.g. `https://app.wazire.com`), not `*`; the `DEBUG` setting SHALL default to `False` and SHALL only be `True` when `DEBUG=true` is explicitly set in the environment; `LOG_LEVEL` SHALL be read from the `LOG_LEVEL` environment variable (defaulting to `"INFO"`) and applied to the application logger and all middleware loggers; all services in `docker-compose.yml` SHALL have `restart: unless-stopped` (already present on most services — any service missing this policy SHALL have it added)
+
+### Expected Behavior (Correct) — GitHub Push After Each Implementation Step
+
+2.140 WHEN any implementation task defined in `tasks.md` is completed THEN the implementer SHALL stage the changed files, create a commit with a message following the Conventional Commits format (e.g. `fix: correct lifespan yield in main.py`, `feat: add tenant_code to Tenant model`, `chore: add gunicorn to requirements.txt`), and push the commit to the feature branch `fix/app-wide-refactor` on `https://github.com/oscaroguledo/wazire.git`
+
+2.141 WHEN all tasks in `tasks.md` are complete THEN a pull request SHALL be opened from `fix/app-wide-refactor` against `main` on `https://github.com/oscaroguledo/wazire.git`; the PR title SHALL be 70 characters or fewer; the PR description SHALL include a summary of all changes, a list of tasks completed, and a note on what was tested; the PR SHALL NOT be merged if the GitHub Actions CI pipeline (defined in requirement 2.89) fails on any job
+
+---
+
+### Unchanged Behavior (Regression Prevention) — Production Readiness, Nginx & Deployment
+
+3.83 WHEN the `nginx` service is added to `docker-compose.yml` and the backend `ports` mapping is removed THEN all existing service definitions (`postgres`, `redis`, `kafka`, `worker`, `scheduler`) SHALL CONTINUE TO use the same image versions, environment variables, volumes, health checks, `restart` policies, and `deploy` resource limits as currently specified; only the `backend` and `frontend` service definitions change (ports removal and Dockerfile update respectively), and the `nginx` service is purely additive
+
+3.84 WHEN the `frontend/Dockerfile` is changed to a multi-stage build that runs `npm run build` THEN the frontend application's runtime behaviour (routing, API calls, authentication, all page components) SHALL CONTINUE TO function identically to the development build; the change affects only the build and serving mechanism, not the application code or its compiled output
+
+3.85 WHEN `gunicorn` is added to `backend/requirements.txt` and the `CMD` is updated THEN all existing backend Python dependencies SHALL CONTINUE TO be listed at their current pinned versions without modification; `gunicorn` is additive; the FastAPI application entrypoint (`main:app`) and all route registrations SHALL CONTINUE TO function identically under `gunicorn + uvicorn` workers as they do under `uvicorn` directly
+
+3.86 WHEN `backend/.env.example` and `frontend/.env.example` are updated to include all required variables THEN the actual `backend/.env` and `frontend/.env` files (which are git-ignored) SHALL NOT be modified; the `.env.example` files are documentation only and their update does not affect any running service or CI environment
+
+3.87 WHEN the CORS configuration is tightened to use `FRONTEND_ORIGIN` instead of `*` THEN all existing API endpoints and their response contracts SHALL CONTINUE TO function identically for requests originating from the configured frontend origin; only cross-origin requests from disallowed origins are newly rejected, and no existing frontend functionality is broken provided `FRONTEND_ORIGIN` is set correctly in the deployment environment
