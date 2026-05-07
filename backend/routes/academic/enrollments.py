@@ -81,7 +81,7 @@ async def get_student_enrollments(
 ):
     service = EnrollmentService(db)
     tenant_id = None if current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else current_user.tenant_id
-    if current_user.role == UserRole.STUDENT.value and str(current_user.id) != str(student_id):
+    if current_user.role == UserRole.STUDENT and str(current_user.id) != str(student_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Can only access your own enrollments")
     params = EnrollmentListParams(page=page, per_page=per_page, search=search, student_id=str(student_id), status=enrollment_status)
     try:
@@ -127,7 +127,7 @@ async def get_lecturer_enrollments(
 ):
     service = EnrollmentService(db)
     tenant_id = None if current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else current_user.tenant_id
-    if current_user.role == UserRole.LECTURER.value and current_user.id != lecturer_id:
+    if current_user.role == UserRole.LECTURER and current_user.id != lecturer_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Can only access your own course enrollments")
     params = EnrollmentListParams(page=page, per_page=per_page, search=search, lecturer_id=lecturer_id, status=enrollment_status)
     try:
@@ -148,9 +148,9 @@ async def get_enrollment(
         tenant_id = None if current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else current_user.tenant_id
     try:
         enrollment = await service.get_enrollment(enrollment_id, tenant_id=tenant_id)
-        if current_user.role == UserRole.STUDENT.value and str(enrollment.student_id) != str(current_user.id):
+        if current_user.role == UserRole.STUDENT and str(enrollment.student_id) != str(current_user.id):
             raise ForbiddenError("Can only access your own enrollments")
-        elif current_user.role == UserRole.LECTURER.value and str(enrollment.course.lecturer_id) != str(current_user.id):
+        elif current_user.role == UserRole.LECTURER and str(enrollment.course.lecturer_id) != str(current_user.id):
             raise ForbiddenError("Can only access enrollments for your courses")
         return Response(success=True, data=enrollment.to_dict(), request=request)
     except ValueError as e:
@@ -194,9 +194,9 @@ async def update_enrollment(
         tenant_id = None if current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else current_user.tenant_id
     try:
         existing = await service.get_enrollment(enrollment_id, tenant_id=tenant_id)
-        if current_user.role == UserRole.STUDENT.value and str(existing.student_id) != str(current_user.id):
+        if current_user.role == UserRole.STUDENT and str(existing.student_id) != str(current_user.id):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Can only update your own enrollments")
-        elif current_user.role == UserRole.LECTURER.value and str(existing.course.lecturer_id) != str(current_user.id):
+        elif current_user.role == UserRole.LECTURER and str(existing.course.lecturer_id) != str(current_user.id):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Can only update enrollments for your courses")
         enrollment = await service.update_enrollment(enrollment_id, enrollment_data, tenant_id=tenant_id)
         return Response(success=True, data=enrollment.to_dict(), request=request)
@@ -215,7 +215,7 @@ async def remove_enrollment(
     current_user: User = Depends(require_lecturer_or_admin(get_token_service())),
 ):
     service = EnrollmentService(db)
-    tenant_id = None if current_user.role in ("admin", "superadmin") else current_user.tenant_id
+    tenant_id = None if current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else current_user.tenant_id
     try:
         enrollment_result = await db.execute(select(Enrollment).where(Enrollment.id == enrollment_id))
         enrollment = enrollment_result.scalar_one_or_none()
