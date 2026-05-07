@@ -58,6 +58,14 @@ class GroqEngineBase:
                             key = settings.GROQ_API_KEYS.split(",")[0].strip()
                         except Exception:
                             key = None
+            except Exception:
+                settings = get_settings()
+                key = None
+                if getattr(settings, "GROQ_API_KEYS", None):
+                    try:
+                        key = settings.GROQ_API_KEYS.split(",")[0].strip()
+                    except Exception:
+                        key = None
             
         if key:
             try:

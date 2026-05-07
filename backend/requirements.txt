@@ -31,3 +31,4 @@ pandas==2.2.3
 requests==2.31.0
 uuid-utils
 aiokafka==0.11.0
+PyYAML==6.0.2

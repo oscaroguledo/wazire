@@ -435,8 +435,8 @@ async def scan_answer_sheet(
         course_stmt = select(Course).where(Course.id == exam.course_id)
         course_result = await db.execute(course_stmt)
         course = course_result.scalar_one_or_none()
-            if course and course.lecturer_id:
-                emit_refresh_dashboard(str(course.lecturer_id))
+        if course and course.lecturer_id:
+            emit_refresh_dashboard(str(course.lecturer_id))
 
     return Response(
         success=True,
