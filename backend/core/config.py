@@ -123,6 +123,11 @@ class Settings(BaseModel):
         # Validate DATABASE_URL
         if not self.DATABASE_URL:
             errors.append("DATABASE_URL is required")
+
+        # Validate GROQ_API_KEYS in production
+        if self.ENV == "production":
+            if not self.GROQ_API_KEYS:
+                errors.append("GROQ_API_KEYS must be set in production environment")
         
         # Validate ACCESS_TOKEN_EXPIRE_SECONDS
         if self.ACCESS_TOKEN_EXPIRE_SECONDS < 60:

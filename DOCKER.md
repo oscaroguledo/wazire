@@ -249,7 +249,9 @@ BACKEND_PORT=8000
 FRONTEND_PORT=5173
 
 # API Keys
-GROQ_API_KEY=your_api_key
+# Provide a comma-separated list of Groq API keys for rotation and higher throughput.
+# Example: GROQ_API_KEYS=key1,key2,key3
+GROQ_API_KEYS=your_api_key
 ```
 
 ## Access Points

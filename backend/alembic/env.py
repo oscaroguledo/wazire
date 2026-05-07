@@ -26,8 +26,7 @@ if db_url:
         db_url = db_url.replace('postgresql+asyncpg://', 'postgresql+psycopg2://', 1)
     elif db_url.startswith('postgresql://'):
         db_url = db_url.replace('postgresql://', 'postgresql+psycopg2://', 1)
-    elif db_url.startswith('sqlite+aiosqlite://'):
-        db_url = db_url.replace('sqlite+aiosqlite://', 'sqlite://', 1)
+    # sqlite support removed - migrations expect a PostgreSQL URL
 
 from core.database import Base
 
