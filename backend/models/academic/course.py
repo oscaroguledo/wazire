@@ -1,5 +1,3 @@
-
-from __future__ import annotations
 import uuid
 from datetime import datetime
 from sqlalchemy import ForeignKey, String, Index, func, DateTime
@@ -51,6 +49,7 @@ class Course(Base):
             "name": self.name,
             "description": self.description,
             "course_code": self.course_code,
+            "lecturer_id": str(self.lecturer_id) if self.lecturer_id else None,
             "tenant_id": str(self.tenant_id),
             "semester_id": str(self.semester_id) if self.semester_id else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,

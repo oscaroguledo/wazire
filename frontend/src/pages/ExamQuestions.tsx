@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react'
+import React, { useState, useCallback, useMemo, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -34,6 +34,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { StatusBadge } from '@/components/StatusBadge'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import { ExamQuestionsSkeleton } from './ExamQuestionsSkeleton'
+import resourceCache from '@/lib/resourceCache'
 
 export default function ExamQuestions() {
   const { examId } = useParams<{ examId: string }>()
@@ -105,6 +106,20 @@ export default function ExamQuestions() {
   const examError = fetchError
   const questionsError = fetchError
   const refetchQuestions = refetch
+
+  const [courseName, setCourseName] = useState<string | null>(null)
+
+  useEffect(() => {
+    let mounted = true
+    if (exam?.course_id) {
+      resourceCache.getCourseName(exam.course_id)
+        .then(name => { if (mounted) setCourseName(name) })
+        .catch(() => { if (mounted) setCourseName(`Course ${exam.course_id}`) })
+    } else {
+      setCourseName(null)
+    }
+    return () => { mounted = false }
+  }, [exam?.course_id])
 
   // Filter questions by type and search query
   const filteredQuestions = useMemo(() => {
@@ -726,7 +741,7 @@ export default function ExamQuestions() {
             </span>
             <span className="text-[var(--color-text-muted)]">•</span>
             <span className="px-2 py-0.5 bg-[var(--color-primary-50)] text-[var(--color-primary-700)] text-sm font-medium rounded-md border border-[var(--color-primary-200)]">
-              {exam.course_name || 'No Course'}
+              {courseName || (exam.course_id ? `Course ${exam.course_id}` : 'No Course')}
             </span>
             <span className="text-[var(--color-text-muted)]">•</span>
             <span className="px-2 py-0.5 bg-[var(--color-success-50)] text-[var(--color-success-700)] text-sm font-medium rounded-md border border-[var(--color-success-200)]">

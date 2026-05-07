@@ -1,7 +1,5 @@
-from __future__ import annotations
-
-from decimal import Decimal
 import uuid
+from decimal import Decimal
 from datetime import datetime
 from enum import Enum
 from typing import Optional
@@ -95,7 +93,7 @@ class SubmissionAttempt(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     submission_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("academic.submissions.id", ondelete="CASCADE"), nullable=False, comment="FK to submission")
     attempt_number: Mapped[int] = mapped_column(Integer, nullable=False, comment="1-based attempt number for this submission")
-    score: Mapped[Optional[float]] = mapped_column(Decimal(5, 2), nullable=True)
+    score: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
     scan_pages: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True, comment="List of scanned page URLs for offline exams")
     grading_started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, default=None, comment="UTC moment when grading began for this attempt")
     graded_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)

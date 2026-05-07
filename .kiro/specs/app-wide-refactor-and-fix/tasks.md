@@ -850,7 +850,7 @@
      PHASE 13 — TEST INFRASTRUCTURE & COVERAGE
      ============================================================ -->
 
-- [-] 15. Set up test infrastructure and write comprehensive test coverage
+- [x] 15. Set up test infrastructure and write comprehensive test coverage
 
   - [x] 15.1 Set up pytest + pytest-cov configuration (`backend/pyproject.toml`)
     - Add `pytest`, `pytest-asyncio`, `pytest-cov`, `httpx` to `backend/requirements.txt`
@@ -869,7 +869,7 @@
     - Create `frontend/src/mocks/server.ts` for Node.js test environment setup
     - _Requirements: 2.100_
 
-  - [-] 15.4 Write backend unit tests (services, task handlers, model methods, utilities, KafkaManager, GroqKeyRotator)
+  - [x] 15.4 Write backend unit tests (services, task handlers, model methods, utilities, KafkaManager, GroqKeyRotator)
     - Create `backend/tests/unit/services/` mirroring service module structure
     - Every public service method: happy path + at least one error/edge case (mocked DB, Redis, Kafka)
     - Every Kafka task handler: invoked directly with mock payload; assert service calls and Kafka emissions
@@ -881,35 +881,35 @@
     - Test files MUST NOT import from `main.py` or `worker.py`
     - _Requirements: 2.95, 2.96, 2.97, 2.94_
 
-  - [ ] 15.5 Write backend integration tests (all API routes)
+  - [x] 15.5 Write backend integration tests (all API routes)
     - Use `pytest-asyncio` with `httpx.AsyncClient` against a real test PostgreSQL database (`TEST_DATABASE_URL`)
     - Cover: auth (register, login, refresh, me), course CRUD, exam CRUD and status transitions, question CRUD, enrollment (enroll, list, bulk enroll), answer PATCH (verify Kafka event produced with mocked Kafka), submission (create, submit, get), dashboard GET (read-only, no inline writes), billing (invoices, plans, payment methods, usage, semesters)
     - _Requirements: 2.98, 3.62_
 
-  - [ ] 15.6 Write backend E2E scenario tests (full exam lifecycle, force submit, concurrent UPSERT)
+  - [x] 15.6 Write backend E2E scenario tests (full exam lifecycle, force submit, concurrent UPSERT)
     - Scenario 1 — Full exam lifecycle: tenant creation → users → course → enrollment → exam → questions → Redis preload → student answers via PATCH → Kafka → worker UPSERT → submission → grading → dashboard update
     - Scenario 2 — Force submit: exam time expires → scheduler emits `FORCE_SUBMIT_EXAM` → worker auto-submits unsubmitted students → grading triggered
     - Scenario 3 — Concurrent answer UPSERT idempotency: 100 concurrent PATCH answer requests for same `(student, exam, question)` → assert exactly one row in `student_answers`
     - _Requirements: 2.99_
 
-  - [ ] 15.7 Write frontend unit tests (API functions, components, AuthContext)
+  - [x] 15.7 Write frontend unit tests (API functions, components, AuthContext)
     - Every API function in `apis/*.ts`: assert correct URL, HTTP method, request payload shape, response parsing
     - Every utility function in `utils/*.ts`
     - Every shared component: `@testing-library/react` render test with representative props
     - `AuthContext` login, logout, register, token storage: each with unit tests
     - _Requirements: 2.100, 3.63_
 
-  - [ ] 15.8 Write frontend integration tests (page components with MSW)
+  - [x] 15.8 Write frontend integration tests (page components with MSW)
     - Every page component (Login, Dashboard, Courses, Exams, TakeExam, UserManagement): Vitest + MSW integration test
     - Cover: form submission → correct API call, correct rendering of mocked responses, navigation/redirect behaviour
     - _Requirements: 2.101_
 
-  - [ ] 15.9 Set up Playwright (`frontend/playwright.config.ts`)
+  - [x] 15.9 Set up Playwright (`frontend/playwright.config.ts`)
     - Create `frontend/playwright.config.ts` targeting the application
     - Install Playwright browsers
     - _Requirements: 2.101_
 
-  - [ ] 15.10 Write Playwright E2E tests (3 critical paths)
+  - [x] 15.10 Write Playwright E2E tests (3 critical paths)
     - Path (a): student login → navigate to exam → take exam → submit → see result
     - Path (b): lecturer login → create course → create exam → add questions → publish
     - Path (c): admin login → manage users → view dashboard
@@ -920,9 +920,9 @@
      PHASE 14 — CI/CD PIPELINE
      ============================================================ -->
 
-- [ ] 16. Set up CI/CD pipeline, coverage reporting, and environment documentation
+- [x] 16. Set up CI/CD pipeline, coverage reporting, and environment documentation
 
-  - [ ] 16.1 Create `.github/workflows/ci.yml` (backend + frontend + playwright jobs)
+  - [x] 16.1 Create `.github/workflows/ci.yml` (backend + frontend + playwright jobs)
     - `backend` job: lint (`ruff`), type-check (`mypy`), test with coverage (`pytest --cov --cov-fail-under=90`), upload to Codecov
     - `frontend` job: lint (`eslint`), type-check (`tsc --noEmit`), test with coverage (`vitest --run --coverage`), upload to Codecov
     - `playwright` job: runs after backend + frontend jobs; installs browsers; runs `npx playwright test`
@@ -932,26 +932,26 @@
     - _Preservation: no existing source code modified (3.58)_
     - _Requirements: 2.89, 2.93_
 
-  - [ ] 16.2 Create `.codecov.yml`
+  - [x] 16.2 Create `.codecov.yml`
     - Configure Codecov to aggregate backend and frontend coverage reports
     - Set overall coverage threshold to 90%
     - _Requirements: 2.90, 2.92_
 
-  - [ ] 16.3 Add Codecov badge to `README.md`
+  - [x] 16.3 Add Codecov badge to `README.md`
     - Prepend Codecov badge near the top of `README.md` linking to `https://codecov.io/gh/oscaroguledo/wazire`
     - _Bug_Condition: isBugCondition(input) where input.target = 'README.md' AND defectPresent('no coverage badge')_
     - _Expected_Behavior: README displays current coverage percentage; badge updates after each CI run_
     - _Preservation: all existing README content unchanged below the badge (3.59)_
     - _Requirements: 2.91, 3.59_
 
-  - [ ] 16.4 Update `backend/.env.example` and `frontend/.env.example` with all variables
+  - [x] 16.4 Update `backend/.env.example` and `frontend/.env.example` with all variables
     - `backend/.env.example`: add all missing variables — `GROQ_API_KEY_1`–`GROQ_API_KEY_4`, `PAYSTACK_SECRET_KEY`, `MONNIFY_API_KEY`, `MONNIFY_SECRET_KEY`, `KAFKA_CONSUMER_GROUP_ID`, `LOG_LEVEL`, `DEBUG`, `GUNICORN_WORKERS`, `GRADING_CONCURRENCY_PER_TENANT`, `GRADING_BATCH_SIZE`, `DB_WRITE_BATCH_SIZE`, `FRONTEND_ORIGIN`, `KAFKA_GRADING_PARTITIONS`
     - `frontend/.env.example`: add all missing variables
     - Each variable has a comment explaining its purpose and an example/placeholder value
     - No secret values committed — only placeholder strings
     - _Requirements: 2.138_
 
-  - [ ] 16.5 Document conventional commits and branch strategy
+  - [x] 16.5 Document conventional commits and branch strategy
     - Add a `CONTRIBUTING.md` or section in `README.md` documenting: Conventional Commits format (`fix`, `feat`, `chore`, `refactor`, `test`, `docs`, `ci` with scopes), branch strategy (`fix/app-wide-refactor` → `main`), PR requirements (CI must pass, title ≤ 70 chars)
     - _Requirements: 2.140, 2.141_
 

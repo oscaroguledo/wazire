@@ -94,7 +94,7 @@ class Question(Base):
     semester_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("billings.semesters.id", ondelete="SET NULL"), nullable=True, comment="FK to semester")
     answer_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("academic.answers.id", ondelete="SET NULL"), nullable=True, comment="Optional FK to an Answer shared across questions")
     rules: Mapped[str] = mapped_column(String(2000), nullable=True, comment="Optional grading rules or metadata in JSON format")
-    mark: Mapped[Optional[Decimal]] = mapped_column(Decimal(10, 2), nullable=True, comment="Mark for the question")
+    mark: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True, comment="Mark for the question")
     industry: Mapped[Industry] = mapped_column(SAEnum(Industry, name="industry_enum"), nullable=False, comment="Industry/subject area of the question")
     qtype: Mapped[QuestionType] = mapped_column(SAEnum(QuestionType, name="question_type_enum", create_type=True), nullable=False, default=QuestionType.THEORY, comment="Question type: multiple_choice|theory|fill_in_blanks")
     options: Mapped[list] = mapped_column(JSON, nullable=True, comment='Options JSON list, e.g. [{"label":"a","text":"Option A"}]')

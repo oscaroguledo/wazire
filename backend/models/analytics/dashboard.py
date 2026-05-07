@@ -1,8 +1,7 @@
-from __future__ import annotations
-
 import uuid
 from decimal import Decimal
 from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import ForeignKey, Index, func, Integer, DateTime, Numeric
 from sqlalchemy.orm import Mapped, mapped_column
@@ -171,7 +170,7 @@ class StudentDashboard(Base):
     total_submissions: Mapped[int] = mapped_column(Integer, nullable=False, default=0, comment="Total submissions made")
     graded_submissions: Mapped[int] = mapped_column(Integer, nullable=False, default=0, comment="Submissions with graded status")
     pending_submissions: Mapped[int] = mapped_column(Integer, nullable=False, default=0, comment="Submissions with pending/submitted status")
-    average_score: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True, comment="Average score across all graded submissions")
+    average_score: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True, comment="Average score across all graded submissions")
     
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), comment="Creation timestamp (timezone-aware)")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), comment="Last update timestamp (timezone-aware)")

@@ -309,7 +309,7 @@ def test_answer_route_uses_patch_not_put():
     Expected: Route uses @router.patch() and emits a Kafka event.
     On unfixed code: FAILS — PUT method found, no Kafka emit.
     """
-    tree = _parse_file("routes", "academic", "answer.py")
+    tree = _parse_file("routes", "academic", "answers.py")
 
     issues = []
 

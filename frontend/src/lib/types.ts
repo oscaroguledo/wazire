@@ -5,19 +5,17 @@ export interface User {
   id: string;
   email: string;
   first_name: string;
-  middle_name?: string | null;
+  middle_name: string | null;
   last_name: string;
   role: UserRole;
   is_active: boolean;
+  is_locked: boolean;
   tenant_id: string | null;
   institution_id: string | null;
   created_at: string;
   updated_at: string;
-  // Frontend-only computed fields
-  name?: string;
-  tenant_name?: string | null;
-  logo_url?: string | null;
-  avatar?: string;
+  created_by: string | null;
+  updated_by: string | null;
 }
 
 // 13.7: Updated InvoiceStatus to match backend enum (pending/paid/overdue/cancelled)
@@ -94,25 +92,29 @@ export interface Course {
   name: string;
   description: string | null;
   course_code: string;
-  lecturer: User | null;
-  tenant_id: string | null;
+  tenant_id: string;
+  semester_id: string | null;
   created_at: string;
   updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
 }
 
 export type EnrollmentStatus = 'active' | 'completed' | 'dropped' | 'pending';
 export type Semester = 'fall' | 'spring' | 'summer';
 
-// 13.7: Replaced student: User / course: Course with student_id / course_id
 export interface Enrollment {
   id: string;
   student_id: string;
   course_id: string;
-  semester: Semester;
+  semester_id: string | null;
   year: number;
   status: EnrollmentStatus;
+  tenant_id: string;
   created_at: string;
   updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
 }
 
 export type QuestionType = 'multiple_choice' | 'theory' | 'fill_in_blanks';
@@ -169,83 +171,83 @@ export interface Exam {
   questions?: Question[];
 }
 
-// 13.7: Removed attempt_number and scan_pages; id is the attempt identifier
 export interface SubmissionAttempt {
   id: string;
   submission_id: string;
+  attempt_number: number;
   score: string | null;
-  graded_at: string | null;
+  scan_pages: Record<string, any> | null;
   grading_started_at: string | null;
+  graded_at: string | null;
   created_at: string;
-  // Frontend-specific fields
-  answers?: Record<string, any>;
 }
 
-// 13.7: Renamed attempts_count → attempts; added submitted_at
 export interface Submission {
   id: string;
   student_id: string;
   exam_id: string;
+  tenant_id: string;
+  semester_id: string | null;
   latest_score: string | null;
   attempts: number;
+  status: 'pending' | 'submitted' | 'graded';
   submitted_at: string | null;
   graded_at: string | null;
   created_at: string;
   updated_at: string;
-  // Frontend-specific fields (added by enrichment in routes)
-  student_name?: string;
-  exam_title?: string;
-  course_id?: string;
-  status?: string;
-  submission_attempts?: SubmissionAttempt[];
 }
 
 export interface LecturerDashboard {
   id: string;
   lecturer_id: string;
+  tenant_id: string;
   total_courses: number;
-  total_exams: number;
+  active_courses: number;
   total_students: number;
+  total_exams: number;
   pending_submissions: number;
   graded_submissions: number;
-  active_courses: number;
   created_at: string;
   updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
 }
 
-// 13.7: Renamed total_graded_submissions/total_pending_submissions → graded_submissions/pending_submissions
 export interface AdminDashboard {
   id: string;
   tenant_id: string;
   total_users: number;
-  total_lecturers: number;
   total_students: number;
+  total_lecturers: number;
   total_courses: number;
   total_exams: number;
   total_submissions: number;
-  graded_submissions: number;
   pending_submissions: number;
+  graded_submissions: number;
   created_at: string;
   updated_at: string;
-  // Frontend-only field
-  admin?: User;
+  created_by: string | null;
+  updated_by: string | null;
 }
 
-// 13.7: Renamed total_graded/pending; added active_courses and completed_courses
 export interface StudentDashboard {
   id: string;
   student_id: string;
+  tenant_id: string;
   total_courses: number;
+  active_courses: number;
+  completed_courses: number;
   total_exams: number;
+  upcoming_exams: number;
+  missed_exams: number;
   total_submissions: number;
   graded_submissions: number;
   pending_submissions: number;
-  active_courses: number;
-  completed_courses: number;
-  missed_exams: number;
-  upcoming_exams: number;
+  average_score: number | null;
   created_at: string;
   updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
 }
 
 export interface DashboardStats {

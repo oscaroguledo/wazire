@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import resourceCache from '@/lib/resourceCache';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FileText, Clock, Edit, Eye, Play, CheckCircle, Calendar } from 'lucide-react';
@@ -20,6 +21,7 @@ export function ExamDetail() {
   
   // exam data loaded from API
   const [exam, setExam] = useState<any | null>(null);
+  const [courseName, setCourseName] = useState<string | null>(null);
   const [questionCount, setQuestionCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [hasSubmission, setHasSubmission] = useState(false);
@@ -51,6 +53,14 @@ export function ExamDetail() {
           setQuestionCount(questionData.length)
           // Use submission_count from exam data
           setSubmissionCount(examRes.submission_count || 0)
+        }
+
+        if (mounted && examRes?.course_id) {
+          resourceCache.getCourseName(examRes.course_id)
+            .then(name => { if (mounted) setCourseName(name) })
+            .catch(() => { if (mounted) setCourseName(`Course ${examRes.course_id}`) })
+        } else if (mounted) {
+          setCourseName(null)
         }
 
         // Check if student has already submitted (only for students)
@@ -118,7 +128,7 @@ export function ExamDetail() {
               <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-[var(--color-text-primary)] truncate">{exam.title}</h1>
               <StatusBadge status={exam.status} />
             </div>
-            <p className="text-sm sm:text-base text-[var(--color-text-secondary)] truncate">{exam.course_name}</p>
+            <p className="text-sm sm:text-base text-[var(--color-text-secondary)] truncate">{courseName || (exam.course_id ? `Course ${exam.course_id}` : '')}</p>
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
             {user?.role === 'student' ? (

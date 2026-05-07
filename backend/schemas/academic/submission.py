@@ -53,3 +53,19 @@ class SubmissionAttemptRead(BaseModel):
 
 class SubmissionDelete(BaseModel):
     id: UUID
+
+
+class ExamSubmit(BaseModel):
+    """Request body for submitting an exam."""
+    model_config = ConfigDict(from_attributes=True)
+    exam_id: UUID
+    answers: Optional[List[Dict[str, Any]]] = None
+
+
+class ExamSubmitResponse(BaseModel):
+    """Response after submitting an exam."""
+    model_config = ConfigDict(from_attributes=True)
+    submission_id: UUID
+    status: str
+    message: str
+    submitted_at: Optional[datetime] = None

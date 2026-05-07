@@ -60,5 +60,48 @@ class EnrollmentRead(EnrollmentBase):
     updated_at: datetime
 
 
+# Alias for API responses
+EnrollmentResponse = EnrollmentRead
+
+
+class EnrollmentListParams(BaseModel):
+    """Query parameters for listing enrollments."""
+    course_id: Optional[UUID] = None
+    student_id: Optional[UUID] = None
+    status: Optional[EnrollmentStatus] = None
+    semester: Optional[Semester] = None
+    year: Optional[int] = None
+    page: int = Field(1, ge=1)
+    page_size: int = Field(20, ge=1, le=100)
+
+
+class BulkEnrollmentRequest(BaseModel):
+    """Request body for bulk enrollment."""
+    course_id: UUID
+    student_ids: List[UUID]
+    semester: Semester
+    year: Optional[int] = Field(None, ge=2020, le=2100)
+
+
+class EnrollmentCheckRequest(BaseModel):
+    """Request to check if a student is enrolled in a course."""
+    student_id: UUID
+    course_id: UUID
+
+
+class EnrollmentCheckResponse(BaseModel):
+    """Response for enrollment check."""
+    is_enrolled: bool
+    enrollment: Optional[EnrollmentRead] = None
+
+
+class EnrollmentListResponse(BaseModel):
+    """Paginated list of enrollments."""
+    data: List[EnrollmentRead]
+    total: int
+    page: int
+    page_size: int
+
+
 class EnrollmentDelete(BaseModel):
     id: UUID

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import uuid
 from decimal import Decimal
 from datetime import datetime, timedelta
@@ -61,7 +59,7 @@ class Exam(Base):
     description: Mapped[str] = mapped_column(String(2000), nullable=True, comment="Exam description")
     start_time: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, comment="Exam start time (timezone-aware)")
     end_time: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, comment="Exam end time: start_time + duration (persisted)")
-    duration: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, comment="Duration in hours (decimal)")
+    duration: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False, comment="Duration in hours (decimal)")
     total_marks: Mapped[int] = mapped_column(Integer, nullable=True, comment="Total marks for the exam")
     passing_marks: Mapped[int] = mapped_column(Integer, nullable=True, comment="Passing marks for the exam")
     status: Mapped[ExamStatus] = mapped_column(SQLEnum(ExamStatus, name="exam_status", create_type=True), nullable=True, default=ExamStatus.NOT_STARTED, comment="Exam status: not_started, in_progress, finished")

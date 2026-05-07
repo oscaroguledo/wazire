@@ -25,6 +25,7 @@ import * as submissionApi from '@/apis/submission';
 import answerApi from '@/apis/answer';
 import type { ExamQuestion } from '@/apis/exam';
 import { formatDuration } from '@/utils/formatDuration';
+import resourceCache from '@/lib/resourceCache'
 import Breadcrumbs from '@/components/Breadcrumbs';
 import TakeExamSkeleton from '@/pages/TakeExamSkeleton';
 
@@ -37,6 +38,7 @@ export function TakeExam() {
   const isActiveExam = location.pathname.endsWith('/active');
   
   const [exam, setExam] = useState<any | null>(null);
+  const [courseName, setCourseName] = useState<string | null>(null);
   const [questions, setQuestions] = useState<any[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, any>>({});
@@ -110,6 +112,15 @@ export function TakeExam() {
           ((examData?.duration_minutes || 0) * 60)
         );
         setTotalDuration(totalSecs);
+
+        // Fetch course name if exam references a course id
+        if (examData?.course_id) {
+          resourceCache.getCourseName(examData.course_id)
+            .then(name => setCourseName(name))
+            .catch(() => setCourseName(`Course ${examData.course_id}`))
+        } else {
+          setCourseName(null)
+        }
 
         if (totalSecs > 0) {
           // Prefer backend end_time for authoritative deadline (prevents client-clock cheating)
@@ -460,7 +471,7 @@ export function TakeExam() {
                 
                 <div className="text-center">
                   <h1 className="text-xl font-bold mb-1 tracking-tight">{exam.title}</h1>
-                  <p className="text-base text-white/90 font-medium">{exam.course_name || 'General Course'}</p>
+                  <p className="text-base text-white/90 font-medium">{courseName || (exam.course_id ? `Course ${exam.course_id}` : 'General Course')}</p>
                   {exam.description && (
                     <p className="text-white/70 mt-2 max-w-xl mx-auto text-sm line-clamp-2">{exam.description}</p>
                   )}
@@ -598,7 +609,7 @@ export function TakeExam() {
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="flex-1">
             <h1 className="text-2xl lg:text-3xl font-bold text-[var(--color-text-primary)] mb-2">{exam.title}</h1>
-            <p className="text-[var(--color-text-secondary)] font-medium">{exam.course_name}</p>
+            <p className="text-[var(--color-text-secondary)] font-medium">{exam.course_id ? `Course ${exam.course_id}` : ''}</p>
           </div>
           
           {/* Timer Display */}

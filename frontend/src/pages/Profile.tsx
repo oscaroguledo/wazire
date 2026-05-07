@@ -90,11 +90,11 @@ export default function ProfilePage() {
         const data = (res as any)?.user || res
         if (!mounted) return
         setEmail(data?.email || '')
-        setFirstName(data?.first_name || data?.firstName || '')
+        setFirstName(data?.first_name || '')
         setMiddleName(data?.middle_name || '')
-        setLastName(data?.last_name || data?.lastName || '')
+        setLastName(data?.last_name || '')
         setRole(data?.role || '')
-        setJoinedDate(data?.created_at || data?.joined_at || null)
+        setJoinedDate(data?.created_at || null)
       })
       .catch((e: unknown) => {
         if (e instanceof Error) {

@@ -1,0 +1,56 @@
+codecov:
+  # Require the Codecov token to be set in CI secrets
+  require_ci_to_pass: true
+  notify:
+    wait_for_ci: true
+
+coverage:
+  # Overall project coverage threshold: 90%
+  status:
+    project:
+      default:
+        target: 90%
+        threshold: 1%
+        if_not_found: success
+        if_ci_failed: error
+    patch:
+      default:
+        target: 90%
+        threshold: 1%
+        if_not_found: success
+        if_ci_failed: error
+
+  # Per-flag thresholds for backend and frontend
+  flags:
+    backend:
+      paths:
+        - backend/
+      carryforward: false
+    frontend:
+      paths:
+        - frontend/src/
+      carryforward: false
+
+# Aggregate both backend and frontend reports
+flag_management:
+  default_rules:
+    carryforward: false
+
+comment:
+  layout: "reach,diff,flags,files"
+  behavior: default
+  require_changes: false
+  require_base: false
+  require_head: true
+
+ignore:
+  - "backend/alembic/**"
+  - "backend/seed_db.py"
+  - "backend/tests/**"
+  - "frontend/src/test-setup.ts"
+  - "frontend/src/mocks/**"
+  - "frontend/src/vite-env.d.ts"
+  - "**/__pycache__/**"
+  - "**/.venv/**"
+  - "**/node_modules/**"
+  - "**/dist/**"

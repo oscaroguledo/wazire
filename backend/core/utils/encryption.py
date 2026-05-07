@@ -88,13 +88,13 @@ class EncryptionService:
 	def decrypt_aes(self, token_b64: str, associated_data: Optional[bytes] = None, *, key: Optional[bytes] = None) -> bytes:
 		if not _HAS_CRYPTO or AESGCM is None:
 			raise ImportError("cryptography is required for AES-GCM; install the 'cryptography' package")
+		k = key or self._aes_key
+		if k is None:
+			raise ValueError("AES key not provided; set in service or pass as `key`")
 		raw = base64.urlsafe_b64decode(token_b64.encode("ascii"))
 		nonce = raw[:12]
 		tag = raw[12:28]
 		ciphertext = raw[28:]
-		k = key or self._aes_key
-		if k is None:
-			raise ValueError("AES key not provided; set in service or pass as `key`")
 		aesgcm = AESGCM(k)
 		return aesgcm.decrypt(nonce, ciphertext + tag, associated_data)
 
