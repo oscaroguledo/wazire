@@ -103,6 +103,7 @@ from routes import health
 from routes.account import user, tenant
 from routes.academic import submission, course, exam, question, answer, enrollments
 from routes.analytics import dashboard
+from routes.billings import invoice as billings_invoice
 import uvicorn
 
 # API Version 1
@@ -116,6 +117,9 @@ app.include_router(question.router, prefix="/api/v1/academic")
 app.include_router(answer.router, prefix="/api/v1/academic")
 app.include_router(enrollments.router, prefix="/api/v1/academic")
 app.include_router(dashboard.router, prefix="/api/v1/analytics")
+
+# Billings routes
+app.include_router(billings_invoice.router, prefix="/api/v1")
 
 
 
