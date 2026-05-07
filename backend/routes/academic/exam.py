@@ -13,7 +13,7 @@ from core.utils.response import Response
 from core.utils.token import TokenService
 from core.middleware.auth import get_token_service, create_auth_dependency, require_lecturer_or_admin
 from services.academic.exam import ExamService
-from tasks.submission import refresh_dashboard_task
+from tasks.submission import emit_refresh_dashboard
 from schemas.academic.exam import ExamCreate, ExamUpdate
 from schemas.account.users import UserRead
 from models.account.users import UserRole
@@ -57,7 +57,7 @@ async def create_exam(
         course_result = await service.db.execute(course_stmt)
         course = course_result.scalar_one_or_none()
         if course and course.lecturer_id:
-            refresh_dashboard_task.delay(str(course.lecturer_id))
+            emit_refresh_dashboard(str(course.lecturer_id))
 
     return Response(success=True, message="Exam created", data=exam.to_dict(), request=request, status_code=status.HTTP_201_CREATED)
 
@@ -215,13 +215,13 @@ async def update_exam(
         old_course_result = await service.db.execute(old_course_stmt)
         old_course = old_course_result.scalar_one_or_none()
         if old_course and old_course.lecturer_id:
-            refresh_dashboard_task.delay(str(old_course.lecturer_id))
+            emit_refresh_dashboard(str(old_course.lecturer_id))
     if updated.course_id:
         new_course_stmt = select(Course).where(Course.id == updated.course_id)
         new_course_result = await service.db.execute(new_course_stmt)
         new_course = new_course_result.scalar_one_or_none()
         if new_course and new_course.lecturer_id:
-            refresh_dashboard_task.delay(str(new_course.lecturer_id))
+            emit_refresh_dashboard(str(new_course.lecturer_id))
 
     return Response(success=True, message="Exam updated", data=updated.to_dict(), request=request)
 
@@ -249,6 +249,6 @@ async def delete_exam(
         course_result = await service.db.execute(course_stmt)
         course = course_result.scalar_one_or_none()
         if course and course.lecturer_id:
-            refresh_dashboard_task.delay(str(course.lecturer_id))
+            emit_refresh_dashboard(str(course.lecturer_id))
     
     return Response(success=True, message="Exam deleted", request=request, status_code=status.HTTP_204_NO_CONTENT)

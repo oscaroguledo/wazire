@@ -13,6 +13,7 @@ from core.utils.logger import logger
 from core.middleware.rate_limit import limiter, rate_limit_exceeded_handler
 from core.middleware.error_handler import setup_error_handlers
 from slowapi.errors import RateLimitExceeded
+from core.utils.kafka import producer_service, consumer_service
 
 settings = get_settings()
 
@@ -28,10 +29,22 @@ async def lifespan(app: FastAPI):
 	# Startup actions
 	logger.info("Wazire backend starting up...")
 
-	# Yield control to the application runtime
-	yield
+	# Start pooled Kafka producer (used by tasks/dispatcher)
+	try:
+		await producer_service.start()
+	except Exception:
+		logger.exception("Failed to start Kafka producer")
+
+	
 
 	# Shutdown actions
+	logger.info("Stopping Kafka producer...")
+	
+	try:
+		await producer_service.stop()
+	except Exception:
+		logger.exception("Error stopping Kafka producer")
+
 	logger.info("Closing database connections...")
 	await close_db()
 	logger.info("Wazire backend has been shut down.")

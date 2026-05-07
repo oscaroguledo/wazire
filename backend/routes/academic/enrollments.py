@@ -18,7 +18,7 @@ from schemas.academic.enrollment import (
 )
 from core.middleware.auth import get_token_service, create_auth_dependency, require_lecturer_or_admin
 from services.academic.enrollment import EnrollmentService
-from tasks.submission import refresh_dashboard_task
+from tasks.submission import emit_refresh_dashboard
 import traceback
 
 router = APIRouter(prefix="/enrollment", tags=["enrollment"])
@@ -30,8 +30,8 @@ async def list_enrollment(
     page: int = Query(1, ge=1),
     per_page: int = Query(10, ge=1, le=100),
     search: Optional[str] = Query(None),
-    student_id: Optional[str] = Query(None),
-    course_id: Optional[str] = Query(None),
+    student_id: Optional[uuid.UUID] = Query(None),
+    course_id: Optional[uuid.UUID] = Query(None),
     lecturer_id: Optional[uuid.UUID] = Query(None),
     enrollment_status: Optional[EnrollmentStatus] = Query(None),
     semester: Optional[Semester] = Query(None),
@@ -42,7 +42,7 @@ async def list_enrollment(
         service = EnrollmentService(db)
         tenant_id = None if current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else current_user.tenant_id
         params = EnrollmentListParams(page=page, per_page=per_page, search=search, student_id=student_id, course_id=course_id, lecturer_id=lecturer_id, status=enrollment_status, semester=semester)
-        items, total = await service.list_enrollments(params, tenant_id=tenant_id)
+        items, total = await service.list(params, tenant_id=tenant_id)
         return Response(success=True, data=[i.to_dict() for i in items], page=page, per_page=per_page, total=total, request=request)
     except Exception as e:
         logger.error(f"list_enrollments error: {e}\n{traceback.format_exc()}")
@@ -59,10 +59,10 @@ async def check_enrollment(
 ):
     service = EnrollmentService(db)
     tenant_id = None if current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else current_user.tenant_id
-    if current_user.role == UserRole.STUDENT and str(current_user.id) != str(student_id):
+    if current_user.role == UserRole.STUDENT and current_user.id != student_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Can only check your own enrollment status")
     try:
-        result = await service.check_enrollment(student_id, course_id, tenant_id=tenant_id)
+        result = await service.check(student_id, course_id, tenant_id=tenant_id)
         return Response(success=True, data=result.to_dict(), request=request)
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
@@ -81,11 +81,11 @@ async def get_student_enrollments(
 ):
     service = EnrollmentService(db)
     tenant_id = None if current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else current_user.tenant_id
-    if current_user.role == UserRole.STUDENT and str(current_user.id) != str(student_id):
+    if current_user.role == UserRole.STUDENT and current_user.id != student_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Can only access your own enrollments")
-    params = EnrollmentListParams(page=page, per_page=per_page, search=search, student_id=str(student_id), status=enrollment_status)
+    params = EnrollmentListParams(page=page, per_page=per_page, search=search, student_id=student_id, status=enrollment_status)
     try:
-        items, total = await service.list_enrollments(params, tenant_id=tenant_id)
+        items, total = await service.list(params, tenant_id=tenant_id)
         return Response(success=True, data=[i.to_dict() for i in items], page=page, per_page=per_page, total=total, request=request)
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
@@ -106,9 +106,9 @@ async def get_course_enrollments(
 ):
     service = EnrollmentService(db)
     tenant_id = None if current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else current_user.tenant_id
-    params = EnrollmentListParams(page=page, per_page=per_page, search=search, course_id=str(course_id), status=enrollment_status, semester=semester, year=year)
+    params = EnrollmentListParams(page=page, per_page=per_page, search=search, course_id=course_id, status=enrollment_status, semester=semester, year=year)
     try:
-        items, total = await service.list_enrollments(params, tenant_id=tenant_id)
+        items, total = await service.list(params, tenant_id=tenant_id)
         return Response(success=True, data=[i.to_dict() for i in items], page=page, per_page=per_page, total=total, request=request)
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
@@ -131,7 +131,7 @@ async def get_lecturer_enrollments(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Can only access your own course enrollments")
     params = EnrollmentListParams(page=page, per_page=per_page, search=search, lecturer_id=lecturer_id, status=enrollment_status)
     try:
-        items, total = await service.list_enrollments(params, tenant_id=tenant_id)
+        items, total = await service.list(params, tenant_id=tenant_id)
         return Response(success=True, data=[i.to_dict() for i in items], page=page, per_page=per_page, total=total, request=request)
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
@@ -145,12 +145,12 @@ async def get_enrollment(
     current_user: User = Depends(create_auth_dependency(get_token_service())),
 ):
     service = EnrollmentService(db)
-        tenant_id = None if current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else current_user.tenant_id
+    tenant_id = None if current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else current_user.tenant_id
     try:
-        enrollment = await service.get_enrollment(enrollment_id, tenant_id=tenant_id)
-        if current_user.role == UserRole.STUDENT and str(enrollment.student_id) != str(current_user.id):
+        enrollment = await service.get(enrollment_id, tenant_id=tenant_id)
+        if current_user.role == UserRole.STUDENT and enrollment.student_id != current_user.id:
             raise ForbiddenError("Can only access your own enrollments")
-        elif current_user.role == UserRole.LECTURER and str(enrollment.course.lecturer_id) != str(current_user.id):
+        elif current_user.role == UserRole.LECTURER and enrollment.course.lecturer_id != current_user.id:
             raise ForbiddenError("Can only access enrollments for your courses")
         return Response(success=True, data=enrollment.to_dict(), request=request)
     except ValueError as e:
@@ -167,14 +167,14 @@ async def enroll_student(
     current_user: User = Depends(require_lecturer_or_admin(get_token_service())),
 ):
     service = EnrollmentService(db)
-        tenant_id = None if current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else current_user.tenant_id
+    tenant_id = None if current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else current_user.tenant_id
     try:
-        enrollment = await service.enroll_student(enrollment_data, current_user, tenant_id=tenant_id)
-        refresh_dashboard_task.delay(str(enrollment_data.student_id))
+        enrollment = await service.create(enrollment_data, current_user, tenant_id=tenant_id)
+        emit_refresh_dashboard(str(enrollment_data.student_id))
         course_result = await db.execute(select(Course).where(Course.id == enrollment_data.course_id))
         course = course_result.scalar_one_or_none()
         if course and course.lecturer_id:
-            refresh_dashboard_task.delay(str(course.lecturer_id))
+            emit_refresh_dashboard(str(course.lecturer_id))
         return Response(success=True, data=enrollment.to_dict(), request=request, status_code=status.HTTP_201_CREATED)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
@@ -191,14 +191,14 @@ async def update_enrollment(
     current_user: User = Depends(create_auth_dependency(get_token_service())),
 ):
     service = EnrollmentService(db)
-        tenant_id = None if current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else current_user.tenant_id
+    tenant_id = None if current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else current_user.tenant_id
     try:
-        existing = await service.get_enrollment(enrollment_id, tenant_id=tenant_id)
-        if current_user.role == UserRole.STUDENT and str(existing.student_id) != str(current_user.id):
+        existing = await service.get(enrollment_id, tenant_id=tenant_id)
+        if current_user.role == UserRole.STUDENT and existing.student_id != current_user.id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Can only update your own enrollments")
-        elif current_user.role == UserRole.LECTURER and str(existing.course.lecturer_id) != str(current_user.id):
+        elif current_user.role == UserRole.LECTURER and existing.course.lecturer_id != current_user.id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Can only update enrollments for your courses")
-        enrollment = await service.update_enrollment(enrollment_id, enrollment_data, tenant_id=tenant_id)
+        enrollment = await service.update(enrollment_id, enrollment_data, tenant_id=tenant_id)
         return Response(success=True, data=enrollment.to_dict(), request=request)
     except HTTPException:
         raise
@@ -219,11 +219,11 @@ async def remove_enrollment(
     try:
         enrollment_result = await db.execute(select(Enrollment).where(Enrollment.id == enrollment_id))
         enrollment = enrollment_result.scalar_one_or_none()
-        await service.remove_enrollment(enrollment_id, current_user, tenant_id=tenant_id)
+        await service.remove(enrollment_id, current_user, tenant_id=tenant_id)
         if enrollment:
-            refresh_dashboard_task.delay(str(enrollment.student_id))
+            emit_refresh_dashboard(str(enrollment.student_id))
             if enrollment.course and enrollment.course.lecturer_id:
-                refresh_dashboard_task.delay(str(enrollment.course.lecturer_id))
+                emit_refresh_dashboard(str(enrollment.course.lecturer_id))
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
@@ -244,7 +244,7 @@ async def bulk_enroll_students(
     service = EnrollmentService(db)
     tenant_id = None if current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else current_user.tenant_id
     try:
-        enrollments = await service.bulk_enroll(bulk_request.enrollments, current_user, tenant_id=tenant_id)
+        enrollments = await service.bulk_create(bulk_request.enrollments, current_user, tenant_id=tenant_id)
         return Response(success=True, data=[e.to_dict() for e in enrollments], request=request, status_code=status.HTTP_201_CREATED)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

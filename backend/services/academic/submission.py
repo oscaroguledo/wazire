@@ -109,59 +109,81 @@ class SubmissionService:
     # Queries
     # ------------------------------------------------------------------
 
-    async def get(self, submission_id: UUID, tenant_id: Optional[UUID] = None) -> Optional[SubmissionModel]:
-        stmt = select(SubmissionModel).options(
-            selectinload(SubmissionModel.exam).selectinload(ExamModel.course).selectinload(CourseModel.lecturer),
-            selectinload(SubmissionModel.student)
-        ).where(SubmissionModel.id == submission_id)
-        if tenant_id:
-            stmt = stmt.join(ExamModel, ExamModel.id == SubmissionModel.exam_id).where(ExamModel.tenant_id == tenant_id)
-        return (await self.db.execute(stmt)).scalar_one_or_none()
+    async def get(
+        self,
+        submission_id: Optional[UUID] = None,
+        tenant_id: Optional[UUID] = None,
+        student_id: Optional[UUID] = None,
+        exam_id: Optional[UUID] = None,
+    ) -> Optional[SubmissionModel]:
+        """Get a submission by `submission_id` or by `(student_id, exam_id)`.
+
+        Provide either `submission_id` (preferred) or both `student_id` and
+        `exam_id`. `tenant_id` applies when resolving by `submission_id`.
+        """
+        if submission_id is not None:
+            stmt = select(SubmissionModel).options(
+                selectinload(SubmissionModel.exam).selectinload(ExamModel.course).selectinload(CourseModel.lecturer),
+                selectinload(SubmissionModel.student)
+            ).where(SubmissionModel.id == submission_id)
+            if tenant_id:
+                stmt = stmt.join(ExamModel, ExamModel.id == SubmissionModel.exam_id).where(ExamModel.tenant_id == tenant_id)
+            return (await self.db.execute(stmt)).scalar_one_or_none()
+
+        if student_id is not None and exam_id is not None:
+            return await self._get_by_student_exam(student_id, exam_id)
+
+        raise ValueError("Either submission_id or (student_id and exam_id) must be provided")
 
     async def get_my_submission(self, student_id: UUID, exam_id: UUID) -> Optional[SubmissionModel]:
-        return await self._get_by_student_exam(student_id, exam_id)
+        return await self.get(student_id=student_id, exam_id=exam_id)
 
-    async def get_all_my_submissions(self, student_id: UUID, tenant_id: Optional[UUID] = None) -> List[SubmissionModel]:
-        """Get all submissions for a specific student across all exams."""
-        stmt = select(SubmissionModel).options(
-            selectinload(SubmissionModel.exam).selectinload(ExamModel.course)
-        ).where(SubmissionModel.student_id == student_id)
-        if tenant_id:
-            stmt = stmt.join(ExamModel, ExamModel.id == SubmissionModel.exam_id).where(ExamModel.tenant_id == tenant_id)
-        stmt = stmt.order_by(SubmissionModel.created_at.desc())
-
-        result = await self.db.execute(stmt)
-        return result.scalars().all()
-
-    async def list_for_exam(
+    async def list(
         self,
-        exam_id: UUID,
+        student_id: Optional[UUID] = None,
+        exam_id: Optional[UUID] = None,
         tenant_id: Optional[UUID] = None,
         status: Optional[str] = None,
         limit: int = 50,
         offset: int = 0,
     ) -> List[SubmissionModel]:
-        """List submissions for an exam with limit/offset pagination."""
+        """Unified listing for submissions.
+
+        - If `student_id` is provided and `limit==0`, returns all submissions for the student.
+        - If `exam_id` is provided, returns submissions for that exam with pagination.
+        - `tenant_id` is applied when joining to Exam for tenant scoping.
+        """
         stmt = select(SubmissionModel).options(
             selectinload(SubmissionModel.exam).selectinload(ExamModel.course),
-            selectinload(SubmissionModel.student)
-        ).where(
-            SubmissionModel.exam_id == exam_id
-        ).order_by(SubmissionModel.created_at.desc()).offset(offset).limit(limit)
+            selectinload(SubmissionModel.student),
+        )
+
+        if student_id is not None:
+            stmt = stmt.where(SubmissionModel.student_id == student_id)
+        elif exam_id is not None:
+            stmt = stmt.where(SubmissionModel.exam_id == exam_id)
+        else:
+            # No filter provided — return empty list to avoid accidental full scan
+            return []
 
         if tenant_id:
             stmt = stmt.join(ExamModel, ExamModel.id == SubmissionModel.exam_id).where(ExamModel.tenant_id == tenant_id)
-        
+
         if status:
             if status == "graded":
                 stmt = stmt.where(SubmissionModel.latest_score.isnot(None))
             elif status == "pending":
                 stmt = stmt.where(SubmissionModel.latest_score.is_(None))
 
-        items = (await self.db.execute(stmt)).scalars().all()
-        return list(items)
+        stmt = stmt.order_by(SubmissionModel.created_at.desc())
 
-    async def list_students_with_submissions(
+        if limit and limit > 0:
+            stmt = stmt.offset(offset).limit(limit)
+
+        result = await self.db.execute(stmt)
+        return result.scalars().all()
+
+    async def list_students(
         self,
         exam_id: UUID,
         tenant_id: Optional[UUID] = None,
@@ -384,11 +406,11 @@ class SubmissionService:
         return total_score.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP), graded_answers
 
     # ------------------------------------------------------------------
-    # Background helpers (run by Celery tasks)
+    # Background helpers (run by background worker / Kafka)
     # ------------------------------------------------------------------
 
     async def grade_attempt_background(self, attempt_id: str, exam_id: str) -> None:
-        """Grade an attempt in the background (used by Celery tasks)."""
+        """Grade an attempt in the background (used by background worker / Kafka)."""
         from core.database import get_db
 
         async with get_db() as db:
@@ -437,9 +459,8 @@ class SubmissionService:
             
             # Refresh dashboards after grading
             if submission:
-                # Import locally to avoid circular import at module import time
-                from tasks.submission import refresh_dashboard_task
-                refresh_dashboard_task.delay(str(submission.student_id))
+                from tasks.submission import emit_refresh_dashboard
+                emit_refresh_dashboard(str(submission.student_id))
                 # Get exam to find lecturer for dashboard refresh
                 exam_result = await db.execute(select(ExamModel).where(ExamModel.id == UUID(exam_id)))
                 exam = exam_result.scalar_one_or_none()
@@ -447,7 +468,7 @@ class SubmissionService:
                     course_result = await db.execute(select(CourseModel).where(CourseModel.id == exam.course_id))
                     course = course_result.scalar_one_or_none()
                     if course and course.lecturer_id:
-                        refresh_dashboard_task.delay(str(course.lecturer_id))
+                        emit_refresh_dashboard(str(course.lecturer_id))
 
     async def list_for_lecturer(
         self,

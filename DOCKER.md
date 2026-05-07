@@ -224,8 +224,9 @@ The application consists of the following containers:
 - **postgres**: PostgreSQL database (port 5432)
 - **redis**: Redis cache (port 6379)
 - **backend**: FastAPI backend (port 8000)
-- **celery-worker**: Background task processor
-- **celery-beat**: Scheduled task scheduler
+- **backend**: FastAPI backend (port 8000)
+- **background worker**: Kafka consumer-based worker (processes tenant-tasks)
+- **scheduler**: APScheduler-based scheduler publishing Kafka events
 - **frontend**: React frontend (port 5173)
 
 ## Environment Variables

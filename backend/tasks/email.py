@@ -1,23 +1,27 @@
+"""Kafka event handler for outbound email."""
 from __future__ import annotations
 
 from typing import Any, Dict
 
-from celery.utils.log import get_task_logger
-
-from celery_app import celery_app
-
-logger = get_task_logger(__name__)
+from core.utils.logger import logger
 
 
-@celery_app.task(name="tasks.email.send_email_task")
-def send_email_task(to_email: str, subject: str, body: str) -> Dict[str, Any]:
-    """Queueable email sender task (stub)."""
-    logger.info("Email queued to=%s subject=%s", to_email, subject)
-    return {"queued": True, "to_email": to_email, "subject": subject}
+async def handle_send_email(data: Dict[str, Any]) -> None:
+    """Send a transactional email.
 
+    Expected data keys: to, subject, body
+    """
+    to = data.get("to")
+    subject = data.get("subject", "(no subject)")
+    body = data.get("body", "")
 
-@celery_app.task(name="tasks.email.send_queued_emails_task")
-def send_queued_emails_task() -> Dict[str, Any]:
-    """Periodic email scheduler task."""
-    logger.info("Periodic email scheduler tick")
-    return {"processed": 0}
+    if not to:
+        logger.warning("SEND_EMAIL: missing recipient — data=%s", data)
+        return
+
+    try:
+        # TODO: replace with real SMTP / SES / SendGrid integration
+        logger.info("Sending email to=%s subject=%s", to, subject)
+    except Exception:
+        logger.exception("SEND_EMAIL failed (to=%s)", to)
+        raise

@@ -6,7 +6,6 @@ from core.utils.logger import logger
 from core.utils.response import Response
 from core.database import get_db
 from core.config import get_settings
-from core.utils.celery_monitor import CeleryMonitor
 
 router = APIRouter()
 
@@ -77,57 +76,3 @@ async def health(request: Request):
     )
 
 
-@router.get("/celery/status")
-async def celery_status(request: Request):
-    """Get Celery worker and task monitoring status."""
-    try:
-        from celery_app import celery_app
-        monitor = CeleryMonitor(celery_app)
-        
-        active_tasks = monitor.get_active_tasks()
-        scheduled_tasks = monitor.get_scheduled_tasks()
-        worker_stats = monitor.get_worker_stats()
-        
-        return Response(
-            success=True,
-            message="Celery status retrieved",
-            data={
-                "active_tasks": active_tasks,
-                "scheduled_tasks": scheduled_tasks,
-                "worker_stats": worker_stats,
-            },
-            request=request
-        )
-    except Exception as e:
-        logger.error(f"Failed to get Celery status: {e}")
-        return Response(
-            success=False,
-            error=f"Failed to retrieve Celery status: {str(e)}",
-            request=request,
-            status_code=500
-        )
-
-
-@router.get("/celery/task/{task_id}")
-async def get_task_status(task_id: str, request: Request):
-    """Get status of a specific Celery task."""
-    try:
-        from celery_app import celery_app
-        monitor = CeleryMonitor(celery_app)
-        
-        task_status = monitor.get_task_status(task_id)
-        
-        return Response(
-            success=True,
-            message="Task status retrieved",
-            data=task_status,
-            request=request
-        )
-    except Exception as e:
-        logger.error(f"Failed to get task status: {e}")
-        return Response(
-            success=False,
-            error=f"Failed to retrieve task status: {str(e)}",
-            request=request,
-            status_code=500
-        )

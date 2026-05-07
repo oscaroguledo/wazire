@@ -1,1 +1,1 @@
-"""Celery task modules for asynchronous and scheduled jobs."""
+"""Task modules for background jobs — use Kafka-based worker and scheduler."""

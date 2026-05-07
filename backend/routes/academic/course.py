@@ -10,10 +10,10 @@ from core.utils.response import Response
 from core.utils.token import TokenService
 from core.middleware.auth import get_token_service, create_auth_dependency, require_lecturer_or_admin
 from services.academic.course import CourseService
-from tasks.submission import refresh_dashboard_task
 from schemas.academic.course import CourseCreate, CourseUpdate
 from schemas.account.users import UserRead
 from models.account.users import UserRole
+from tasks.submission import emit_refresh_dashboard
 
 router = APIRouter(prefix="/courses", tags=["courses"])
 
@@ -49,9 +49,9 @@ async def create_course(
 
     course = await service.create(course_data, tenant_id=tenant_id)
     
-    # Refresh lecturer dashboard in background (enqueue Celery task)
+    # Refresh lecturer dashboard in background
     if course.lecturer_id:
-        refresh_dashboard_task.delay(str(course.lecturer_id))
+        emit_refresh_dashboard(str(course.lecturer_id))
     
     return Response(success=True, message="Course created", data=course.to_dict(), request=request, status_code=status.HTTP_201_CREATED)
 
@@ -129,11 +129,11 @@ async def update_course(
     
     updated = await service.update(course_model, course_in)
     
-    # Refresh dashboards in background (enqueue Celery tasks)
+    # Refresh dashboards in background
     if old_lecturer_id and old_lecturer_id != updated.lecturer_id:
-        refresh_dashboard_task.delay(str(old_lecturer_id))
+        emit_refresh_dashboard(str(old_lecturer_id))
     if updated.lecturer_id:
-        refresh_dashboard_task.delay(str(updated.lecturer_id))
+        emit_refresh_dashboard(str(updated.lecturer_id))
     
     return Response(success=True, message="Course updated", data=updated.to_dict(), request=request)
 
@@ -156,8 +156,8 @@ async def delete_course(
     
     await service.delete(course_model)
     
-    # Refresh lecturer dashboard in background (enqueue Celery task)
+    # Refresh lecturer dashboard in background
     if lecturer_id:
-        refresh_dashboard_task.delay(str(lecturer_id))
+        emit_refresh_dashboard(str(lecturer_id))
     
     return Response(success=True, message="Course deleted", request=request, status_code=status.HTTP_204_NO_CONTENT)

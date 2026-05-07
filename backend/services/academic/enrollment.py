@@ -16,15 +16,84 @@ from models.academic.course import Course as CourseModel
 class EnrollmentService:
     def __init__(self, db: AsyncSession):
         self.db = db
+    async def list(self, params: EnrollmentListParams, tenant_id: Optional[uuid.UUID] = None) -> Tuple[List[EnrollmentModel], int]:
+        """List enrollments with filtering and pagination.
 
-    async def list_enrollments(self, params: EnrollmentListParams, tenant_id: Optional[uuid.UUID] = None) -> Tuple[List[EnrollmentModel], int]:
-        """List enrollments with filtering and pagination."""
-        # Build base query with joins using select for async compatibility
+        Builds a reusable filters list (used for both count and data queries)
+        and normalizes schema inputs (ids, enums) similar to Tenant/User services.
+        """
         from sqlalchemy.orm import aliased
 
         lecturer_alias = aliased(User)
 
-        # Use select statement for async compatibility
+        # Build reusable filters
+        filters = []
+
+        # Tenant scope
+        if tenant_id:
+            filters.append(CourseModel.tenant_id == tenant_id)
+
+        # Normalize and apply IDs
+        if params.student_id:
+            try:
+                sid = uuid.UUID(str(params.student_id))
+                filters.append(EnrollmentModel.student_id == sid)
+            except Exception:
+                raise ValueError("Invalid student_id")
+
+        if params.course_id:
+            try:
+                cid = uuid.UUID(str(params.course_id))
+                filters.append(EnrollmentModel.course_id == cid)
+            except Exception:
+                raise ValueError("Invalid course_id")
+
+        if params.lecturer_id:
+            filters.append(CourseModel.lecturer_id == params.lecturer_id)
+
+        # Status (enum or string)
+        if params.status:
+            status_val = params.status.value if hasattr(params.status, "value") else str(params.status)
+            filters.append(EnrollmentModel.status == status_val)
+
+        # Semester (normalize to lowercase string)
+        if params.semester:
+            sem = params.semester.value if hasattr(params.semester, "value") else str(params.semester)
+            filters.append(EnrollmentModel.semester == sem.lower())
+
+        # Year filtering based on created_at
+        if params.year:
+            start_of_year = datetime(params.year, 1, 1, tzinfo=timezone.utc)
+            end_of_year = datetime(params.year, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
+            filters.append(EnrollmentModel.created_at >= start_of_year)
+            filters.append(EnrollmentModel.created_at <= end_of_year)
+
+        # Search across student and course fields
+        if params.search:
+            search_term = f"%{params.search}%"
+            filters.append(
+                or_(
+                    User.first_name.ilike(search_term),
+                    User.last_name.ilike(search_term),
+                    User.email.ilike(search_term),
+                    CourseModel.name.ilike(search_term),
+                    CourseModel.course_code.ilike(search_term),
+                )
+            )
+
+        # Efficient count using same filters
+        count_stmt = select(func.count(EnrollmentModel.id)).select_from(
+            select(EnrollmentModel)
+            .join(User, EnrollmentModel.student_id == User.id)
+            .join(CourseModel, EnrollmentModel.course_id == CourseModel.id)
+            .outerjoin(lecturer_alias, CourseModel.lecturer_id == lecturer_alias.id)
+            .where(*filters)
+            .subquery()
+        )
+        total = int((await self.db.execute(count_stmt)).scalar_one())
+
+        # Data query
+        offset_val = (params.page - 1) * params.per_page
         stmt = (
             select(EnrollmentModel)
             .join(User, EnrollmentModel.student_id == User.id)
@@ -32,74 +101,20 @@ class EnrollmentService:
             .outerjoin(lecturer_alias, CourseModel.lecturer_id == lecturer_alias.id)
             .options(
                 selectinload(EnrollmentModel.student),
-                selectinload(EnrollmentModel.course).selectinload(CourseModel.lecturer)
+                selectinload(EnrollmentModel.course).selectinload(CourseModel.lecturer),
             )
-        )
-
-        # Apply tenant filtering
-        if tenant_id:
-            stmt = stmt.filter(CourseModel.tenant_id == tenant_id)
-
-        # Apply filters
-        if params.student_id:
-            stmt = stmt.filter(EnrollmentModel.student_id == uuid.UUID(params.student_id))
-
-        if params.course_id:
-            stmt = stmt.filter(EnrollmentModel.course_id == uuid.UUID(params.course_id))
-
-        if params.lecturer_id:
-            stmt = stmt.filter(CourseModel.lecturer_id == params.lecturer_id)
-        
-        if params.status:
-            stmt = stmt.filter(EnrollmentModel.status == params.status)
-        
-        if params.semester:
-            # Compare as lowercase string since DB stores lowercase values
-            stmt = stmt.filter(EnrollmentModel.semester == params.semester.lower())
-        
-        if params.year:
-            # Filter by year based on created_at timestamp
-            start_of_year = datetime(params.year, 1, 1, tzinfo=timezone.utc)
-            end_of_year = datetime(params.year, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
-            stmt = stmt.filter(
-                and_(
-                    EnrollmentModel.created_at >= start_of_year,
-                    EnrollmentModel.created_at <= end_of_year
-                )
-            )
-        
-        if params.search:
-            search_term = f"%{params.search}%"
-            stmt = stmt.filter(
-                or_(
-                    User.first_name.ilike(search_term),
-                    User.last_name.ilike(search_term),
-                    User.email.ilike(search_term),
-                    CourseModel.name.ilike(search_term),
-                    CourseModel.course_code.ilike(search_term)
-                )
-            )
-        
-        # Get total count (subquery already has filters applied)
-        count_stmt = select(func.count()).select_from(stmt.subquery())
-        
-        total_result = await self.db.execute(count_stmt)
-        total = total_result.scalar()
-        
-        # Apply pagination
-        offset = (params.page - 1) * params.per_page
-        paginated_stmt = (
-            stmt.offset(offset)
-            .limit(params.per_page)
+            .where(*filters)
             .order_by(desc(EnrollmentModel.created_at))
+            .offset(offset_val)
+            .limit(params.per_page)
         )
-        
-        result = await self.db.execute(paginated_stmt)
+
+        result = await self.db.execute(stmt)
         enrollments = result.scalars().all()
-        
+
         return enrollments, total
 
-    async def get_enrollment(self, enrollment_id: uuid.UUID, tenant_id: Optional[uuid.UUID] = None) -> EnrollmentModel:
+    async def get(self, enrollment_id: uuid.UUID, tenant_id: Optional[uuid.UUID] = None) -> EnrollmentModel:
         """Get enrollment by ID."""
 
         from sqlalchemy.orm import aliased
@@ -129,12 +144,14 @@ class EnrollmentService:
         
         return enrollment
 
-    async def enroll_student(self, enrollment_data: EnrollmentCreate, current_user: User, tenant_id: Optional[uuid.UUID] = None) -> EnrollmentModel:
+    
+
+    async def create(self, enrollment_data: EnrollmentCreate, current_user: User, tenant_id: Optional[uuid.UUID] = None) -> EnrollmentModel:
         """Enroll student in course."""
         try:
-            student_uuid = uuid.UUID(enrollment_data.student_id)
-            course_uuid = uuid.UUID(enrollment_data.course_id)
-        except ValueError:
+            student_uuid = uuid.UUID(str(enrollment_data.student_id))
+            course_uuid = uuid.UUID(str(enrollment_data.course_id))
+        except Exception:
             raise ValueError("Invalid student ID or course ID format")
 
         # Check if course exists (with tenant filtering)
@@ -181,7 +198,7 @@ class EnrollmentService:
                 await self.db.commit()
                 await self.db.refresh(existing_enrollment)
                 # Eager load relationships before returning
-                enrollment_with_rels = await self.get_enrollment(str(existing_enrollment.id))
+                enrollment_with_rels = await self.get(existing_enrollment.id)
                 return enrollment_with_rels
             else:
                 raise ValueError("Student is already enrolled in this course")
@@ -199,10 +216,10 @@ class EnrollmentService:
         await self.db.refresh(enrollment)
         
         # Eager load relationships before returning
-        enrollment_with_rels = await self.get_enrollment(enrollment.id)
+        enrollment_with_rels = await self.get(enrollment.id)
         return enrollment_with_rels
 
-    async def update_enrollment(self, enrollment_id: uuid.UUID, enrollment_data: EnrollmentUpdate, tenant_id: Optional[uuid.UUID] = None) -> EnrollmentModel:
+    async def update(self, enrollment_id: uuid.UUID, enrollment_data: EnrollmentUpdate, tenant_id: Optional[uuid.UUID] = None) -> EnrollmentModel:
         """Update enrollment."""
         stmt = select(EnrollmentModel).options(
             selectinload(EnrollmentModel.course).selectinload(CourseModel.lecturer)
@@ -221,7 +238,7 @@ class EnrollmentService:
         await self.db.refresh(enrollment)
         return enrollment
 
-    async def remove_enrollment(self, enrollment_id: uuid.UUID, current_user: User, tenant_id: Optional[uuid.UUID] = None) -> None:
+    async def remove(self, enrollment_id: uuid.UUID, current_user: User, tenant_id: Optional[uuid.UUID] = None) -> None:
         """Remove student enrollment."""
         stmt = (
             select(EnrollmentModel)
@@ -244,13 +261,13 @@ class EnrollmentService:
         await self.db.delete(enrollment)
         await self.db.commit()
 
-    async def bulk_enroll(self, enrollments_data: List[EnrollmentCreate], current_user: User, tenant_id: Optional[uuid.UUID] = None) -> List[EnrollmentModel]:
+    async def bulk_create(self, enrollments_data: List[EnrollmentCreate], current_user: User, tenant_id: Optional[uuid.UUID] = None) -> List[EnrollmentModel]:
         """Bulk enroll students."""
         results = []
 
         for enrollment_data in enrollments_data:
             try:
-                enrollment = await self.enroll_student(enrollment_data, current_user, tenant_id=tenant_id)
+                enrollment = await self.create(enrollment_data, current_user, tenant_id=tenant_id)
                 results.append(enrollment)
             except ValueError as e:
                 # Log error but continue with other enrollments
@@ -259,7 +276,7 @@ class EnrollmentService:
 
         return results
 
-    async def check_enrollment(self, student_id: uuid.UUID, course_id: uuid.UUID, tenant_id: Optional[uuid.UUID] = None) -> EnrollmentModel:
+    async def check(self, student_id: uuid.UUID, course_id: uuid.UUID, tenant_id: Optional[uuid.UUID] = None) -> EnrollmentModel:
         """Check if student is enrolled in course."""
         # Use async-compatible query with eager loading
         stmt = (
@@ -288,67 +305,3 @@ class EnrollmentService:
             raise ValueError("Not enrolled")
         
         return enrollment
-
-    async def get_enrollment_statistics(self, course_id: Optional[str] = None, student_id: Optional[str] = None, lecturer_id: Optional[uuid.UUID] = None, tenant_id: Optional[uuid.UUID] = None) -> Dict[str, Any]:
-        """
-        Get enrollment statistics for a course or student.
-        """
-        # Build base query
-        base_stmt = select(EnrollmentModel).join(CourseModel, EnrollmentModel.course_id == CourseModel.id)
-
-        if tenant_id:
-            base_stmt = base_stmt.filter(CourseModel.tenant_id == tenant_id)
-
-        if course_id:
-            try:
-                course_uuid = uuid.UUID(course_id)
-                base_stmt = base_stmt.filter(EnrollmentModel.course_id == course_uuid)
-            except ValueError:
-                raise ValueError("Invalid course ID format")
-
-        if student_id:
-            try:
-                student_uuid = uuid.UUID(student_id)
-                base_stmt = base_stmt.filter(EnrollmentModel.student_id == student_uuid)
-            except ValueError:
-                raise ValueError("Invalid student ID format")
-
-        if lecturer_id:
-            base_stmt = base_stmt.filter(CourseModel.lecturer_id == lecturer_id)
-        
-        # Get total count
-        count_stmt = select(func.count()).select_from(base_stmt.subquery())
-        total_result = await self.db.execute(count_stmt)
-        total = total_result.scalar() or 0
-        
-        # Get active count
-        active_stmt = base_stmt.filter(EnrollmentModel.status == EnrollmentStatus.ACTIVE)
-        active_count_stmt = select(func.count()).select_from(active_stmt.subquery())
-        active_result = await self.db.execute(active_count_stmt)
-        active = active_result.scalar() or 0
-        
-        # Get completed count
-        completed_stmt = base_stmt.filter(EnrollmentModel.status == EnrollmentStatus.COMPLETED)
-        completed_count_stmt = select(func.count()).select_from(completed_stmt.subquery())
-        completed_result = await self.db.execute(completed_count_stmt)
-        completed = completed_result.scalar() or 0
-        
-        # Get dropped count
-        dropped_stmt = base_stmt.filter(EnrollmentModel.status == EnrollmentStatus.DROPPED)
-        dropped_count_stmt = select(func.count()).select_from(dropped_stmt.subquery())
-        dropped_result = await self.db.execute(dropped_count_stmt)
-        dropped = dropped_result.scalar() or 0
-        
-        # Get pending count
-        pending_stmt = base_stmt.filter(EnrollmentModel.status == EnrollmentStatus.PENDING)
-        pending_count_stmt = select(func.count()).select_from(pending_stmt.subquery())
-        pending_result = await self.db.execute(pending_count_stmt)
-        pending = pending_result.scalar() or 0
-        
-        return {
-            "total_enrolled": total,
-            "active_enrolled": active,
-            "completed_enrolled": completed,
-            "dropped_enrolled": dropped,
-            "pending_enrolled": pending
-        }

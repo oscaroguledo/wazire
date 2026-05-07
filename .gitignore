@@ -52,7 +52,6 @@ Thumbs.db
 # Logs
 *.log
 logs/
-celerybeat-schedule
 
 # Docker
 .docker/

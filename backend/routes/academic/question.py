@@ -13,7 +13,8 @@ from core.utils.logger import logger
 from core.utils.token import TokenService
 from core.middleware.auth import get_token_service, create_auth_dependency, require_lecturer_or_admin
 from services.academic.question import QuestionService
-from tasks.question import detect_answer_task, parse_and_create_task
+from tasks.question import emit_detect_answer
+from tasks.submission import emit_refresh_dashboard
 from services.engine.exam_extractor import ExamParser
 from schemas.academic.question import (
     QuestionCreate,
@@ -58,8 +59,8 @@ async def create_question(
         q = await service.create(question_in, tenant_id=tenant_id)
         # If MCQ with no answer provided, detect it in the background
         if q.qtype == QuestionType.MULTIPLE_CHOICE and not q.answer_id:
-            # Enqueue MCQ answer detection to Celery worker
-            detect_answer_task.delay(str(q.id))
+            # Enqueue MCQ answer detection to background worker
+            emit_detect_answer(str(q.id))
         return Response(success=True, message="Question created", data=q.to_dict(), request=request, status_code=status.HTTP_201_CREATED)
     except ValueError as e:
         return Response(success=False, error=str(e), request=request, status_code=status.HTTP_400_BAD_REQUEST)
@@ -95,7 +96,7 @@ async def get_exam_questions(
 ):
     """Get questions for exam."""
     service = QuestionService(db)
-    questions = await service.list_for_exam(exam_id)
+    questions = await service.list(exam_id=exam_id)
     return Response(
         success=True,
         message="Exam questions retrieved",
@@ -182,8 +183,9 @@ async def upload_exam_paper(
 
     tenant_id = None if current_user.role == UserRole.ADMIN else str(current_user.tenant_id)
 
-    # Enqueue exam parsing and question-creation to Celery worker
-    parse_and_create_task.delay(body.pages, body.industry.value, str(body.exam_id), body.mark_per_question, tenant_id)
+    # Enqueue exam parsing and question-creation to background worker
+    from tasks.question import emit_parse_and_create
+    emit_parse_and_create(body.pages, body.industry.value, str(body.exam_id), body.mark_per_question, tenant_id)
 
     return Response(
         success=True,

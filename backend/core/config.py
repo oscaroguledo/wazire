@@ -34,13 +34,7 @@ class Settings(BaseModel):
 
     GROQ_API_KEY: Optional[str] = None
 
-    CELERY_BROKER_URL: Optional[str] = None
-    CELERY_RESULT_BACKEND: Optional[str] = None
-    USE_INTERNAL_SCHEDULER: bool = False
-    
-    # Celery beat schedule intervals (in seconds)
-    CELERY_EXAM_STATUS_UPDATE_INTERVAL: int = 60
-    CELERY_EMAIL_SEND_INTERVAL: int = 60
+    # Kafka settings
 
     # Kafka settings
     KAFKA_BOOTSTRAP_SERVERS: Optional[str] = None
@@ -49,6 +43,9 @@ class Settings(BaseModel):
     KAFKA_PASSWORD: Optional[str] = None
     KAFKA_SECURITY_PROTOCOL: Optional[str] = "PLAINTEXT"
     KAFKA_SASL_MECHANISM: Optional[str] = None
+    # Scheduler intervals (minutes) for the internal scheduler that publishes Kafka events
+    SCHEDULER_EXAM_STATUS_UPDATE_INTERVAL: Optional[int] = None
+    SCHEDULER_EMAIL_SEND_INTERVAL: Optional[int] = None
 
     def cors_origins_list(self) -> List[str]:
         if isinstance(self.CORS_ORIGINS, str):
@@ -135,11 +132,7 @@ class Settings(BaseModel):
         if not (1 <= self.PORT <= 65535):
             errors.append("PORT must be between 1 and 65535")
         
-        # Validate CELERY intervals
-        if self.CELERY_EXAM_STATUS_UPDATE_INTERVAL < 10:
-            errors.append("CELERY_EXAM_STATUS_UPDATE_INTERVAL must be at least 10 seconds")
-        if self.CELERY_EMAIL_SEND_INTERVAL < 10:
-            errors.append("CELERY_EMAIL_SEND_INTERVAL must be at least 10 seconds")
+        # No Celery validation required — Kafka-based scheduler handles intervals
         
         if errors:
             raise ValueError("Configuration validation failed:\n" + "\n".join(f"  - {e}" for e in errors))
@@ -181,17 +174,14 @@ def get_settings(force_reload: bool = False) -> Settings:
             CORS_ORIGINS=_parse_list(os.getenv("CORS_ORIGINS"), _defaults.CORS_ORIGINS),
             REQUEST_ID_HEADERS=os.getenv("REQUEST_ID_HEADERS", _defaults.REQUEST_ID_HEADERS),
             GROQ_API_KEY=os.getenv("GROQ_API_KEY", _defaults.GROQ_API_KEY),
-            CELERY_BROKER_URL=os.getenv("CELERY_BROKER_URL", os.getenv("REDIS_URL", _defaults.CELERY_BROKER_URL)),
-            CELERY_RESULT_BACKEND=os.getenv("CELERY_RESULT_BACKEND", os.getenv("REDIS_URL", _defaults.CELERY_RESULT_BACKEND)),
-            USE_INTERNAL_SCHEDULER=os.getenv("USE_INTERNAL_SCHEDULER", str(_defaults.USE_INTERNAL_SCHEDULER)).lower() in ("1", "true", "yes"),
-            CELERY_EXAM_STATUS_UPDATE_INTERVAL=int(os.getenv("CELERY_EXAM_STATUS_UPDATE_INTERVAL", str(_defaults.CELERY_EXAM_STATUS_UPDATE_INTERVAL))),
-            CELERY_EMAIL_SEND_INTERVAL=int(os.getenv("CELERY_EMAIL_SEND_INTERVAL", str(_defaults.CELERY_EMAIL_SEND_INTERVAL))),
             KAFKA_BOOTSTRAP_SERVERS=os.getenv("KAFKA_BOOTSTRAP_SERVERS", _defaults.KAFKA_BOOTSTRAP_SERVERS),
             KAFKA_TOPIC_PREFIX=os.getenv("KAFKA_TOPIC_PREFIX", _defaults.KAFKA_TOPIC_PREFIX),
             KAFKA_USERNAME=os.getenv("KAFKA_USERNAME", _defaults.KAFKA_USERNAME),
             KAFKA_PASSWORD=os.getenv("KAFKA_PASSWORD", _defaults.KAFKA_PASSWORD),
             KAFKA_SECURITY_PROTOCOL=os.getenv("KAFKA_SECURITY_PROTOCOL", _defaults.KAFKA_SECURITY_PROTOCOL),
             KAFKA_SASL_MECHANISM=os.getenv("KAFKA_SASL_MECHANISM", _defaults.KAFKA_SASL_MECHANISM),
+            SCHEDULER_EXAM_STATUS_UPDATE_INTERVAL=os.getenv("SCHEDULER_EXAM_STATUS_UPDATE_INTERVAL", None),
+            SCHEDULER_EMAIL_SEND_INTERVAL=os.getenv("SCHEDULER_EMAIL_SEND_INTERVAL", None),
         )
         
         # Validate configuration

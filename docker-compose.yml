@@ -142,56 +142,6 @@ services:
           cpus: '0.5'
           memory: 256M
 
-  celery-worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    container_name: wazire-celery-worker
-    env_file:
-      - ./backend/.env
-    command: celery -A celery_app.celery_app worker --loglevel=info --concurrency=${CELERY_WORKER_CONCURRENCY:-2}
-    depends_on:
-      pgbouncer:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - wazire-network
-    deploy:
-      resources:
-        limits:
-          cpus: '2.0'
-          memory: 1G
-        reservations:
-          cpus: '0.5'
-          memory: 256M
-
-  celery-beat:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    container_name: wazire-celery-beat
-    env_file:
-      - ./backend/.env
-    command: celery -A celery_app.celery_app beat --loglevel=info
-    depends_on:
-      pgbouncer:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - wazire-network
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 256M
-        reservations:
-          cpus: '0.1'
-          memory: 64M
-
   frontend:
     build:
       context: ./frontend
@@ -214,6 +164,61 @@ services:
         reservations:
           cpus: '0.1'
           memory: 64M
+
+  # Kafka worker: runs the background consumer that dispatches to `tasks/*`.
+  # To run two instances locally with Docker Compose v2, use:
+  #   docker compose up --scale worker=2
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["python", "worker.py"]
+    networks:
+      - wazire-network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 64M
+
+    # Scheduler: periodic task publisher using `backend/scheduler.py`.
+    # Run as a single instance; scale only if you understand the scheduler's semantics.
+    scheduler:
+      build:
+        context: ./backend
+        dockerfile: Dockerfile
+      restart: unless-stopped
+      env_file:
+        - ./backend/.env
+      depends_on:
+        pgbouncer:
+          condition: service_healthy
+        redis:
+          condition: service_healthy
+      command: ["python", "scheduler.py"]
+      networks:
+        - wazire-network
+      deploy:
+        replicas: 1
+        resources:
+          limits:
+            cpus: '0.5'
+            memory: 128M
+          reservations:
+            cpus: '0.1'
+            memory: 32M
 
 networks:
   wazire-network:

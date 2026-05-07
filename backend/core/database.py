@@ -3,8 +3,7 @@ from __future__ import annotations
 from typing import AsyncGenerator, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
-from sqlalchemy import create_engine
+from sqlalchemy.orm import DeclarativeBase
 
 from core.config import get_settings
 from functools import lru_cache
@@ -17,20 +16,16 @@ class Base(DeclarativeBase):
 
 
 class PostgresDB:
-    """Class-based manager for PostgreSQL (async + sync) engines and sessions.
+    """Class-based manager for PostgreSQL (async) engines and sessions.
 
-    This encapsulates engine/session creation and provides a stable
-    API compatible with the previous module-level functions: `get_db()`
-    and `get_sync_db()`.
+    Encapsulates async engine/session creation and provides `get_db()`.
     """
 
     _instance = None
 
     def __init__(self):
         self._engine = None
-        self._sync_engine = None
         self._session_factory = None
-        self._sync_session_factory = None
 
     @classmethod
     def instance(cls) -> "PostgresDB":
@@ -67,42 +62,6 @@ class PostgresDB:
                 },
             )
         return self._engine
-
-    def sync_engine(self):
-        if self._sync_engine is None:
-            settings = get_settings()
-            database_url = self._database_url()
-            sync_url = database_url.replace("postgresql+asyncpg://", "postgresql://")
-            sync_url = sync_url.replace("sqlite+aiosqlite://", "sqlite://")
-
-            self._sync_engine = create_engine(
-                sync_url,
-                echo=bool(settings.DEBUG),
-                pool_size=int(getattr(settings, "SYNC_DB_POOL_SIZE", 10)),
-                max_overflow=int(getattr(settings, "SYNC_DB_MAX_OVERFLOW", 20)),
-                pool_pre_ping=True,
-                pool_recycle=int(getattr(settings, "DB_POOL_RECYCLE", 1800)),
-                pool_timeout=int(getattr(settings, "DB_POOL_TIMEOUT", 30)),
-            )
-        return self._sync_engine
-
-    def get_sync_db(self):
-        if self._sync_session_factory is None:
-            engine = self.sync_engine()
-            self._sync_session_factory = sessionmaker(
-                bind=engine,
-                expire_on_commit=False,
-                autocommit=False,
-                autoflush=False,
-            )
-        session = self._sync_session_factory()
-        try:
-            yield session
-        except Exception:
-            session.rollback()
-            raise
-        finally:
-            session.close()
 
     async def get_db(self) -> AsyncGenerator[AsyncSession, None]:
         if self._session_factory is None:
@@ -174,16 +133,9 @@ class RedisClient:
             self._client = None
 
 
-# Module-level compatibility helpers (previous API)
 @lru_cache(maxsize=1)
 def get_postgres_db() -> PostgresDB:
     return PostgresDB.instance()
-
-
-def get_sync_db():
-    """Yield a synchronous DB session for Celery / blocking tasks."""
-    pg = get_postgres_db()
-    yield from pg.get_sync_db()
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

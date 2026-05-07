@@ -44,7 +44,7 @@ Nigerian tertiary institutions face multiple examination problems:
 
 - **AI grading** - Not just auto-marking, but intelligent grading of theory and fill-in-blank questions
 - **Fully automated** - From exam creation to results, no manual intervention needed
-- **Already built** - Backend complete with FastAPI, Celery tasks, AI graders, multi-tenant architecture
+- **Already built** - Backend complete with FastAPI, Kafka-based background worker and scheduler, AI graders, multi-tenant architecture
 - **Fast** - Instant results vs 4-6 weeks manual grading
 - **Secure** - Full audit trail prevents manipulation
 

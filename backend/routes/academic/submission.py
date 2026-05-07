@@ -12,10 +12,10 @@ from core.database import get_db
 from core.utils.response import Response
 from core.utils.token import TokenService
 from core.middleware.auth import get_token_service, create_auth_dependency, require_lecturer_or_admin, require_student
-from services.academic.submission import SubmissionService
 # StudentAnswerService is used in services and grading; not required at route-level
 from services.engine.answer_sheet_extractor import AnswerSheetParser
-from tasks.submission import grade_submission_attempt_task, refresh_dashboard_task
+from services.academic.submission import SubmissionService
+from tasks.submission import emit_refresh_dashboard, emit_grade_attempt
 from models.academic.question import Question as QuestionModel
 from models.academic.exam import Exam as ExamModel
 from models.academic.course import Course
@@ -100,11 +100,11 @@ async def submit_exam(
     except ValueError as e:
         return Response(success=False, error=str(e), request=request, status_code=status.HTTP_400_BAD_REQUEST)
 
-    # Grade in background using Celery worker
-    grade_submission_attempt_task.delay(str(attempt.id), str(body.exam_id))
+    # Grade in background via Kafka worker
+    emit_grade_attempt(str(attempt.id), str(body.exam_id))
 
     # Refresh dashboards in background after submission
-    refresh_dashboard_task.delay(str(current_user.id))
+    emit_refresh_dashboard(str(current_user.id))
     # Get exam to find lecturer for background refresh
     exam_stmt = select(ExamModel).where(ExamModel.id == body.exam_id)
     exam_result = await service.db.execute(exam_stmt)
@@ -115,7 +115,7 @@ async def submit_exam(
         course_result = await service.db.execute(course_stmt)
         course = course_result.scalar_one_or_none()
         if course and course.lecturer_id:
-            refresh_dashboard_task.delay(str(course.lecturer_id))
+            emit_refresh_dashboard(str(course.lecturer_id))
 
     print(f"[log] Student {current_user.id} submitted exam {body.exam_id}, attempt #{attempt.attempt_number}")
 
@@ -177,7 +177,7 @@ async def list_students_with_submissions(
     """All students and their full submission + attempt history for a specific exam in the caller's tenant."""
     try:
         offset = (page - 1) * per_page
-        results, total = await service.list_students_with_submissions(
+        results, total = await service.list_students(
             exam_id=exam_id,
             tenant_id=_tenant(current_user),
             limit=per_page,
@@ -216,7 +216,7 @@ async def list_submissions(
     offset = (page - 1) * per_page
     
     # Get submissions
-    items = await service.list_for_exam(exam_id=exam_id, tenant_id=_tenant(current_user), status=status, limit=per_page, offset=offset)
+    items = await service.list(exam_id=exam_id, tenant_id=_tenant(current_user), status=status, limit=per_page, offset=offset)
     
     # Get total count for pagination
     total_count = await service.count_for_exam(exam_id=exam_id, tenant_id=_tenant(current_user), status=status)
@@ -291,7 +291,7 @@ async def my_submission(
     service = SubmissionService(db)
     if exam_id:
         # Get submission for specific exam
-        submission = await service.get_my_submission(student_id=current_user.id, exam_id=exam_id)
+        submission = await service.get(student_id=current_user.id, exam_id=exam_id)
         if not submission:
             # Return success with null data instead of 404 - student hasn't submitted yet
             return Response(
@@ -313,7 +313,7 @@ async def my_submission(
         )
     else:
         # Get all submissions for this student
-        submissions = await service.get_all_my_submissions(student_id=current_user.id, tenant_id=_tenant(current_user))
+        submissions = await service.list(student_id=current_user.id, tenant_id=_tenant(current_user), limit=0)
         return Response(
             success=True,
             message="All your submissions retrieved",
@@ -337,7 +337,7 @@ async def all_my_submissions(
 ):
     service = SubmissionService(db)
     """Get all submissions for the current student across all exams."""
-    submissions = await service.get_all_my_submissions(student_id=current_user.id, tenant_id=_tenant(current_user))
+    submissions = await service.list(student_id=current_user.id, tenant_id=_tenant(current_user), limit=0)
     return Response(
         success=True,
         message="All your submissions retrieved",
@@ -421,11 +421,11 @@ async def scan_answer_sheet(
     except ValueError as e:
         return Response(success=False, error=str(e), request=request, status_code=status.HTTP_400_BAD_REQUEST)
 
-    # Grade scanned attempt in background using Celery worker
-    grade_submission_attempt_task.delay(str(attempt.id), str(body.exam_id))
+    # Grade scanned attempt in background via Kafka worker
+    emit_grade_attempt(str(attempt.id), str(body.exam_id))
 
     # Refresh dashboards in background after scan submission
-    refresh_dashboard_task.delay(str(body.student_id))
+    emit_refresh_dashboard(str(body.student_id))
     # Get exam to find lecturer for background refresh
     exam_stmt = select(ExamModel).where(ExamModel.id == body.exam_id)
     exam_result = await db.execute(exam_stmt)
@@ -435,8 +435,8 @@ async def scan_answer_sheet(
         course_stmt = select(Course).where(Course.id == exam.course_id)
         course_result = await db.execute(course_stmt)
         course = course_result.scalar_one_or_none()
-        if course and course.lecturer_id:
-            refresh_dashboard_task.delay(str(course.lecturer_id))
+            if course and course.lecturer_id:
+                emit_refresh_dashboard(str(course.lecturer_id))
 
     return Response(
         success=True,

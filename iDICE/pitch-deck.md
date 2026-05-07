@@ -93,7 +93,7 @@ Nigerian tertiary institutions face multiple examination problems:
 ## Slide 7: Competitive Advantage
 
 1. **AI grading** - Intelligent grading of theory and fill-in-blank questions
-2. **Already built** - Backend complete with FastAPI, Celery, AI graders
+2. **Already built** - Backend complete with FastAPI, Kafka-based background worker and scheduler, AI graders
 3. **Local expertise** - We understand Nigerian exam workflows
 4. **Affordability** - 10x cheaper than foreign alternatives
 5. **Simple** - Not a full LMS, just exams
@@ -106,7 +106,7 @@ Nigerian tertiary institutions face multiple examination problems:
 **Backend is complete:**
 
 - FastAPI framework
-- Celery for async processing
+- Kafka for async processing (background worker consumes tenant-tasks)
 - AI graders (similarity matching, answer extraction)
 - Multi-tenant architecture
 - Database triggers for dashboard updates
