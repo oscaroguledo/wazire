@@ -1,7 +1,5 @@
-from __future__ import annotations
-
-from .user import UserService
-from .tenant import TenantService
+from .users import UserService
+from .tenants import TenantService
 
 __all__ = [
     "UserService",

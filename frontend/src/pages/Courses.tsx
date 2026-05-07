@@ -18,6 +18,7 @@ import Dropdown from '@/components/Dropdown';
 import * as courseApi from '@/apis/course';
 import * as enrollmentApi from '@/apis/enrollment';
 import * as authApi from '@/apis/auth';
+import resourceCache from '@/lib/resourceCache';
 import { config } from '@/config';
 import type { Course } from '@/lib/types';
 import type { CourseListParams } from '@/apis/course';
@@ -45,6 +46,7 @@ export function Courses() {
   });
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [lecturerNames, setLecturerNames] = useState<Record<string,string>>({});
 
   // Filter states
   const [selectedLecturer, setSelectedLecturer] = useState<string>('all');
@@ -157,6 +159,29 @@ export function Courses() {
       setLecturers(data.lecturers)
     }
   }, [data?.lecturers])
+
+  // Resolve lecturer names for any courses where lecturer is an id
+  useEffect(() => {
+    let mounted = true
+    const idsToFetch: string[] = []
+    courses.forEach((course: any) => {
+      const lect = course.lecturer
+      if (!lect) return
+      if (typeof lect === 'string' && !lecturerNames[lect]) idsToFetch.push(lect)
+      if (lect && typeof lect === 'object' && !lecturerNames[lect.id]) {
+        lecturerNames[lect.id] = [lect.first_name, lect.middle_name, lect.last_name].filter(Boolean).join(' ') || lect.email || lect.id
+      }
+    })
+    if (idsToFetch.length === 0) return
+    Promise.all(idsToFetch.map(id => resourceCache.getUserFullName(id).catch(() => `User ${id}`)))
+      .then(results => {
+        if (!mounted) return
+        const map: Record<string,string> = {}
+        idsToFetch.forEach((id, idx) => { map[id] = results[idx] })
+        setLecturerNames(prev => ({ ...prev, ...map }))
+      })
+    return () => { mounted = false }
+  }, [courses])
 
   // Handle course creation
   const handleCreateCourse = async (e: React.FormEvent) => {
@@ -406,7 +431,12 @@ export function Courses() {
                         <div>
                           <p className="text-xs text-[var(--color-text-muted)]">Lecturer</p>
                           <p className="text-sm font-medium text-[var(--color-text-primary)]">
-                            {course.lecturer ? `${course.lecturer.first_name} ${course.lecturer.last_name}` : 'No lecturer assigned'}
+                            {(() => {
+                              const lect = (course as any).lecturer
+                              if (!lect) return 'No lecturer assigned'
+                              if (typeof lect === 'string') return lecturerNames[lect] || `User ${lect}`
+                              return `${lect.first_name} ${lect.last_name}`
+                            })()}
                           </p>
                         </div>
                       </div>

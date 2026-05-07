@@ -63,7 +63,7 @@ export default function ExamQuestions() {
   // Form states
   const [formData, setFormData] = useState<QuestionCreate>({
     question_text: '',
-    question_type: 'multiple_choice',
+    qtype: 'multiple_choice',
     options: ['', '', '', ''],
     correct_answer: '',
     marks: 1,
@@ -326,7 +326,7 @@ export default function ExamQuestions() {
       }
       
       // Add options and answer for multiple choice questions
-      if (formData.question_type === 'multiple_choice') {
+      if (formData.qtype === 'multiple_choice') {
         const validOptions = formData.options?.filter(o => o.trim()) || []
         if (validOptions.length < 2) {
           setFormError('Multiple choice questions require at least 2 options')

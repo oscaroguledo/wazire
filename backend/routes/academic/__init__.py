@@ -1,1 +1,1 @@
-from . import submission, course, exam, question, answer, enrollments
+from . import submissions, courses, exams, questions, answers, enrollments

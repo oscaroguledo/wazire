@@ -10,7 +10,7 @@ import { server } from '@/mocks/server'
 import * as authApi from '@/apis/auth'
 import { ApiError } from '@/apis/client'
 
-const BASE_URL = 'http://localhost:8000/api/v1'
+const BASE_URL = '/api/v1'
 
 const mockUser = {
   id: 'user-1',

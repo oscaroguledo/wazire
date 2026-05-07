@@ -43,6 +43,16 @@ class Logger:
 		self.level = level.upper()
 		self.levelno = self.LEVELS.get(self.level, 10)
 
+	def setLevel(self, levelno: int) -> None:
+		"""Set the logging level by integer value (compatible with stdlib logging)."""
+		for name, val in self.LEVELS.items():
+			if val == levelno:
+				self.level = name
+				self.levelno = val
+				return
+		# If not found, set directly
+		self.levelno = levelno
+
 	def _should_log(self, level: str) -> bool:
 		return self.LEVELS.get(level, 0) >= self.levelno
 

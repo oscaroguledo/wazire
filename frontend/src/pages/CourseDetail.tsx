@@ -26,6 +26,7 @@ import * as authApi from '@/apis/auth';
 import type { Exam } from '@/apis/exam';
 import type { Enrollment, Semester } from '@/apis/enrollment';
 import { Modal } from '@/components/Modal';
+import resourceCache from '@/lib/resourceCache';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import Pagination from '@/components/Pagination';
 import Dropdown from '@/components/Dropdown';
@@ -53,6 +54,8 @@ export function CourseDetail() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [lecturerName, setLecturerName] = useState<string | null>(null);
+  const [studentNames, setStudentNames] = useState<Record<string, string>>({});
   const [enrollmentsLoading, setEnrollmentsLoading] = useState(false);
   const [enrollmentsPage, setEnrollmentsPage] = useState(1);
   const [enrollmentsPerPage] = useState(10);
@@ -132,6 +135,58 @@ export function CourseDetail() {
 
     loadData();
   }, [id]);
+
+  // Resolve lecturer name when course loaded
+  useEffect(() => {
+    let mounted = true
+    const loadLecturer = async () => {
+      if (!course) return
+      const lect = (course as any).lecturer
+      if (!lect) {
+        setLecturerName(null)
+        return
+      }
+      if (typeof lect === 'string') {
+        try {
+          const name = await resourceCache.getUserFullName(lect)
+          if (mounted) setLecturerName(name)
+        } catch {
+          if (mounted) setLecturerName(`User ${lect}`)
+        }
+      } else {
+        const parts = [lect.first_name, lect.middle_name, lect.last_name].filter(Boolean)
+        if (mounted) setLecturerName(parts.join(' ') || lect.email || null)
+      }
+    }
+    void loadLecturer()
+    return () => { mounted = false }
+  }, [course])
+
+  // Resolve student names for enrollments that only include IDs
+  useEffect(() => {
+    let mounted = true
+    const idsToFetch: string[] = []
+    enrollments.forEach(e => {
+      const s = (e as any).student
+      if (!s) return
+      if (typeof s === 'string') {
+        if (!studentNames[s]) idsToFetch.push(s)
+      } else if (s && typeof s === 'object' && !studentNames[s.id]) {
+        // ensure mapping exists for object students
+        const parts = [s.first_name, s.middle_name, s.last_name].filter(Boolean)
+        studentNames[s.id] = parts.join(' ') || s.email || s.id
+      }
+    })
+    if (idsToFetch.length === 0) return
+    Promise.all(idsToFetch.map(id => resourceCache.getUserFullName(id).catch(() => `User ${id}`)))
+      .then(results => {
+        if (!mounted) return
+        const map: Record<string,string> = {}
+        idsToFetch.forEach((sid, idx) => { map[sid] = results[idx] })
+        setStudentNames(prev => ({ ...prev, ...map }))
+      })
+    return () => { mounted = false }
+  }, [enrollments])
 
   // Fetch exams when page params change (pagination, year filter)
   useEffect(() => {
@@ -444,7 +499,12 @@ export function CourseDetail() {
             </div>
             <div className="flex justify-between py-2">
               <dt className="text-sm text-[var(--color-text-muted)]">Instructor</dt>
-              <dd className="text-sm font-medium text-[var(--color-text-primary)]">{course.lecturer ? `${course.lecturer.first_name} ${course.lecturer.last_name}` : 'No lecturer assigned'}</dd>
+              <dd className="text-sm font-medium text-[var(--color-text-primary)]">{(() => {
+                const lect = (course as any).lecturer
+                if (!lect) return 'No lecturer assigned'
+                if (typeof lect === 'string') return lecturerName || `User ${lect}`
+                return `${lect.first_name} ${lect.last_name}`
+              })()}</dd>
             </div>
           </dl>
         </div>
@@ -660,7 +720,12 @@ export function CourseDetail() {
                     </div>
                     <div>
                       <p className="font-medium text-[var(--color-text-primary)]">
-                        {enrollment.student ? `${enrollment.student.first_name} ${enrollment.student.last_name}` : 'Unknown Student'}
+                        {(() => {
+                          const s = (enrollment as any).student
+                          if (!s) return 'Unknown Student'
+                          if (typeof s === 'string') return studentNames[s] || `User ${s}`
+                          return `${s.first_name} ${s.last_name}`
+                        })()}
                       </p>
                       {enrollment.student?.institution_id ? (
                         <p className="text-sm text-[var(--color-text-muted)]">
@@ -805,7 +870,12 @@ export function CourseDetail() {
                     </div>
                     <div>
                       <p className="text-white/75 text-xs">Instructor</p>
-                      <p className="text-white font-medium">{course.lecturer ? `${course.lecturer.first_name} ${course.lecturer.last_name}` : 'No lecturer assigned'}</p>
+                      <p className="text-white font-medium">{(() => {
+                        const lect = (course as any).lecturer
+                        if (!lect) return 'No lecturer assigned'
+                        if (typeof lect === 'string') return lecturerName || `User ${lect}`
+                        return `${lect.first_name} ${lect.last_name}`
+                      })()}</p>
                     </div>
                   </div>
                   
