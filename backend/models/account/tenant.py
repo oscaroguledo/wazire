@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import String, Index, func, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import UUID
@@ -72,7 +72,7 @@ class Tenant(Base):
 
 	def delete(self) -> None:
 		"""Mark tenant as deleted."""
-		self.deleted_at = datetime.utcnow()
+		self.deleted_at = datetime.now(timezone.utc)
 		self.is_deleted = True
 		self.is_active = False
 

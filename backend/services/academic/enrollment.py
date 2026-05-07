@@ -8,7 +8,8 @@ from datetime import datetime, timezone
 from schemas.academic.enrollment import (
     EnrollmentCreate, EnrollmentUpdate,
     EnrollmentListParams, EnrollmentStatus, Semester
-)from models.account.users import User, UserRole
+)
+from models.account.users import User, UserRole
 from models.academic.enrollment import Enrollment as EnrollmentModel
 from models.academic.course import Course as CourseModel
 
@@ -155,7 +156,7 @@ class EnrollmentService:
             raise ValueError("Student not found")
         if student.role != UserRole.STUDENT:
             raise ValueError("User is not a student")
-        
+
         # Lecturer can only enroll students in their own courses
         if current_user.role == UserRole.LECTURER and str(course.lecturer_id) != str(current_user.id):
             raise ValueError("Can only enroll students in your own courses")

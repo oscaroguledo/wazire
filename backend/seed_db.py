@@ -7,7 +7,7 @@ import os
 import requests
 import json
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
@@ -236,7 +236,7 @@ def create_exam(course_id, tenant_id):
         "total_marks": 100,
         "passing_marks": 60,
         "status": "not_started",
-        "start_time": (datetime.now() + timedelta(days=7)).isoformat(),
+        "start_time": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
         "course_id": course_id,
         "tenant_id": tenant_id
     }

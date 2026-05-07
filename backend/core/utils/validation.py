@@ -1,7 +1,7 @@
 from pydantic import BaseModel, field_validator, ConfigDict
 from typing import Optional, List, Union
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 
@@ -84,7 +84,14 @@ def validate_uuid(uuid_str: str) -> bool:
 
 def validate_future_date(date: datetime) -> bool:
     """Validate that a date is in the future."""
-    return date > datetime.now()
+    # Ensure both sides are timezone-aware in UTC before comparison.
+    if date is None:
+        return False
+    if date.tzinfo is None:
+        date = date.replace(tzinfo=timezone.utc)
+    else:
+        date = date.astimezone(timezone.utc)
+    return date > datetime.now(timezone.utc)
 
 
 def validate_positive_number(value: Union[int, float]) -> bool:

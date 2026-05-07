@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from enum import Enum
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import String, Index, func, CheckConstraint, DateTime, ForeignKey, Boolean
 from sqlalchemy import Enum as SAEnum
@@ -165,20 +165,20 @@ class User(Base):
         """Soft delete user by setting is_active to False and is_locked to True."""
         self.is_active = False
         self.is_deleted = True
-        self.deleted_at = datetime.utcnow()
-        self.updated_at = datetime.utcnow()
+        self.deleted_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(timezone.utc)
 
     def restore(self):
         """Restore a soft-deleted user by setting is_active to True."""
         self.is_active = True
         self.is_deleted = False
         self.deleted_at = None
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(timezone.utc)
     
     def lock(self):
         """Lock user account (e.g., for students with unpaid fees)."""
         self.is_locked = True
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(timezone.utc)
     
     def to_dict(self) -> dict:
         return {

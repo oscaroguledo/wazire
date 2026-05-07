@@ -37,8 +37,8 @@ async def get_my_dashboard(
     """Get dashboard data for the currently authenticated user."""
     try:
         # Get the raw dashboard model and call to_dict()
-        dashboard_model = await service.get_or_create_lecturer_dashboard(current_user.id) if current_user.role == UserRole.LECTURER else \
-                          await service.get_or_create_admin_dashboard(current_user.id, current_user.tenant_id) if current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else \
+        dashboard_model = await service.get_or_create_lecturer_dashboard(current_user.id) if current_user.role == UserRole.LECTURER.value else \
+                  await service.get_or_create_admin_dashboard(current_user.id, current_user.tenant_id) if current_user.role in (UserRole.ADMIN.value, UserRole.SUPERADMIN.value) else \
                           await service.get_or_create_student_dashboard(current_user.id)
         return Response(success=True, data=dashboard_model.to_dict() if dashboard_model else None, request=request)
     except Exception as e:
@@ -69,7 +69,7 @@ async def get_lecturer_dashboard(
     """
     try:
         # Access control
-        if current_user.role == UserRole.LECTURER and current_user.id != lecturer_id:
+        if current_user.role == UserRole.LECTURER.value and current_user.id != lecturer_id:
             return Response(
                 success=False,
                 error="Can only view your own dashboard",
@@ -111,7 +111,7 @@ async def get_admin_dashboard(
     """Get dashboard for a specific admin (superadmin only)."""
     try:
         # Access control
-        if current_user.role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
+        if current_user.role not in (UserRole.ADMIN.value, UserRole.SUPERADMIN.value):
             return Response(
                 success=False,
                 error="Admin access required",
@@ -157,7 +157,7 @@ async def get_student_dashboard(
     """
     try:
         # Access control
-        if current_user.role not in (UserRole.ADMIN, UserRole.SUPERADMIN) and current_user.id != student_id:
+        if current_user.role not in (UserRole.ADMIN.value, UserRole.SUPERADMIN.value) and current_user.id != student_id:
             return Response(
                 success=False,
                 error="Can only view your own dashboard",

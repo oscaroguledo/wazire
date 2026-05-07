@@ -25,7 +25,7 @@ router = APIRouter(prefix="/exams", tags=["exams"])
 
 
 def _tenant(user: UserRead):
-    return None if user.role == UserRole.SUPERADMIN else user.tenant_id
+    return None if user.role == UserRole.SUPERADMIN.value else user.tenant_id
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
@@ -41,11 +41,11 @@ async def create_exam(
 
     # Set tenant_id based on user role
     tenant_id = _tenant(current_user)
-    if not tenant_id and current_user.role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
+    if not tenant_id and current_user.role not in (UserRole.ADMIN.value, UserRole.SUPERADMIN.value):
         return Response(success=False, error="No tenant assigned to your account", request=request, status_code=status.HTTP_403_FORBIDDEN)
 
     # Override tenant_id if provided in payload for admins
-    if exam_data.tenant_id and current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN):
+    if exam_data.tenant_id and current_user.role in (UserRole.ADMIN.value, UserRole.SUPERADMIN.value):
         tenant_id = exam_data.tenant_id
 
     # course_id can be None for standalone exams
@@ -79,12 +79,12 @@ async def list_exams(
     
     # For lecturers, only show exams they teach (via course) or created
     lecturer_id = None
-    if current_user.role == UserRole.LECTURER:
+    if current_user.role == UserRole.LECTURER.value:
         lecturer_id = current_user.id
     
     # For students, get their enrolled course IDs
     student_course_ids = None
-    if current_user.role == UserRole.STUDENT:
+    if current_user.role == UserRole.STUDENT.value:
         enrollment_stmt = select(Enrollment.course_id).where(
             Enrollment.student_id == current_user.id,
             Enrollment.status.in_([EnrollmentStatus.ACTIVE.value, EnrollmentStatus.COMPLETED.value])

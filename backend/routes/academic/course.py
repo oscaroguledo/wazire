@@ -34,11 +34,11 @@ async def create_course(
     course_data = course_in.model_copy()
 
     # Admin can override tenant_id; lecturer is always assigned to their own tenant
-    if course_data.tenant_id and current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN):
+    if course_data.tenant_id and current_user.role in (UserRole.ADMIN.value, UserRole.SUPERADMIN.value):
         tenant_id = course_data.tenant_id
 
     # Lecturers are automatically assigned as the lecturer of the course they create
-    if current_user.role == UserRole.LECTURER:
+    if current_user.role == UserRole.LECTURER.value:
         course_data.lecturer_id = current_user.id
 
     if not course_data.name or not course_data.name.strip():
@@ -72,7 +72,7 @@ async def list_courses(
 
     # Lecturers always see only their own courses — ignore any passed lecturer_id
     effective_lecturer_id = lecturer_id
-    if current_user.role == UserRole.LECTURER:
+    if current_user.role == UserRole.LECTURER.value:
         effective_lecturer_id = current_user.id
 
     items, total_count = await service.list(

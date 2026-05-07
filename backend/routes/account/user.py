@@ -23,14 +23,14 @@ router = APIRouter(prefix="/auth", tags=["authentication"])
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(
     user_in: UserCreate,
-    request: Request,
+    tenant_id: Optional[uuid.UUID] = Query(None),
     db: AsyncSession = Depends(get_db),
     token_service: TokenService = Depends(get_token_service),
 ):
     encryption = EncryptionService()
     service = UserService(db, encryption=encryption, token_service=token_service)
-    if getattr(request.state, "tenant_id", None):
-        user_in.tenant_id = request.state.tenant_id
+    if tenant_id:
+        user_in.tenant_id = tenant_id
     if await service.get(email=user_in.email):
         return Response(success=False, error="Email already registered", request=request, status_code=status.HTTP_400_BAD_REQUEST)
     user = await service.create(user_in)
@@ -129,7 +129,7 @@ async def get_user(
 ):
     encryption = EncryptionService()
     service = UserService(db, encryption=encryption, token_service=token_service)
-    tenant_id = None if current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else current_user.tenant_id
+    tenant_id = None if current_user.role in (UserRole.ADMIN.value, UserRole.SUPERADMIN.value) else current_user.tenant_id
     user = await service.get(user_id=user_id, tenant_id=tenant_id)
     if not user:
         return Response(success=False, error="User not found", request=request, status_code=status.HTTP_404_NOT_FOUND)

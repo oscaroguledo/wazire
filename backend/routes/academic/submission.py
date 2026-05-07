@@ -70,7 +70,7 @@ class ScanSubmit(BaseModel):
 
 
 def _tenant(user: UserRead) -> Optional[uuid.UUID]:
-    return None if user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else user.tenant_id
+    return None if user.role in (UserRole.ADMIN.value, UserRole.SUPERADMIN.value) else user.tenant_id
 
 
 # ---------------------------------------------------------------------------
@@ -86,7 +86,7 @@ async def submit_exam(
 ):
     service = SubmissionService(db)
     """Submit an exam attempt. Returns immediately; grading runs in background."""
-    if not current_user.tenant_id and current_user.role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
+    if not current_user.tenant_id and current_user.role not in (UserRole.ADMIN.value, UserRole.SUPERADMIN.value):
         return Response(success=False, error="No tenant assigned to your account", request=request, status_code=status.HTTP_403_FORBIDDEN)
 
     try:
@@ -144,7 +144,7 @@ async def start_submission(
 ):
     service = SubmissionService(db)
     """Create a Submission record (no attempt) when the student clicks Start Exam."""
-    if not current_user.tenant_id and current_user.role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
+    if not current_user.tenant_id and current_user.role not in (UserRole.ADMIN.value, UserRole.SUPERADMIN.value):
         return Response(success=False, error="No tenant assigned to your account", request=request, status_code=status.HTTP_403_FORBIDDEN)
 
     try:
