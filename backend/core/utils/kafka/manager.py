@@ -101,7 +101,7 @@ class KafkaManager:
 
 
 # Module-level singleton — initialised here; bound to the producer in lifespan.
-# Routes import this directly: `from core.kafka_manager import kafka_manager`
+# Routes import this directly: `from core.utils.kafka.manager import kafka_manager`
 kafka_manager = KafkaManager()
 
 __all__ = ["KafkaManager", "kafka_manager"]

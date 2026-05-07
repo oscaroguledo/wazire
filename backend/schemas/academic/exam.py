@@ -67,6 +67,22 @@ class ExamBase(ValidationMixin):
                 raise ValueError(f"Invalid status. Must be one of: {', '.join(valid)}")
         return v
 
+    @field_validator("start_time")
+    @classmethod
+    def validate_start_time_utc(cls, v):
+        """Reject naive (timezone-unaware) start_time values.
+
+        A naive datetime has no tzinfo and cannot be reliably compared to
+        UTC timestamps on the server.  Callers must supply a timezone-aware
+        value (e.g. 2026-05-07T10:00:00Z or 2026-05-07T10:00:00+00:00).
+        """
+        if v is not None and v.tzinfo is None:
+            raise ValueError(
+                "start_time must be a timezone-aware datetime (e.g. include 'Z' or '+00:00'). "
+                "Naive datetimes are rejected to prevent silent UTC misinterpretation."
+            )
+        return v
+
 
 class ExamCreate(ExamBase):
     pass
@@ -83,6 +99,17 @@ class ExamUpdate(BaseModel):
     status: Optional[str] = None
     start_time: Optional[datetime] = None
     max_attempts: Optional[int] = None
+
+    @field_validator("start_time")
+    @classmethod
+    def validate_start_time_utc(cls, v):
+        """Reject naive start_time on updates for the same reason as ExamCreate."""
+        if v is not None and v.tzinfo is None:
+            raise ValueError(
+                "start_time must be a timezone-aware datetime (e.g. include 'Z' or '+00:00'). "
+                "Naive datetimes are rejected to prevent silent UTC misinterpretation."
+            )
+        return v
 
 
 class ExamRead(ExamBase):

@@ -16,10 +16,10 @@ from core.middleware.auth import get_token_service, create_auth_dependency, requ
 from services.engine.answer_sheet_extractor import AnswerSheetParser
 from services.academic.submissions import SubmissionService
 from tasks.submission import emit_refresh_dashboard, emit_grade_attempt
-from models.academic.question import Question as QuestionModel
-from models.academic.exam import Exam as ExamModel
+from models.academic.question import Question
+from models.academic.exam import Exam
 from models.academic.course import Course
-from models.account.users import User as UserModel
+from models.account.users import User
 from models.account.users import UserRole
 from models.academic.question import QuestionType
 from models.academic.submission import SubmissionStatus
@@ -47,11 +47,11 @@ async def _enrich_submission(s, db) -> dict:
     else:
         data['status'] = SubmissionStatus.PENDING.value
     # Fetch student name
-    student = (await db.execute(select(UserModel).where(UserModel.id == s.student_id))).scalar_one_or_none()
+    student = (await db.execute(select(User).where(User.id == s.student_id))).scalar_one_or_none()
     if student:
         data['student_name'] = student.full_name()
     # Fetch exam and course info
-    exam = (await db.execute(select(ExamModel).where(ExamModel.id == s.exam_id))).scalar_one_or_none()
+    exam = (await db.execute(select(Exam).where(Exam.id == s.exam_id))).scalar_one_or_none()
     if exam:
         data['exam'] = exam.to_dict()
         if exam.course_id:
@@ -106,7 +106,7 @@ async def submit_exam(
     # Refresh dashboards in background after submission
     emit_refresh_dashboard(str(current_user.id))
     # Get exam to find lecturer for background refresh
-    exam_stmt = select(ExamModel).where(ExamModel.id == body.exam_id)
+    exam_stmt = select(Exam).where(Exam.id == body.exam_id)
     exam_result = await service.db.execute(exam_stmt)
     exam = exam_result.scalar_one_or_none()
     # Refresh lecturer dashboard in background if exam has a course with lecturer
@@ -379,7 +379,7 @@ async def scan_answer_sheet(
 
     # 1. Load exam questions
     questions = (await db.execute(
-        select(QuestionModel).where(QuestionModel.exams.any(ExamModel.id == body.exam_id))
+        select(Question).where(Question.exams.any(Exam.id == body.exam_id))
     )).scalars().all()
     if not questions:
         return Response(success=False, error="No questions found for this exam", request=request, status_code=status.HTTP_404_NOT_FOUND)
@@ -404,7 +404,7 @@ async def scan_answer_sheet(
         if not qid or answer_value is None:
             continue
         q = next((q for q in questions if q.number == str(number)), None)
-        if q and q.qtype == "multiple_choice":
+        if q and q.qtype == QuestionType.MULTIPLE_CHOICE:
             answers[qid] = {"option": str(answer_value).strip().lower()}
         elif q:
             answers[qid] = {"text": str(answer_value).strip()}
@@ -427,7 +427,7 @@ async def scan_answer_sheet(
     # Refresh dashboards in background after scan submission
     emit_refresh_dashboard(str(body.student_id))
     # Get exam to find lecturer for background refresh
-    exam_stmt = select(ExamModel).where(ExamModel.id == body.exam_id)
+    exam_stmt = select(Exam).where(Exam.id == body.exam_id)
     exam_result = await db.execute(exam_stmt)
     exam = exam_result.scalar_one_or_none()
     # Refresh lecturer dashboard in background if exam has a course with lecturer

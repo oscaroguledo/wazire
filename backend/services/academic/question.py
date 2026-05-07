@@ -225,7 +225,7 @@ class QuestionService:
             else:
                 # theory
                 question.options = None
-            # Normalize to enum value where possible
+            # Normalize stored qtype to enum where possible
             try:
                 question.qtype = QuestionType(qtype) if not isinstance(qtype, QuestionType) else qtype
             except Exception:

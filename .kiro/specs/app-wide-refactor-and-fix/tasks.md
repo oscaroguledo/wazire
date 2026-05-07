@@ -413,9 +413,9 @@
      PHASE 6 — EXAM DATA FLOW ARCHITECTURE
      ============================================================ -->
 
-- [-] 8. Implement the correct exam data flow: Redis preload, Kafka-buffered answer UPSERT, force-submit, and UTC timing
+- [x] 8. Implement the correct exam data flow: Redis preload, Kafka-buffered answer UPSERT, force-submit, and UTC timing
 
-  - [ ] 8.1 Add `PRELOAD_QUESTIONS` scheduler job to `backend/scheduler.py`
+  - [x] 8.1 Add `PRELOAD_QUESTIONS` scheduler job to `backend/scheduler.py`
     - Add a periodic job (every 1–5 minutes) that queries PostgreSQL for exams whose `start_time` is within the next ~15 minutes and whose `exam:{exam_id}:preloaded` Redis key is absent
     - Emit a `PRELOAD_QUESTIONS` Kafka event for each such exam: `{exam_id, duration_seconds, tenant_id}`
     - Use `KafkaManager.emit()` (not `producer_service` directly)
@@ -424,7 +424,7 @@
     - _Preservation: existing UPDATE_EXAM_STATUS and SEND_QUEUED_EMAILS jobs unchanged (3.19, 3.21)_
     - _Requirements: 2.18, 3.19_
 
-  - [ ] 8.2 Add `PRELOAD_QUESTIONS` worker handler in `backend/tasks/question.py`
+  - [x] 8.2 Add `PRELOAD_QUESTIONS` worker handler in `backend/tasks/question.py`
     - Implement `handle_preload_questions(payload)` handler
     - Fetch all questions for `exam_id` from PostgreSQL
     - Write to Redis: `SET exam:{exam_id}:questions = JSON(questions)` with TTL = `duration_seconds + 1800`
@@ -435,7 +435,7 @@
     - _Preservation: existing DETECT_ANSWER and PARSE_AND_CREATE handlers unchanged (3.20)_
     - _Requirements: 2.19, 2.20, 3.20_
 
-  - [ ] 8.3 Update question fetch endpoints to read from Redis first (with PostgreSQL fallback)
+  - [x] 8.3 Update question fetch endpoints to read from Redis first (with PostgreSQL fallback)
     - In `GET /api/v1/academic/questions/?exam_id=` and `GET /api/v1/academic/questions/exam/{exam_id}`: try `GET exam:{exam_id}:questions` from Redis first
     - On cache miss: fall back to PostgreSQL `QuestionService.list()`
     - _Bug_Condition: isBugCondition(input) where input.target = 'question.GET' AND architectureDeviationPresent('queries PostgreSQL directly')_
@@ -443,7 +443,7 @@
     - _Preservation: Redis unavailability falls back to PostgreSQL; students never blocked (3.18)_
     - _Requirements: 2.21, 3.18_
 
-  - [ ] 8.4 Change answer endpoint from PUT to PATCH and emit `UPSERT_STUDENT_ANSWER` Kafka event
+  - [x] 8.4 Change answer endpoint from PUT to PATCH and emit `UPSERT_STUDENT_ANSWER` Kafka event
     - Change route decorator from `@router.put` to `@router.patch` in `backend/routes/academic/answers.py`
     - Replace direct `StudentAnswerService.upsert()` DB call with `KafkaManager.emit("UPSERT_STUDENT_ANSWER", {...}, partition_key=tenant_id)`
     - Return HTTP 200 with optimistic acknowledgement immediately (no DB wait)
@@ -452,7 +452,7 @@
     - _Preservation: API response contract (HTTP 200, success/message/data shape) unchanged (3.27)_
     - _Requirements: 2.22, 2.29, 3.27_
 
-  - [ ] 8.5 Add `UPSERT_STUDENT_ANSWER` worker handler in `backend/tasks/question.py`
+  - [x] 8.5 Add `UPSERT_STUDENT_ANSWER` worker handler in `backend/tasks/question.py`
     - Implement `handle_upsert_student_answer(payload)` handler
     - Perform `INSERT INTO student_answers ... ON CONFLICT (student_id, exam_id, question_id) DO UPDATE SET answer=EXCLUDED.answer, updated_at=now()`
     - Commit Kafka offset only after successful DB write
@@ -462,7 +462,7 @@
     - _Preservation: existing question handlers unchanged (3.20)_
     - _Requirements: 2.23, 2.30, 3.20_
 
-  - [ ] 8.6 Add `FORCE_SUBMIT_EXAM` scheduler job to `backend/scheduler.py`
+  - [x] 8.6 Add `FORCE_SUBMIT_EXAM` scheduler job to `backend/scheduler.py`
     - Add a periodic job (every 1–5 minutes) that queries PostgreSQL for exams where `start_time + duration <= now()` and `status = 'in_progress'`
     - Emit a `FORCE_SUBMIT_EXAM` Kafka event for each such exam: `{exam_id, tenant_id}`
     - _Bug_Condition: isBugCondition(input) where input.target = 'scheduler.FORCE_SUBMIT_EXAM' AND defectPresent('no force-submit job')_
@@ -470,7 +470,7 @@
     - _Preservation: existing scheduler jobs unchanged (3.21)_
     - _Requirements: 2.24, 3.21_
 
-  - [ ] 8.7 Add `FORCE_SUBMIT_EXAM` worker handler in `backend/tasks/exam.py`
+  - [x] 8.7 Add `FORCE_SUBMIT_EXAM` worker handler in `backend/tasks/exam.py`
     - Implement `handle_force_submit_exam(payload)` handler
     - Query all `Enrollment` records for `exam_id`; filter out students with existing `Submission`
     - Auto-create `Submission(status='submitted', submitted_at=exam.end_time)` and `SubmissionAttempt` for each unsubmitted student
@@ -481,7 +481,7 @@
     - _Preservation: manual submission flow unchanged; FORCE_SUBMIT skips students with existing Submission (3.25)_
     - _Requirements: 2.25, 3.25_
 
-  - [ ] 8.8 Add UTC timestamp validation for `Exam.start_time`
+  - [x] 8.8 Add UTC timestamp validation for `Exam.start_time`
     - In exam create/update schema or service: validate that `start_time` is a UTC-aware datetime (`tzinfo` is not `None`)
     - Reject naive `start_time` values with a clear validation error
     - In `_update_exam_statuses()`: log an error and skip exams with naive `start_time` instead of silently patching
@@ -489,7 +489,7 @@
     - _Expected_Behavior: naive start_time rejected at schema layer; _update_exam_statuses skips and logs offending exams_
     - _Requirements: 2.34_
 
-  - [ ] 8.9 Compute and persist `Exam.end_time` on create/update
+  - [x] 8.9 Compute and persist `Exam.end_time` on create/update
     - In `ExamService.create()` and `ExamService.update()`: compute `end_time = start_time + timedelta(hours=float(duration))` and persist it
     - Include `end_time` in all exam API responses
     - _Requirements: 2.35, 2.51_

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import List, Optional
 import uuid
 
@@ -7,7 +8,7 @@ from fastapi import APIRouter, Depends, Request, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.database import get_db
+from core.database import get_db, get_redis_client
 from core.utils.response import Response
 from core.utils.logger import logger
 from core.utils.token import TokenService
@@ -74,9 +75,28 @@ async def list_questions(
     db: AsyncSession = Depends(get_db),
 ):
     service = QuestionService(db)
-    """List all questions."""
-    # Questions are global (not tenant-scoped); still enforce role
+    """List all questions, serving from Redis cache when an exam_id is provided."""
 
+    # Redis-first fetch for exam-scoped question lists
+    if exam_id is not None:
+        redis = get_redis_client()
+        if redis is not None:
+            try:
+                cached = await redis.get(f"exam:{exam_id}:questions")
+                if cached:
+                    questions_data = json.loads(cached)
+                    return Response(
+                        success=True,
+                        message="Questions retrieved",
+                        data=questions_data,
+                        request=request,
+                    )
+            except Exception:
+                logger.warning(
+                    "Redis fetch failed for exam %s — falling back to PostgreSQL", exam_id
+                )
+
+    # PostgreSQL fallback (also used when exam_id is None)
     items = await service.list(exam_id=exam_id)
 
     return Response(
@@ -94,7 +114,26 @@ async def get_exam_questions(
     current_user: UserRead = Depends(create_auth_dependency(get_token_service())),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get questions for exam."""
+    """Get questions for exam — served from Redis cache when available."""
+    # Try Redis first
+    redis = get_redis_client()
+    if redis is not None:
+        try:
+            cached = await redis.get(f"exam:{exam_id}:questions")
+            if cached:
+                questions_data = json.loads(cached)
+                return Response(
+                    success=True,
+                    message="Exam questions retrieved",
+                    data=questions_data,
+                    request=request,
+                )
+        except Exception:
+            logger.warning(
+                "Redis fetch failed for exam %s — falling back to PostgreSQL", exam_id
+            )
+
+    # PostgreSQL fallback
     service = QuestionService(db)
     questions = await service.list(exam_id=exam_id)
     return Response(

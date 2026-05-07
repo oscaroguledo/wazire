@@ -15,8 +15,8 @@ from sqlalchemy.orm import selectinload
 from models.academic.submission import Submission as SubmissionModel, SubmissionAttempt as SubmissionAttemptModel
 from models.academic.exam import Exam as ExamModel
 from models.academic.course import Course as CourseModel
-from models.academic.question import Question, Answer, QuestionExams, QuestionType
-from models.academic.student_answer import StudentAnswer as StudentAnswer
+from models.academic.question import Question as QuestionModel, Answer as AnswerModel, QuestionExams, QuestionType
+from models.academic.student_answer import StudentAnswer as StudentAnswerModel
 from services.academic.student_answer import StudentAnswerService
 from services.engine.similarity_grader import SimilarityGrader
 from core.database import get_db
@@ -338,11 +338,11 @@ class SubmissionService:
         """
         # Fetch all exam questions; outer-join Answer so theory questions without answers still load
         stmt = (
-            select(Question, Answer)
-            .outerjoin(Answer, Answer.id == Question.answer_id)
+            select(QuestionModel, AnswerModel)
+            .outerjoin(AnswerModel, AnswerModel.id == QuestionModel.answer_id)
             .where(
                 exists().where(
-                    QuestionExams.question_id == Question.id,
+                    QuestionExams.question_id == QuestionModel.id,
                     QuestionExams.exam_id == exam_id
                 )
             )

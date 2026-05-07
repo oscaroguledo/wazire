@@ -14,7 +14,7 @@ from core.middleware.rate_limit import limiter, rate_limit_exceeded_handler
 from core.middleware.error_handler import setup_error_handlers
 from slowapi.errors import RateLimitExceeded
 from core.utils.kafka import producer_service
-from core.kafka_manager import kafka_manager
+from core.utils.kafka.manager import kafka_manager
 
 settings = get_settings()
 
