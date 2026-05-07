@@ -170,11 +170,11 @@ async def enroll_student(
     tenant_id = None if current_user.role in (UserRole.ADMIN, UserRole.SUPERADMIN) else current_user.tenant_id
     try:
         enrollment = await service.create(enrollment_data, current_user, tenant_id=tenant_id)
-        emit_refresh_dashboard(str(enrollment_data.student_id))
+        await emit_refresh_dashboard(str(enrollment_data.student_id))
         course_result = await db.execute(select(Course).where(Course.id == enrollment_data.course_id))
         course = course_result.scalar_one_or_none()
         if course and course.lecturer_id:
-            emit_refresh_dashboard(str(course.lecturer_id))
+            await emit_refresh_dashboard(str(course.lecturer_id))
         return Response(success=True, data=enrollment.to_dict(), request=request, status_code=status.HTTP_201_CREATED)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
@@ -221,9 +221,9 @@ async def remove_enrollment(
         enrollment = enrollment_result.scalar_one_or_none()
         await service.remove(enrollment_id, current_user, tenant_id=tenant_id)
         if enrollment:
-            emit_refresh_dashboard(str(enrollment.student_id))
+            await emit_refresh_dashboard(str(enrollment.student_id))
             if enrollment.course and enrollment.course.lecturer_id:
-                emit_refresh_dashboard(str(enrollment.course.lecturer_id))
+                await emit_refresh_dashboard(str(enrollment.course.lecturer_id))
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:

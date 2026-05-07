@@ -49,9 +49,9 @@ async def create_course(
 
     course = await service.create(course_data, tenant_id=tenant_id)
     
-    # Refresh lecturer dashboard in background
+    # Refresh lecturer dashboard — await so publish failures are observable
     if course.lecturer_id:
-        emit_refresh_dashboard(str(course.lecturer_id))
+        await emit_refresh_dashboard(str(course.lecturer_id))
     
     return Response(success=True, message="Course created", data=course.to_dict(), request=request, status_code=status.HTTP_201_CREATED)
 
@@ -129,11 +129,11 @@ async def update_course(
     
     updated = await service.update(course_model, course_in)
     
-    # Refresh dashboards in background
+    # Refresh dashboards — await so publish failures are observable
     if old_lecturer_id and old_lecturer_id != updated.lecturer_id:
-        emit_refresh_dashboard(str(old_lecturer_id))
+        await emit_refresh_dashboard(str(old_lecturer_id))
     if updated.lecturer_id:
-        emit_refresh_dashboard(str(updated.lecturer_id))
+        await emit_refresh_dashboard(str(updated.lecturer_id))
     
     return Response(success=True, message="Course updated", data=updated.to_dict(), request=request)
 
@@ -156,8 +156,8 @@ async def delete_course(
     
     await service.delete(course_model)
     
-    # Refresh lecturer dashboard in background
+    # Refresh lecturer dashboard — await so publish failures are observable
     if lecturer_id:
-        emit_refresh_dashboard(str(lecturer_id))
+        await emit_refresh_dashboard(str(lecturer_id))
     
     return Response(success=True, message="Course deleted", request=request, status_code=status.HTTP_204_NO_CONTENT)

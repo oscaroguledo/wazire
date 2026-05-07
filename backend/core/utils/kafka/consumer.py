@@ -6,6 +6,7 @@ import importlib
 import json
 import os
 import ssl
+import time
 from typing import Any, Callable, Coroutine, Dict, List, Optional
 
 from aiokafka import AIOKafkaConsumer, TopicPartition
@@ -20,6 +21,13 @@ Handler = Callable[[Dict[str, Any]], Coroutine[Any, Any, None]]
 # Maximum consecutive broker errors before backing off
 _MAX_ERRORS = 5
 _BACKOFF_SECONDS = 10
+
+# Dead-letter topic name
+_DEAD_LETTER_TOPIC = "wazire-dead-letter"
+
+# Retry policy: 3 attempts with exponential backoff (1s, 2s, 4s)
+_MAX_RETRIES = 3
+_RETRY_BACKOFF_SECONDS = [1, 2, 4]
 
 # Task modules that export a HANDLERS dict — add new modules here to register
 # their events without touching consumer.py.
@@ -161,18 +169,71 @@ class KafkaConsumerService:
             await self._commit(msg)
             return
 
-        try:
-            await handler(data)
-        except Exception:
-            # Dead-letter: log full context so nothing is silently lost
-            logger.exception(
-                "Handler failed for event '%s' (offset=%d partition=%d) — data=%s",
-                event, msg.offset, msg.partition, data,
-            )
-            # Still commit so the consumer doesn't get stuck on a poison pill.
-            # For critical events, implement a dead-letter topic here.
+        # Retry loop: up to _MAX_RETRIES attempts with exponential backoff.
+        # Offset is committed only after a successful handler run or after the
+        # message is forwarded to the dead-letter topic.
+        last_exc: Optional[Exception] = None
+        for attempt in range(_MAX_RETRIES):
+            try:
+                await handler(data)
+                # Success — commit offset and return
+                await self._commit(msg)
+                return
+            except Exception as exc:
+                last_exc = exc
+                backoff = _RETRY_BACKOFF_SECONDS[attempt] if attempt < len(_RETRY_BACKOFF_SECONDS) else _RETRY_BACKOFF_SECONDS[-1]
+                logger.warning(
+                    "Handler failed for event '%s' (offset=%d partition=%d attempt=%d/%d) — "
+                    "retrying in %ds: %s",
+                    event, msg.offset, msg.partition, attempt + 1, _MAX_RETRIES, backoff, exc,
+                )
+                if attempt < _MAX_RETRIES - 1:
+                    await asyncio.sleep(backoff)
 
+        # All retries exhausted — forward to dead-letter topic and commit offset
+        # so the consumer is not stuck on a poison pill.
+        logger.error(
+            "Handler exhausted %d retries for event '%s' (offset=%d partition=%d) — "
+            "forwarding to dead-letter topic '%s'. data=%s",
+            _MAX_RETRIES, event, msg.offset, msg.partition, _DEAD_LETTER_TOPIC, data,
+        )
+        await self._forward_to_dead_letter(msg, event, data, last_exc)
         await self._commit(msg)
+
+    async def _forward_to_dead_letter(
+        self,
+        msg: Any,
+        event: str,
+        data: Dict[str, Any],
+        exc: Optional[Exception],
+    ) -> None:
+        """Forward a failed message to the dead-letter topic with full metadata."""
+        from core.utils.kafka import producer_service
+
+        dead_letter_payload = {
+            "original_topic": msg.topic,
+            "original_partition": msg.partition,
+            "original_offset": msg.offset,
+            "event": event,
+            "data": data,
+            "error_message": str(exc) if exc else "unknown",
+            "timestamp": time.time(),
+        }
+        try:
+            await producer_service.publish_safe(
+                _DEAD_LETTER_TOPIC, "DEAD_LETTER", dead_letter_payload
+            )
+            logger.info(
+                "Forwarded event '%s' (offset=%d) to dead-letter topic '%s'",
+                event, msg.offset, _DEAD_LETTER_TOPIC,
+            )
+        except Exception:
+            # Dead-letter publish itself failed — log everything so ops can replay manually
+            logger.exception(
+                "CRITICAL: failed to forward event '%s' (offset=%d) to dead-letter topic. "
+                "Original payload: %s",
+                event, msg.offset, dead_letter_payload,
+            )
 
     async def _commit(self, msg: Any) -> None:
         try:

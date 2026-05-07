@@ -499,9 +499,9 @@
      PHASE 7 — PRODUCTION RESILIENCE
      ============================================================ -->
 
-- [ ] 9. Harden production resilience: safe Kafka publishes, dead-letter forwarding, idempotency, and offset commit discipline
+- [x] 9. Harden production resilience: safe Kafka publishes, dead-letter forwarding, idempotency, and offset commit discipline
 
-  - [ ] 9.1 Replace `asyncio.ensure_future` with `await publish_safe` in task handlers
+  - [x] 9.1 Replace `asyncio.ensure_future` with `await publish_safe` in task handlers
     - In `backend/tasks/submission.py`: replace all `asyncio.ensure_future(producer_service.publish_safe(...))` calls with `await kafka_manager.emit(...)` (or `await producer_service.publish_safe(...)`)
     - Ensure failures are logged with enough context for manual replay
     - _Bug_Condition: isBugCondition(input) where input.target = 'emit_grade_attempt/emit_refresh_dashboard' AND defectPresent('asyncio.ensure_future silently drops events')_
@@ -509,7 +509,7 @@
     - _Preservation: grading and dashboard refresh events continue to be emitted (3.32)_
     - _Requirements: 2.32, 3.32_
 
-  - [ ] 9.2 Add dead-letter topic forwarding on exhausted retries
+  - [x] 9.2 Add dead-letter topic forwarding on exhausted retries
     - In `KafkaConsumerService._handle_message()`: after 3 retry attempts (1s, 2s, 4s backoff), forward the message to `wazire-dead-letter` topic with metadata (`original_topic`, `original_offset`, `error_message`, `timestamp`)
     - Commit the offset after forwarding to dead-letter so the consumer is not stuck
     - _Bug_Condition: isBugCondition(input) where input.target = 'KafkaConsumerService._handle_message' AND defectPresent('offset committed on first failure, no dead-letter')_
@@ -517,7 +517,7 @@
     - _Preservation: manual-commit, dead-letter-logging, reconnect-on-error behaviour preserved (3.23)_
     - _Requirements: 2.31, 3.23_
 
-  - [ ] 9.3 Add idempotency check (`attempt.graded_at`) before re-grading
+  - [x] 9.3 Add idempotency check (`attempt.graded_at`) before re-grading
     - At the start of the `GRADE_SUBMISSION_ATTEMPT` handler: check if `attempt.graded_at IS NOT NULL`
     - If already graded: skip re-grading, commit offset, and return
     - _Bug_Condition: isBugCondition(input) where input.target = 'GRADE_SUBMISSION_ATTEMPT handler' AND defectPresent('no idempotency check, score overwritten on redelivery')_
@@ -525,7 +525,7 @@
     - _Preservation: grading logic unchanged for non-idempotent (first-time) events (3.32)_
     - _Requirements: 2.33_
 
-  - [ ] 9.4 Commit Kafka offset only after successful DB write
+  - [x] 9.4 Commit Kafka offset only after successful DB write
     - In `UPSERT_STUDENT_ANSWER` and `GRADE_SUBMISSION_ATTEMPT` handlers: do not commit offset until all DB writes have been committed successfully
     - If DB write raises an exception: do not commit offset; allow message redelivery on worker restart
     - _Bug_Condition: isBugCondition(input) where input.target = 'GRADE_SUBMISSION_ATTEMPT offset commit' AND defectPresent('offset committed before DB write completes')_

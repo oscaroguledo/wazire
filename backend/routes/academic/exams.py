@@ -51,13 +51,13 @@ async def create_exam(
     # course_id can be None for standalone exams
     exam = await service.create(exam_data, tenant_id=tenant_id)
 
-    # Refresh lecturer dashboard in background
+    # Refresh lecturer dashboard — await so publish failures are observable
     if exam.course_id:
         course_stmt = select(Course).where(Course.id == exam.course_id)
         course_result = await service.db.execute(course_stmt)
         course = course_result.scalar_one_or_none()
         if course and course.lecturer_id:
-            emit_refresh_dashboard(str(course.lecturer_id))
+            await emit_refresh_dashboard(str(course.lecturer_id))
 
     return Response(success=True, message="Exam created", data=exam.to_dict(), request=request, status_code=status.HTTP_201_CREATED)
 
@@ -209,19 +209,19 @@ async def update_exam(
 
     updated = await service.update(exam, exam_in)
 
-    # Refresh lecturer dashboards in background
+    # Refresh lecturer dashboards — await so publish failures are observable
     if old_course_id and old_course_id != updated.course_id:
         old_course_stmt = select(Course).where(Course.id == old_course_id)
         old_course_result = await service.db.execute(old_course_stmt)
         old_course = old_course_result.scalar_one_or_none()
         if old_course and old_course.lecturer_id:
-            emit_refresh_dashboard(str(old_course.lecturer_id))
+            await emit_refresh_dashboard(str(old_course.lecturer_id))
     if updated.course_id:
         new_course_stmt = select(Course).where(Course.id == updated.course_id)
         new_course_result = await service.db.execute(new_course_stmt)
         new_course = new_course_result.scalar_one_or_none()
         if new_course and new_course.lecturer_id:
-            emit_refresh_dashboard(str(new_course.lecturer_id))
+            await emit_refresh_dashboard(str(new_course.lecturer_id))
 
     return Response(success=True, message="Exam updated", data=updated.to_dict(), request=request)
 
@@ -243,12 +243,12 @@ async def delete_exam(
     
     await service.delete(exam)
     
-    # Refresh lecturer dashboard in background
+    # Refresh lecturer dashboard — await so publish failures are observable
     if course_id:
         course_stmt = select(Course).where(Course.id == course_id)
         course_result = await service.db.execute(course_stmt)
         course = course_result.scalar_one_or_none()
         if course and course.lecturer_id:
-            emit_refresh_dashboard(str(course.lecturer_id))
+            await emit_refresh_dashboard(str(course.lecturer_id))
     
     return Response(success=True, message="Exam deleted", request=request, status_code=status.HTTP_204_NO_CONTENT)

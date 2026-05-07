@@ -468,9 +468,9 @@ class SubmissionService:
             except Exception as e:
                 print(f"[grading] Failed to persist graded answers in bulk: {e}")
 
-            # Refresh dashboards after grading
+            # Refresh dashboards after grading — await so failures are observable
             if submission:
-                emit_refresh_dashboard(str(submission.student_id))
+                await emit_refresh_dashboard(str(submission.student_id))
                 # Get exam to find lecturer for dashboard refresh
                 exam_result = await db.execute(select(ExamModel).where(ExamModel.id == UUID(exam_id)))
                 exam = exam_result.scalar_one_or_none()
@@ -478,7 +478,7 @@ class SubmissionService:
                     course_result = await db.execute(select(CourseModel).where(CourseModel.id == exam.course_id))
                     course = course_result.scalar_one_or_none()
                     if course and course.lecturer_id:
-                        emit_refresh_dashboard(str(course.lecturer_id))
+                        await emit_refresh_dashboard(str(course.lecturer_id))
 
     async def list_for_lecturer(
         self,

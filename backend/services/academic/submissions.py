@@ -407,78 +407,95 @@ class SubmissionService:
     # ------------------------------------------------------------------
 
     async def grade_attempt_background(self, attempt_id: str, exam_id: str) -> None:
-        """Grade an attempt in the background (used by background worker / Kafka)."""
+        """Grade an attempt in the background (used by background worker / Kafka).
+
+        Exceptions are propagated to the caller so the Kafka consumer does NOT
+        commit the offset on failure — allowing message redelivery on restart.
+        The idempotency check in the Kafka handler prevents double-grading on
+        redelivery.
+        """
         async for db in get_db():
             attempt = (await db.execute(
                 select(SubmissionAttemptModel).where(
-                    SubmissionAttemptModel.id == UUID(attempt_id)
+                    SubmissionAttemptModel.id == int(attempt_id)
                 )
             )).scalar_one_or_none()
 
             if not attempt:
-                print(f"[grading] Attempt {attempt_id} not found")
+                logger.warning("[grading] Attempt %s not found", attempt_id)
                 return
 
+            # Mark grading as started (for observability / timing)
+            attempt.grading_started_at = datetime.now(timezone.utc)
+            db.add(attempt)
+            await db.flush()
+
             service = SubmissionService(db)
-            # If attempt.answers are empty (we store answers in StudentAnswer rows),
-            # fetch student answers for grading
             submission = (await db.execute(
                 select(SubmissionModel).where(SubmissionModel.id == attempt.submission_id)
             )).scalar_one_or_none()
 
             if submission is None:
-                print(f"[grading] Submission for attempt {attempt_id} not found")
+                logger.warning("[grading] Submission for attempt %s not found", attempt_id)
                 return
 
+            # Update submission status to grading_in_progress
+            from models.academic.submission import SubmissionStatus
+            submission.status = SubmissionStatus.GRADING_IN_PROGRESS
+            db.add(submission)
+            await db.flush()
+
             student_id = submission.student_id
-            # Use StudentAnswerService to gather answers
             sa_service = StudentAnswerService(db)
             answers_map = await sa_service.answers_map_for_student_exam(student_id, UUID(exam_id))
 
             score, graded_answers = await service._grade_answers(UUID(exam_id), answers_map)
 
+            # Persist score on the attempt — score being set is the idempotency sentinel
             attempt.score = score
-            attempt.graded_at = datetime.now(timezone.utc)
             db.add(attempt)
 
+            # Update submission with final score and status
             submission = (await db.execute(
                 select(SubmissionModel).where(SubmissionModel.id == attempt.submission_id)
             )).scalar_one_or_none()
             if submission:
                 submission.latest_score = score
                 submission.graded_at = datetime.now(timezone.utc)
+                submission.status = SubmissionStatus.GRADED
                 db.add(submission)
 
+            # Commit all grading writes atomically — if this raises, the Kafka
+            # offset will NOT be committed and the message will be redelivered.
             await db.commit()
-            print(f"[grading] Graded attempt {attempt_id} with score {score}")
-            # Persist per-question graded results in bulk to avoid N x single-row writes.
-            # Prepare mappings for bulk update: merge a `graded` key into existing `answer` JSON.
+            logger.info("[grading] Graded attempt %s with score %s", attempt_id, score)
+
+            # Persist per-question graded results in bulk (best-effort — non-fatal)
             try:
                 from core.db_bulk import bulk_update_student_answers
-                mappings = []
-                for qid, entry in graded_answers.items():
-                    mappings.append({
+                mappings = [
+                    {
                         "student_id": str(student_id),
                         "exam_id": str(UUID(exam_id)),
                         "question_id": qid,
                         "graded": entry,
-                    })
-                # perform bulk update in batches
+                    }
+                    for qid, entry in graded_answers.items()
+                ]
                 await bulk_update_student_answers(db, mappings, batch_size=500)
             except Exception as e:
-                print(f"[grading] Failed to persist graded answers in bulk: {e}")
+                logger.warning("[grading] Failed to persist graded answers in bulk: %s", e)
 
-            # Refresh dashboards after grading
+            # Refresh dashboards after grading — await so failures are observable
             if submission:
-                emit_refresh_dashboard(str(submission.student_id))
-                # Get exam to find lecturer for dashboard refresh
+                await emit_refresh_dashboard(str(submission.student_id))
                 exam_result = await db.execute(select(ExamModel).where(ExamModel.id == UUID(exam_id)))
                 exam = exam_result.scalar_one_or_none()
                 if exam and exam.course_id:
                     course_result = await db.execute(select(CourseModel).where(CourseModel.id == exam.course_id))
                     course = course_result.scalar_one_or_none()
                     if course and course.lecturer_id:
-                        emit_refresh_dashboard(str(course.lecturer_id))
+                        await emit_refresh_dashboard(str(course.lecturer_id))
 
     async def list_for_lecturer(
         self,

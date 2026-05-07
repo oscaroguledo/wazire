@@ -100,22 +100,22 @@ async def submit_exam(
     except ValueError as e:
         return Response(success=False, error=str(e), request=request, status_code=status.HTTP_400_BAD_REQUEST)
 
-    # Grade in background via Kafka worker
-    emit_grade_attempt(str(attempt.id), str(body.exam_id))
+    # Grade in background via Kafka worker — await so failures are observable
+    await emit_grade_attempt(str(attempt.id), str(body.exam_id))
 
-    # Refresh dashboards in background after submission
-    emit_refresh_dashboard(str(current_user.id))
+    # Refresh dashboards after submission — await so failures are observable
+    await emit_refresh_dashboard(str(current_user.id))
     # Get exam to find lecturer for background refresh
     exam_stmt = select(Exam).where(Exam.id == body.exam_id)
     exam_result = await service.db.execute(exam_stmt)
     exam = exam_result.scalar_one_or_none()
-    # Refresh lecturer dashboard in background if exam has a course with lecturer
+    # Refresh lecturer dashboard if exam has a course with lecturer
     if exam and exam.course_id:
         course_stmt = select(Course).where(Course.id == exam.course_id)
         course_result = await service.db.execute(course_stmt)
         course = course_result.scalar_one_or_none()
         if course and course.lecturer_id:
-            emit_refresh_dashboard(str(course.lecturer_id))
+            await emit_refresh_dashboard(str(course.lecturer_id))
 
     print(f"[log] Student {current_user.id} submitted exam {body.exam_id}, attempt #{attempt.attempt_number}")
 
@@ -421,22 +421,22 @@ async def scan_answer_sheet(
     except ValueError as e:
         return Response(success=False, error=str(e), request=request, status_code=status.HTTP_400_BAD_REQUEST)
 
-    # Grade scanned attempt in background via Kafka worker
-    emit_grade_attempt(str(attempt.id), str(body.exam_id))
+    # Grade scanned attempt in background via Kafka worker — await so failures are observable
+    await emit_grade_attempt(str(attempt.id), str(body.exam_id))
 
-    # Refresh dashboards in background after scan submission
-    emit_refresh_dashboard(str(body.student_id))
+    # Refresh dashboards after scan submission — await so failures are observable
+    await emit_refresh_dashboard(str(body.student_id))
     # Get exam to find lecturer for background refresh
     exam_stmt = select(Exam).where(Exam.id == body.exam_id)
     exam_result = await db.execute(exam_stmt)
     exam = exam_result.scalar_one_or_none()
-    # Refresh lecturer dashboard in background if exam has a course with lecturer
+    # Refresh lecturer dashboard if exam has a course with lecturer
     if exam and exam.course_id:
         course_stmt = select(Course).where(Course.id == exam.course_id)
         course_result = await db.execute(course_stmt)
         course = course_result.scalar_one_or_none()
         if course and course.lecturer_id:
-            emit_refresh_dashboard(str(course.lecturer_id))
+            await emit_refresh_dashboard(str(course.lecturer_id))
 
     return Response(
         success=True,

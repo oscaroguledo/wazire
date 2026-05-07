@@ -3,22 +3,30 @@ from __future__ import annotations
 
 import json
 from typing import Any, Dict, Optional
-from uuid import UUID
+from uuid import UUID  # This line is removed as it is duplicated
 
 from core.utils.logger import logger
 from schemas.academic.question import QuestionCreate
+from services.academic.student_answer import StudentAnswerService
+from models.academic.student_answer import StudentAnswer
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from datetime import datetime, timezone
 from models.academic.question import Industry, QuestionType
+from services.engine.answer_grader import QuestionAnswerer
+from sqlalchemy import select
+from models.academic.question import Question, Answer
+from services.engine.exam_extractor import ExamParser
+from services.academic.questions import QuestionService
+import asyncio
+from .utils import with_db
+from core.database import get_redis_client
 
 TOPIC = "tenant-tasks"
 
 
 async def detect_answer_background(db, question_id: str) -> None:
     """Run AI answer detection for an MCQ question using an existing DB session."""
-    from services.engine.answer_grader import QuestionAnswerer
-    from sqlalchemy import select
-    from models.academic.question import Question as QuestionModel, Answer as AnswerModel
-
-    q = (await db.execute(select(QuestionModel).where(QuestionModel.id == UUID(question_id)))).scalar_one_or_none()
+    q = (await db.execute(select(Question).where(Question.id == UUID(question_id)))).scalar_one_or_none()
     if not q or q.qtype != QuestionType.MULTIPLE_CHOICE or q.answer_id is not None:
         logger.info("[question] Answer detection skipped for question %s", question_id)
         return
@@ -44,12 +52,12 @@ async def detect_answer_background(db, question_id: str) -> None:
         logger.info("[question] Invalid answer '%s' for question %s", graded_label, question_id)
         return
 
-    existing = (await db.execute(select(AnswerModel).where(AnswerModel.value == graded_label))).scalar_one_or_none()
+    existing = (await db.execute(select(Answer).where(Answer.value == graded_label))).scalar_one_or_none()
 
     if existing:
         q.answer_id = existing.id
     else:
-        new_ans = AnswerModel(value=graded_label)
+        new_ans = Answer(value=graded_label)
         db.add(new_ans)
         await db.flush()
         q.answer_id = new_ans.id
@@ -61,10 +69,6 @@ async def detect_answer_background(db, question_id: str) -> None:
 
 async def parse_and_create_background(db, pages: list, industry: str, exam_id: str, mark_per_question: Optional[float], tenant_id: Optional[UUID]) -> None:
     """Parse exam pages and bulk-create questions using an existing DB session."""
-    from services.engine.exam_extractor import ExamParser
-    from services.academic.questions import QuestionService
-    from uuid import UUID
-
     parser = ExamParser()
     raw_questions = parser.parse(
         pages=pages,
@@ -104,9 +108,6 @@ async def parse_and_create_background(db, pages: list, industry: str, exam_id: s
 
 def emit_detect_answer(question_id: str) -> None:
     """Schedule answer detection in-process using a DB session (no Kafka)."""
-    import asyncio
-    from .utils import with_db
-
     asyncio.ensure_future(
         with_db(detect_answer_background, question_id)
     )
@@ -114,9 +115,6 @@ def emit_detect_answer(question_id: str) -> None:
 
 def emit_parse_and_create(pages: list, industry: str, exam_id: str, mark: float, tenant_id: Optional[UUID]) -> None:
     """Schedule parse-and-create in-process using a DB session (no Kafka)."""
-    import asyncio
-    from .utils import with_db
-
     asyncio.ensure_future(
         with_db(parse_and_create_background, pages, industry, exam_id, mark, tenant_id)
     )
@@ -132,7 +130,6 @@ async def handle_detect_answer(data: Dict[str, Any]) -> None:
         logger.warning("DETECT_ANSWER: missing question_id — data=%s", data)
         return
 
-    from .utils import with_db
     try:
         await with_db(detect_answer_background, question_id)
         logger.info("Answer detected for question %s", question_id)
@@ -162,7 +159,6 @@ async def handle_parse_and_create(data: Dict[str, Any]) -> None:
         logger.warning("PARSE_AND_CREATE: missing pages or exam_id — data=%s", data)
         return
 
-    from .utils import with_db
     try:
         await with_db(parse_and_create_background, pages, industry, exam_id, mark, tenant_id)
         logger.info("Questions parsed and created for exam %s", exam_id)
@@ -188,15 +184,12 @@ async def handle_preload_questions(data: Dict[str, Any]) -> None:
 
     ttl = int(duration_seconds) + 1800  # exam duration + 30-minute buffer
 
-    from core.database import get_redis_client
     redis = get_redis_client()
     if redis is None:
         logger.warning("PRELOAD_QUESTIONS: Redis not configured — skipping preload for exam %s", exam_id)
         return
 
-    from .utils import with_db
-    from services.academic.questions import QuestionService
-
+    
     async def _fetch_and_cache(db) -> None:
         service = QuestionService(db)
         questions = await service.list(exam_id=UUID(exam_id))
@@ -248,15 +241,10 @@ async def handle_upsert_student_answer(data: Dict[str, Any]) -> None:
         logger.error("UPSERT_STUDENT_ANSWER: invalid UUID in payload — %s", exc)
         return
 
-    from .utils import with_db
-    from services.academic.student_answer import StudentAnswerService
-
+    
     async def _upsert(db) -> None:
         service = StudentAnswerService(db)
         # Override tenant_id on the service call if provided
-        from sqlalchemy.dialects.postgresql import insert as pg_insert
-        from models.academic.student_answer import StudentAnswer
-        from datetime import datetime, timezone
 
         stmt = (
             pg_insert(StudentAnswer)

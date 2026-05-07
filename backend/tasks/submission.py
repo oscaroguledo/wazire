@@ -28,6 +28,11 @@ async def handle_grade_submission_attempt(data: Dict[str, Any]) -> None:
     """Grade a submission attempt.
 
     Expected data keys: attempt_id, exam_id
+
+    Idempotency: if the attempt already has a score set (i.e. it was graded in a
+    previous delivery), the handler skips re-grading and returns immediately.
+    This prevents score overwrites when Kafka redelivers a message after a crash
+    between the DB commit and the offset commit.
     """
     attempt_id = data.get("attempt_id")
     exam_id = data.get("exam_id")
@@ -37,6 +42,36 @@ async def handle_grade_submission_attempt(data: Dict[str, Any]) -> None:
         return
 
     from .utils import with_db
+
+    async def _check_idempotency(db) -> bool:
+        """Return True if the attempt is already graded (score is set)."""
+        from models.academic.submission import SubmissionAttempt
+        from sqlalchemy import select
+        from uuid import UUID
+
+        attempt = (await db.execute(
+            select(SubmissionAttempt).where(SubmissionAttempt.id == int(attempt_id))
+        )).scalar_one_or_none()
+        if attempt is None:
+            return False  # Not found — let the main handler log the warning
+        return attempt.score is not None
+
+    try:
+        already_graded = await with_db(_check_idempotency)
+    except Exception:
+        logger.exception(
+            "GRADE_SUBMISSION_ATTEMPT: idempotency check failed (attempt=%s) — proceeding with grading",
+            attempt_id,
+        )
+        already_graded = False
+
+    if already_graded:
+        logger.info(
+            "GRADE_SUBMISSION_ATTEMPT: attempt %s already graded — skipping redelivery (idempotent)",
+            attempt_id,
+        )
+        # Return without raising so the consumer commits the offset cleanly
+        return
 
     async def _run(db):
         from services.academic.submissions import SubmissionService
@@ -96,20 +131,36 @@ async def handle_refresh_dashboard(data: Dict[str, Any]) -> None:
         raise
 
 
-def emit_refresh_dashboard(user_id: str) -> None:
-    """Convenience wrapper — fire-and-forget dashboard refresh event."""
-    import asyncio
-    asyncio.ensure_future(
-        producer_service.publish_safe(TOPIC, "REFRESH_DASHBOARD", {"user_id": user_id})
-    )
+async def emit_refresh_dashboard(user_id: str) -> None:
+    """Emit a REFRESH_DASHBOARD Kafka event and await the publish.
+
+    Awaiting ensures failures are observable and logged rather than silently
+    dropped by a fire-and-forget ``asyncio.ensure_future`` call.
+    """
+    success = await producer_service.publish_safe(TOPIC, "REFRESH_DASHBOARD", {"user_id": user_id})
+    if not success:
+        logger.error(
+            "emit_refresh_dashboard: failed to publish REFRESH_DASHBOARD for user=%s — "
+            "dashboard may be stale; replay manually if needed",
+            user_id,
+        )
 
 
-def emit_grade_attempt(attempt_id: str, exam_id: str) -> None:
-    """Convenience wrapper — fire-and-forget grading event."""
-    import asyncio
-    asyncio.ensure_future(
-        producer_service.publish_safe(TOPIC, "GRADE_SUBMISSION_ATTEMPT", {"attempt_id": attempt_id, "exam_id": exam_id})
+async def emit_grade_attempt(attempt_id: str, exam_id: str) -> None:
+    """Emit a GRADE_SUBMISSION_ATTEMPT Kafka event and await the publish.
+
+    Awaiting ensures failures are observable and logged rather than silently
+    dropped by a fire-and-forget ``asyncio.ensure_future`` call.
+    """
+    success = await producer_service.publish_safe(
+        TOPIC, "GRADE_SUBMISSION_ATTEMPT", {"attempt_id": attempt_id, "exam_id": exam_id}
     )
+    if not success:
+        logger.error(
+            "emit_grade_attempt: failed to publish GRADE_SUBMISSION_ATTEMPT "
+            "(attempt=%s exam=%s) — grading job may be lost; replay manually if needed",
+            attempt_id, exam_id,
+        )
 
 
 # ---------------------------------------------------------------------------
